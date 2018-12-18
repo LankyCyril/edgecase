@@ -2,6 +2,7 @@
 from argparse import ArgumentParser
 from itertools import product
 from regex import compile, IGNORECASE
+from random import sample
 
 ARG_RULES = {
     ("input-fastq",): {
@@ -11,9 +12,9 @@ ARG_RULES = {
         "help": "target kmer sequence (default TTAGGG)",
         "default": "TTAGGG", "metavar": "M"
     },
-    ("--background-kmers",): {
-        "help": "number of random kmers for significance threshold estimation (default 10)",
-        "default": 10, "type": int, "metavar": "B"
+    ("-b", "--n-background-kmers"): {
+        "help": "number of random kmers for significance threshold estimation (default 9)",
+        "default": 9, "type": int, "metavar": "B"
     },
     ("--density-kde-plot",): {
         "help": "if filename provided, will plot densities of checked kmers",
@@ -28,6 +29,7 @@ ARG_RULES = {
         "default": 1, "type": int, "metavar": "J"
     }
 }
+
 
 class KmerIdentity:
     """Hold all possible kmers of length k and their groupings by circular shift"""
@@ -54,10 +56,33 @@ class KmerIdentity:
         anchor_kmer = self._many2one[kmer]
         shifted_kmers = self._one2many[anchor_kmer]
         return compile(r'|'.join(shifted_kmers), flags=flags)
+ 
+    def anchors(self, exclude=()):
+        """Return all anchor kmers except for the ones matching `exclude`"""
+        anchor_kmers = set(self._one2many.keys())
+        excluded_kmers = {self._many2one[kmer] for kmer in exclude}
+        return anchor_kmers - excluded_kmers
+
+
+def choose_background_kmers(kmer_identity, kmer, n_background_kmers):
+    """Choose background kmers at random, throw sensible errors"""
+    population = kmer_identity.anchors(exclude={kmer})
+    if n_background_kmers > len(population):
+        raise ValueError(
+            "Requested number of background kmers " +
+            "bigger than number of possible kmers"
+        )
+    else:
+        return sample(population, n_background_kmers)
+
 
 def main(args):
     kmer_identity = KmerIdentity(k=len(args.kmer))
+    background_kmers = choose_background_kmers(
+        kmer_identity, args.kmer, args.n_background_kmers
+    )
     return 0
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()
