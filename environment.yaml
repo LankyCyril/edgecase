@@ -80,4 +80,5 @@ dependencies:
   - numpy-base=1.15.0=py36h3dfced4_0
   - scipy=1.1.0=py36hc49cb51_0
   - pip:
+    - regex==2018.11.22
     - venn==0.1.3
