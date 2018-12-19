@@ -148,7 +148,19 @@ def pattern_scanner(read_iterator, patterns, overlapped=True, window_size=120, n
         )
 
 
-def to_narrow_dataframe(scanner, total=None):
+def fastq_scanner(fastq, patterns, overlapped=True, window_size=120, num_reads=None, jobs=1):
+    """Thin wrapper over pattern_scanner() providing read_iterator from fastq file"""
+    with FastxFile(args.fastq) as read_iterator:
+        # only take the first num_reads entries (`None` takes all):
+        capped_read_iterator = islice(read_iterator, args.num_reads)
+        # parallelize scan (all patterns at once):
+        yield from pattern_scanner(
+            capped_read_iterator, patterns, jobs=args.jobs,
+            window_size=args.window_size, num_reads=args.num_reads
+        )
+
+
+def to_narrow_dataframe(scanner):
     """Convert multilevel data reads->kmers->densities to narrow-form DataFrame"""
     sections = []
     for read_name, kmers, density_array in scanner:
@@ -163,6 +175,13 @@ def to_narrow_dataframe(scanner, total=None):
     matrix = concat(sections)[["kmer", "read_name", "position", "density"]]
     print("done", file=stderr, flush=True)
     return matrix
+
+
+def dump_scan_results(scanner):
+    """Print scanner results to stdout"""
+    for read_name, kmers, density_array in scanner:
+        for kmer, kmer_density in zip(kmers, density_array.T):
+            print(read_name, kmer, *kmer_density, sep="\t")
 
 
 def plot_density_kdes(densities_matrix, target_kmers, imgfile, figsize=(10, 12)):
@@ -207,31 +226,23 @@ def main(args):
         (kmer, kmer_identity.pattern(kmer))
         for kmer in [target_kmer, target_rc_kmer] + background_kmers
     ))
-    # scan fastq for each unique kmer query:
-    with FastxFile(args.fastq) as read_iterator:
-        # only take the first num_reads entries (`None` takes all):
-        capped_read_iterator = islice(read_iterator, args.num_reads)
-        # parallelize scan (all patterns at once):
-        scanner = pattern_scanner(
-            capped_read_iterator, patterns, jobs=args.jobs,
-            window_size=args.window_size, num_reads=args.num_reads
+    # scan fastq for each unique kmer query, parallelizing on reads:
+    scanner = fastq_scanner(
+        args.fastq, patterns, jobs=args.jobs,
+        window_size=args.window_size, num_reads=args.num_reads
+    )
+    if args.dump: # print everything to stdout:
+        dump_scan_results(scanner)
+    elif args.density_kde_plot: # make narrow-form DataFrame and plot:
+        densities_matrix = to_narrow_dataframe(scanner)
+        plot_density_kdes(
+            densities_matrix, target_kmers={target_kmer, target_rc_kmer},
+            imgfile=args.density_kde_plot
         )
-        if args.dump:
-            for read_name, kmers, density_array in scanner:
-                for kmer, kmer_density in zip(kmers, density_array.T):
-                    print(read_name, kmer, *kmer_density, sep="\t")
-        elif args.density_kde_plot:
-            # convert collected density data to narrow-form DataFrame and plot:
-            densities_matrix = to_narrow_dataframe(scanner, total=args.num_reads)
-            plot_density_kdes(
-                densities_matrix, target_kmers={target_kmer, target_rc_kmer},
-                imgfile=args.density_kde_plot
-            )
-        else:
-            print("Dry run", file=stderr, flush=True)
-            for _ in scanner:
-                pass
-    return 0
+    else: # perform searches without further action:
+        print("Dry run", file=stderr, flush=True)
+        for _ in scanner:
+            pass
 
 
 if __name__ == "__main__":
@@ -242,5 +253,4 @@ if __name__ == "__main__":
     if args.dump and args.density_kde_plot:
         raise ValueError("Cannot both dump and plot at the same time")
     else:
-        returncode = main(args)
-    exit(returncode)
+        main(args)
