@@ -8,7 +8,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 from pysam import FastxFile
 from functools import partial
-from numpy import array, zeros, cumsum, arange, vstack
+from numpy import array, zeros, cumsum
 from pandas import DataFrame, concat
 from matplotlib.pyplot import subplots, switch_backend
 from seaborn import kdeplot
