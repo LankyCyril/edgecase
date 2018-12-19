@@ -3,14 +3,22 @@ from argparse import ArgumentParser
 from itertools import product
 from regex import compile, IGNORECASE
 from random import sample
+from multiprocessing import Pool
+from tqdm import tqdm
+from pysam import FastxFile
+from functools import partial
 
 ARG_RULES = {
-    ("input-fastq",): {
+    ("fastq",): {
         "help": "name of input FASTQ file",
     },
     ("--kmer",): {
         "help": "target kmer sequence (default TTAGGG)",
         "default": "TTAGGG", "metavar": "M"
+    },
+    ("-w", "--window-size"): {
+        "help": "size of the rolling window (default 120)",
+        "default": 120, "type": int, "metavar": "W"
     },
     ("-b", "--n-background-kmers"): {
         "help": "number of random kmers for significance threshold estimation (default 9)",
@@ -76,11 +84,40 @@ def choose_background_kmers(kmer_identity, kmer, n_background_kmers):
         return sample(population, n_background_kmers)
 
 
+def calculate_density(read, overlapped, window_size):
+    return read.name, [len(read.sequence)]
+
+
+def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, jobs=1, num_reads=None, desc=None):
+    """Calculate density of pattern hits in a rolling window along each read"""
+    with Pool(jobs) as pool:
+        density_calculator = partial(
+            calculate_density, overlapped=overlapped, window_size=window_size
+        )
+        read_density_iterator = pool.imap_unordered(
+            density_calculator, read_iterator
+        )
+        if desc is None:
+            desc = pattern.pattern
+        yield from tqdm(
+            read_density_iterator, desc=desc, unit="read", total=num_reads
+        )
+
+
 def main(args):
     kmer_identity = KmerIdentity(k=len(args.kmer))
     background_kmers = choose_background_kmers(
         kmer_identity, args.kmer, args.n_background_kmers
     )
+    for kmer in [args.kmer]+background_kmers:
+        with FastxFile(args.fastq) as read_iterator:
+            scanner = pattern_scanner(
+                read_iterator, kmer_identity.pattern(kmer),
+                window_size=args.window_size, jobs=args.jobs,
+                num_reads=args.num_reads, desc=kmer
+            )
+            for read_name, kmer_density in scanner:
+                print(kmer, read_name, *kmer_density, sep="\t")
     return 0
 
 
