@@ -49,18 +49,21 @@ COMPLEMENT = dict(zip(ALPHABET, ALPHABET[::-1]))
 
 
 def revcomp(sequence):
-    """Very simple reverse complementer"""
+    """Reverse complement a nucleotide sequence"""
     return "".join(COMPLEMENT[c] for c in reversed(sequence))
 
 
 class KmerIdentity:
-    """Hold all possible kmers of length k and their groupings by circular shift"""
+    """Holds all possible kmers of length k and their groupings by circular shift"""
     _one2many = {}
     _many2one = {}
  
-    def __init__(self, k=6, alphabet=list("ACGT")):
+    def __init__(self, k, alphabet=ALPHABET):
         """Generate all possible kmers and group into identical by circular shift"""
-        for kmer in map("".join, product(alphabet, repeat=k)):
+        kmer_iterator = map("".join, product(alphabet, repeat=k))
+        total = len(alphabet)**k
+        desc = "Generating kmer identity map"
+        for kmer in tqdm(kmer_iterator, desc=desc, total=total):
             shifted_kmers = {kmer[i:]+kmer[:i] for i in range(k)}
             for shifted_kmer in shifted_kmers:
                 if shifted_kmer in self._one2many:
@@ -82,8 +85,8 @@ class KmerIdentity:
     def anchors(self, exclude=()):
         """Return all anchor kmers except for the ones matching `exclude`"""
         anchor_kmers = set(self._one2many.keys())
-        excluded_kmers = {self._many2one[kmer] for kmer in exclude}
-        return anchor_kmers - excluded_kmers
+        excluded_anchors = {self._many2one[kmer] for kmer in exclude}
+        return anchor_kmers - excluded_anchors
 
 
 def choose_background_kmers(kmer_identity, n_background_kmers, exclude):
@@ -102,63 +105,73 @@ def calculate_density(read, pattern, overlapped, window_size):
     """Calculate density of pattern hits in a rolling window along given read"""
     read_length = len(read.sequence)
     if read_length == 0: # nothing to search for
-        density = zeros(1)
+        density_array = zeros(1)
     elif read_length <= window_size: # no need to roll window
         n_positions = len(pattern.findall(read.sequence, overlapped=overlapped))
-        density = array([n_positions/read_length])
+        density_array = array([n_positions/read_length])
     else: # find all positions and roll window
         positions = array([
             match.start()
             for match in pattern.finditer(read.sequence, overlapped=overlapped)
         ])
-        if len(positions):
+        if len(positions): # calculate quick rolling mean
             canvas = zeros(read_length, dtype=bool)
             canvas[positions] = True
             roller = cumsum(canvas)
             roller[window_size:] = roller[window_size:] - roller[:-window_size]
-            density = roller[window_size-1:] / window_size
-        else:
-            density = zeros(read_length-window_size+1)
-    return read.name, density
+            density_array = roller[window_size-1:] / window_size
+        else: # no hits means all densities are zero
+            density_array = zeros(read_length-window_size+1)
+    return read.name, density_array
 
 
 def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, jobs=1, num_reads=None, desc=None):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
+        # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
             calculate_density, pattern=pattern,
             overlapped=overlapped, window_size=window_size
         )
+        # lazy multiprocess evaluation:
         read_density_iterator = pool.imap_unordered(
             density_calculator, read_iterator
         )
-        if desc is None:
-            desc = pattern.pattern
+        # iterate pairs (read.name, density_array), same as calculate_density():
         yield from tqdm(
-            read_density_iterator, desc=desc, unit="read", total=num_reads
+            read_density_iterator, desc=(desc or pattern.pattern),
+            unit="read", total=num_reads
         )
 
 
 def main(args):
-    kmer_identity = KmerIdentity(k=len(args.kmer))
+    """Dispatch data to subroutines"""
     target_kmer, target_rc_kmer = args.kmer, revcomp(args.kmer)
+    # precompute circular shifts of all possible kmers of same length as target:
+    kmer_identity = KmerIdentity(k=len(target_kmer))
+    # randomly select n_background_kmers kmers different from target:
     background_kmers = choose_background_kmers(
         kmer_identity, args.n_background_kmers,
         exclude={target_kmer, target_rc_kmer}
     )
+    # initialize storage for all density data:
     densities = {}
+    # scan fastq for each unique kmer query (`set` will collapse target_kmer and
+    # target_rc_kmer into one entry if equal, e.g. TTAA and TTAA):
     for kmer in set([target_kmer, target_rc_kmer] + background_kmers):
         with FastxFile(args.fastq) as read_iterator:
+            # only take the first num_reads entries (`None` takes all):
             capped_read_iterator = islice(read_iterator, args.num_reads)
+            # parallelize scan:
             scanner = pattern_scanner(
                 capped_read_iterator, kmer_identity.pattern(kmer),
                 window_size=args.window_size, jobs=args.jobs,
                 num_reads=args.num_reads, desc=kmer
             )
-            if args.dump:
-                for read_name, kmer_density in scanner:
-                    print(kmer, read_name, *kmer_density, sep="\t")
-            else:
+            if args.dump: # just print everything to stdout
+                for read_name, density_array in scanner:
+                    print(kmer, read_name, *density_array, sep="\t")
+            else: # insert a dict of key->value pairs read.name->density_array
                 densities[kmer] = dict(scanner)
     return 0
 
