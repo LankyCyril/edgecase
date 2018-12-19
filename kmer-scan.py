@@ -10,6 +10,8 @@ from pysam import FastxFile
 from functools import partial
 from numpy import array, zeros, cumsum, arange, vstack
 from pandas import DataFrame, concat
+from matplotlib.pyplot import subplots, switch_backend
+from seaborn import kdeplot
 
 ARG_RULES = {
     ("fastq",): {
@@ -164,6 +166,31 @@ def to_narrow_dataframe(densities):
     return concat(sections)[["kmer", "read_name", "position", "density"]]
 
 
+def plot_density_kdes(densities_matrix, target_kmers, imgfile, figsize=(10, 12)):
+    """Plot combined density kde to imgfile"""
+    switch_backend("Agg")
+    figure, [target_ax, background_ax] = subplots(
+        nrows=2, figsize=figsize, sharex=True
+    )
+    target_indexer = densities_matrix["kmer"].isin(target_kmers)
+    kdeplot(
+        densities_matrix.loc[target_indexer, "density"],
+        color="green", ax=target_ax, legend=False
+    )
+    kdeplot(
+        densities_matrix.loc[~target_indexer, "density"],
+        color="gray", ax=background_ax, legend=False
+    )
+    title_mask = "Density distribution of {}"
+    target_ax.set(
+        title=title_mask.format(target_kmers)
+    )
+    background_ax.set(
+        title=title_mask.format(set(densities_matrix["kmer"]) - target_kmers)
+    )
+    figure.savefig(imgfile)
+
+
 def main(args):
     """Dispatch data to subroutines"""
     target_kmer, target_rc_kmer = args.kmer, revcomp(args.kmer)
@@ -190,10 +217,16 @@ def main(args):
             )
             # insert a dict of key->value pairs read.name->density_array
             densities[kmer] = dict(scanner)
-    # convert collected density data to narrow-form DataFrame:
-    densities_matrix = to_narrow_dataframe(densities)
+    # convert collected density data to narrow-form DataFrame and dump/plot:
+    if args.dump or args.density_kde_plot:
+        densities_matrix = to_narrow_dataframe(densities)
     if args.dump:
         print(densities_matrix.to_csv(sep="\t", index=None))
+    if args.density_kde_plot:
+        plot_density_kdes(
+            densities_matrix, target_kmers={target_kmer, target_rc_kmer},
+            imgfile=args.density_kde_plot
+        )
     return 0
 
 
