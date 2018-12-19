@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser
-from itertools import product
+from itertools import product, islice
 from regex import compile, IGNORECASE
 from random import sample
 from multiprocessing import Pool
 from tqdm import tqdm
 from pysam import FastxFile
 from functools import partial
+from numpy import array, zeros, cumsum
 
 ARG_RULES = {
     ("fastq",): {
@@ -29,7 +30,7 @@ ARG_RULES = {
         "default": None, "metavar": "P"
     },
     ("-n", "--num-reads"): {
-        "help": "process only N reads (default all)",
+        "help": "process at most N reads (default all)",
         "default": None, "type": int, "metavar": "N"
     },
     ("-j", "--jobs"): {
@@ -84,15 +85,36 @@ def choose_background_kmers(kmer_identity, kmer, n_background_kmers):
         return sample(population, n_background_kmers)
 
 
-def calculate_density(read, overlapped, window_size):
-    return read.name, [len(read.sequence)]
+def calculate_density(read, pattern, overlapped, window_size):
+    """Calculate density of pattern hits in a rolling window along given read"""
+    read_length = len(read.sequence)
+    if read_length == 0: # nothing to search for
+        density = zeros(1)
+    elif read_length <= window_size: # no need to roll window
+        n_positions = len(pattern.findall(read.sequence, overlapped=overlapped))
+        density = array([n_positions/read_length])
+    else: # find all positions and roll window
+        positions = array([
+            match.start()
+            for match in pattern.finditer(read.sequence, overlapped=overlapped)
+        ])
+        if len(positions):
+            canvas = zeros(read_length, dtype=bool)
+            canvas[positions] = True
+            roller = cumsum(canvas)
+            roller[window_size:] = roller[window_size:] - roller[:-window_size]
+            density = roller[window_size-1:] / window_size
+        else:
+            density = zeros(read_length-window_size+1)
+    return read.name, density
 
 
 def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, jobs=1, num_reads=None, desc=None):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
         density_calculator = partial(
-            calculate_density, overlapped=overlapped, window_size=window_size
+            calculate_density, pattern=pattern,
+            overlapped=overlapped, window_size=window_size
         )
         read_density_iterator = pool.imap_unordered(
             density_calculator, read_iterator
@@ -111,8 +133,9 @@ def main(args):
     )
     for kmer in [args.kmer]+background_kmers:
         with FastxFile(args.fastq) as read_iterator:
+            capped_read_iterator = islice(read_iterator, args.num_reads)
             scanner = pattern_scanner(
-                read_iterator, kmer_identity.pattern(kmer),
+                capped_read_iterator, kmer_identity.pattern(kmer),
                 window_size=args.window_size, jobs=args.jobs,
                 num_reads=args.num_reads, desc=kmer
             )
