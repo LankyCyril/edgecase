@@ -136,6 +136,7 @@ def main(args):
     background_kmers = choose_background_kmers(
         kmer_identity, args.kmer, args.n_background_kmers
     )
+    densities = {}
     for kmer in [args.kmer]+background_kmers:
         with FastxFile(args.fastq) as read_iterator:
             capped_read_iterator = islice(read_iterator, args.num_reads)
@@ -148,9 +149,7 @@ def main(args):
                 for read_name, kmer_density in scanner:
                     print(kmer, read_name, *kmer_density, sep="\t")
             else:
-                print("Checking speed only", file=stderr, flush=True)
-                for read_name, kmer_density in scanner:
-                    pass
+                densities[kmer] = dict(scanner)
     return 0
 
 
