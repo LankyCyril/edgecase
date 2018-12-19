@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from sys import stderr
 from argparse import ArgumentParser
 from itertools import product, islice
 from regex import compile, IGNORECASE
@@ -36,6 +37,10 @@ ARG_RULES = {
     ("-j", "--jobs"): {
         "help": "number of jobs to run in parallel (default 1)",
         "default": 1, "type": int, "metavar": "J"
+    },
+    ("--dump",): {
+        "help": "(temporary) dump all output to text file",
+        "action": "store_true"
     }
 }
 
@@ -139,8 +144,13 @@ def main(args):
                 window_size=args.window_size, jobs=args.jobs,
                 num_reads=args.num_reads, desc=kmer
             )
-            for read_name, kmer_density in scanner:
-                print(kmer, read_name, *kmer_density, sep="\t")
+            if args.dump:
+                for read_name, kmer_density in scanner:
+                    print(kmer, read_name, *kmer_density, sep="\t")
+            else:
+                print("Checking speed only", file=stderr, flush=True)
+                for read_name, kmer_density in scanner:
+                    pass
     return 0
 
 
