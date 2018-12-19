@@ -163,11 +163,15 @@ def to_narrow_dataframe(densities):
             section["kmer"] = kmer
             section["read_name"] = read_name
             sections.append(section)
-    return concat(sections)[["kmer", "read_name", "position", "density"]]
+    print("Merging DataFrame entries... ", end="", file=stderr, flush=True)
+    matrix = concat(sections)[["kmer", "read_name", "position", "density"]]
+    print("done", file=stderr, flush=True)
+    return matrix
 
 
 def plot_density_kdes(densities_matrix, target_kmers, imgfile, figsize=(10, 12)):
     """Plot combined density kde to imgfile"""
+    print("Plotting density KDEs... ", end="", file=stderr, flush=True)
     switch_backend("Agg")
     figure, [target_ax, background_ax] = subplots(
         nrows=2, figsize=figsize, sharex=True
@@ -189,6 +193,7 @@ def plot_density_kdes(densities_matrix, target_kmers, imgfile, figsize=(10, 12))
         title=title_mask.format(set(densities_matrix["kmer"]) - target_kmers)
     )
     figure.savefig(imgfile)
+    print("done", file=stderr, flush=True)
 
 
 def main(args):
@@ -220,13 +225,13 @@ def main(args):
     # convert collected density data to narrow-form DataFrame and dump/plot:
     if args.dump or args.density_kde_plot:
         densities_matrix = to_narrow_dataframe(densities)
-    if args.dump:
-        print(densities_matrix.to_csv(sep="\t", index=None))
     if args.density_kde_plot:
         plot_density_kdes(
             densities_matrix, target_kmers={target_kmer, target_rc_kmer},
             imgfile=args.density_kde_plot
         )
+    if args.dump:
+        print(densities_matrix.to_csv(sep="\t", index=None))
     return 0
 
 
