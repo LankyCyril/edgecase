@@ -1,4 +1,4 @@
-EdgeCase
+edgeCase
 ========
 
-Stuff
+Preferred spelling :-)
