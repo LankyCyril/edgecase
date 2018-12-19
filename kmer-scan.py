@@ -44,6 +44,14 @@ ARG_RULES = {
     }
 }
 
+ALPHABET = list("ACGT")
+COMPLEMENT = dict(zip(ALPHABET, ALPHABET[::-1]))
+
+
+def revcomp(sequence):
+    """Very simple reverse complementer"""
+    return "".join(COMPLEMENT[c] for c in reversed(sequence))
+
 
 class KmerIdentity:
     """Hold all possible kmers of length k and their groupings by circular shift"""
@@ -78,9 +86,9 @@ class KmerIdentity:
         return anchor_kmers - excluded_kmers
 
 
-def choose_background_kmers(kmer_identity, kmer, n_background_kmers):
+def choose_background_kmers(kmer_identity, n_background_kmers, exclude):
     """Choose background kmers at random, throw sensible errors"""
-    population = kmer_identity.anchors(exclude={kmer})
+    population = kmer_identity.anchors(exclude=exclude)
     if n_background_kmers > len(population):
         raise ValueError(
             "Requested number of background kmers " +
@@ -133,11 +141,13 @@ def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, jo
 
 def main(args):
     kmer_identity = KmerIdentity(k=len(args.kmer))
+    target_kmer, target_rc_kmer = args.kmer, revcomp(args.kmer)
     background_kmers = choose_background_kmers(
-        kmer_identity, args.kmer, args.n_background_kmers
+        kmer_identity, args.n_background_kmers,
+        exclude={target_kmer, target_rc_kmer}
     )
     densities = {}
-    for kmer in [args.kmer]+background_kmers:
+    for kmer in set([target_kmer, target_rc_kmer] + background_kmers):
         with FastxFile(args.fastq) as read_iterator:
             capped_read_iterator = islice(read_iterator, args.num_reads)
             scanner = pattern_scanner(
