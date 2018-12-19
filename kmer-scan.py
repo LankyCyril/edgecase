@@ -8,7 +8,8 @@ from multiprocessing import Pool
 from tqdm import tqdm
 from pysam import FastxFile
 from functools import partial
-from numpy import array, zeros, cumsum
+from numpy import array, zeros, cumsum, arange, vstack
+from pandas import DataFrame, concat
 
 ARG_RULES = {
     ("fastq",): {
@@ -144,6 +145,25 @@ def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, jo
         )
 
 
+def to_narrow_dataframe(densities):
+    """Convert multilevel dictionary densities->kmers->reads to narrow-form DataFrame"""
+    sections = []
+    decorated_iterator = tqdm(
+        densities.items(), desc="Converting collected densities to DataFrame",
+        unit="kmer", total=len(densities)
+    )
+    for kmer, read_density_arrays in decorated_iterator:
+        for read_name, density_array in read_density_arrays.items():
+            section = DataFrame(
+                data=vstack([arange(len(density_array)), density_array]).T,
+                columns=["position", "density"]
+            )
+            section["kmer"] = kmer
+            section["read_name"] = read_name
+            sections.append(section)
+    return concat(sections)[["kmer", "read_name", "position", "density"]]
+
+
 def main(args):
     """Dispatch data to subroutines"""
     target_kmer, target_rc_kmer = args.kmer, revcomp(args.kmer)
@@ -168,11 +188,12 @@ def main(args):
                 window_size=args.window_size, jobs=args.jobs,
                 num_reads=args.num_reads, desc=kmer
             )
-            if args.dump: # just print everything to stdout
-                for read_name, density_array in scanner:
-                    print(kmer, read_name, *density_array, sep="\t")
-            else: # insert a dict of key->value pairs read.name->density_array
-                densities[kmer] = dict(scanner)
+            # insert a dict of key->value pairs read.name->density_array
+            densities[kmer] = dict(scanner)
+    # convert collected density data to narrow-form DataFrame:
+    densities_matrix = to_narrow_dataframe(densities)
+    if args.dump:
+        print(densities_matrix.to_csv(sep="\t", index=None))
     return 0
 
 
