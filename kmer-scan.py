@@ -12,6 +12,7 @@ from numpy import array, zeros, cumsum, arange, vstack
 from pandas import DataFrame, concat
 from matplotlib.pyplot import subplots, switch_backend
 from seaborn import kdeplot
+from collections import OrderedDict
 
 ARG_RULES = {
     ("fastq",): {
@@ -29,10 +30,6 @@ ARG_RULES = {
         "help": "number of random kmers for significance threshold estimation (default 9)",
         "default": 9, "type": int, "metavar": "B"
     },
-    ("--density-kde-plot",): {
-        "help": "if filename provided, will plot densities of checked kmers",
-        "default": None, "metavar": "P"
-    },
     ("-n", "--num-reads"): {
         "help": "process at most N reads (default all)",
         "default": None, "type": int, "metavar": "N"
@@ -44,7 +41,11 @@ ARG_RULES = {
     ("--dump",): {
         "help": "(temporary) dump all output to text file",
         "action": "store_true"
-    }
+    },
+    ("--density-kde-plot",): {
+        "help": "if filename provided, will plot densities of checked kmers",
+        "default": None, "metavar": "P"
+    },
 }
 
 ALPHABET = list("ACGT")
@@ -104,36 +105,36 @@ def choose_background_kmers(kmer_identity, n_background_kmers, exclude):
         return sample(population, n_background_kmers)
 
 
-def calculate_density(read, pattern, overlapped, window_size):
+def calculate_density(read, patterns, overlapped, window_size):
     """Calculate density of pattern hits in a rolling window along given read"""
     read_length = len(read.sequence)
     if read_length == 0: # nothing to search for
-        density_array = zeros(1)
-    elif read_length <= window_size: # no need to roll window
-        n_positions = len(pattern.findall(read.sequence, overlapped=overlapped))
-        density_array = array([n_positions/read_length])
-    else: # find all positions and roll window
-        positions = array([
-            match.start()
-            for match in pattern.finditer(read.sequence, overlapped=overlapped)
-        ])
-        if len(positions): # calculate quick rolling mean
-            canvas = zeros(read_length, dtype=bool)
-            canvas[positions] = True
-            roller = cumsum(canvas)
+        density_array = zeros((1, len(patterns)))
+    else: # create array of hits; axis 0 is positions, axis 1 is patterns:
+        canvas = zeros((read_length, len(patterns)), dtype=bool)
+        for i, pattern in enumerate(patterns.values()):
+            pattern_positions = array([
+                match.start() for match
+                in pattern.finditer(read.sequence, overlapped=overlapped)
+            ])
+            if len(pattern_positions):
+                canvas[pattern_positions, i] = True
+        if read_length <= window_size: # use one window:
+            # [None, :] ensures two dimensions in output:
+            density_array = (canvas.sum(axis=0) / read_length)[None, :]
+        else: # use rolling window:
+            roller = cumsum(canvas, axis=0)
             roller[window_size:] = roller[window_size:] - roller[:-window_size]
             density_array = roller[window_size-1:] / window_size
-        else: # no hits means all densities are zero
-            density_array = zeros(read_length-window_size+1)
-    return read.name, density_array
+    return read.name, list(patterns.keys()), density_array
 
 
-def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, jobs=1, num_reads=None, desc=None):
+def pattern_scanner(read_iterator, patterns, overlapped=True, window_size=120, num_reads=None, jobs=1):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
-            calculate_density, pattern=pattern,
+            calculate_density, patterns=patterns,
             overlapped=overlapped, window_size=window_size
         )
         # lazy multiprocess evaluation:
@@ -142,27 +143,22 @@ def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, jo
         )
         # iterate pairs (read.name, density_array), same as calculate_density():
         yield from tqdm(
-            read_density_iterator, desc=(desc or pattern.pattern),
+            read_density_iterator, desc="Calculating kmer density",
             unit="read", total=num_reads
         )
 
 
-def to_narrow_dataframe(densities):
-    """Convert multilevel dictionary densities->kmers->reads to narrow-form DataFrame"""
+def to_narrow_dataframe(scanner, total=None):
+    """Convert multilevel data reads->kmers->densities to narrow-form DataFrame"""
     sections = []
-    decorated_iterator = tqdm(
-        densities.items(), desc="Converting collected densities to DataFrame",
-        unit="kmer", total=len(densities)
-    )
-    for kmer, read_density_arrays in decorated_iterator:
-        for read_name, density_array in read_density_arrays.items():
-            section = DataFrame(
-                data=vstack([arange(len(density_array)), density_array]).T,
-                columns=["position", "density"]
-            )
-            section["kmer"] = kmer
-            section["read_name"] = read_name
-            sections.append(section)
+    for read_name, kmers, density_array in scanner:
+        section = DataFrame(data=density_array, columns=kmers)
+        section.index.name = "position"
+        section = section.reset_index().melt(
+            id_vars="position", var_name="kmer", value_name="density"
+        )
+        section["read_name"] = read_name
+        sections.append(section)
     print("Merging DataFrame entries... ", end="", file=stderr, flush=True)
     matrix = concat(sections)[["kmer", "read_name", "position", "density"]]
     print("done", file=stderr, flush=True)
@@ -190,7 +186,7 @@ def plot_density_kdes(densities_matrix, target_kmers, imgfile, figsize=(10, 12))
         title=title_mask.format(target_kmers)
     )
     background_ax.set(
-        title=title_mask.format(set(densities_matrix["kmer"]) - target_kmers)
+        title=title_mask.format("background kmers")
     )
     figure.savefig(imgfile)
     print("done", file=stderr, flush=True)
@@ -206,32 +202,35 @@ def main(args):
         kmer_identity, args.n_background_kmers,
         exclude={target_kmer, target_rc_kmer}
     )
-    # initialize storage for all density data:
-    densities = {}
-    # scan fastq for each unique kmer query (`set` will collapse target_kmer and
-    # target_rc_kmer into one entry if equal, e.g. TTAA and TTAA):
-    for kmer in set([target_kmer, target_rc_kmer] + background_kmers):
-        with FastxFile(args.fastq) as read_iterator:
-            # only take the first num_reads entries (`None` takes all):
-            capped_read_iterator = islice(read_iterator, args.num_reads)
-            # parallelize scan:
-            scanner = pattern_scanner(
-                capped_read_iterator, kmer_identity.pattern(kmer),
-                window_size=args.window_size, jobs=args.jobs,
-                num_reads=args.num_reads, desc=kmer
-            )
-            # insert a dict of key->value pairs read.name->density_array
-            densities[kmer] = dict(scanner)
-    # convert collected density data to narrow-form DataFrame and dump/plot:
-    if args.dump or args.density_kde_plot:
-        densities_matrix = to_narrow_dataframe(densities)
-    if args.density_kde_plot:
-        plot_density_kdes(
-            densities_matrix, target_kmers={target_kmer, target_rc_kmer},
-            imgfile=args.density_kde_plot
+    # prepare scanner patterns:
+    patterns = OrderedDict((
+        (kmer, kmer_identity.pattern(kmer))
+        for kmer in [target_kmer, target_rc_kmer] + background_kmers
+    ))
+    # scan fastq for each unique kmer query:
+    with FastxFile(args.fastq) as read_iterator:
+        # only take the first num_reads entries (`None` takes all):
+        capped_read_iterator = islice(read_iterator, args.num_reads)
+        # parallelize scan (all patterns at once):
+        scanner = pattern_scanner(
+            capped_read_iterator, patterns, jobs=args.jobs,
+            window_size=args.window_size, num_reads=args.num_reads
         )
-    if args.dump:
-        print(densities_matrix.to_csv(sep="\t", index=None))
+        if args.dump:
+            for read_name, kmers, density_array in scanner:
+                for kmer, kmer_density in zip(kmers, density_array.T):
+                    print(read_name, kmer, *kmer_density, sep="\t")
+        elif args.density_kde_plot:
+            # convert collected density data to narrow-form DataFrame and plot:
+            densities_matrix = to_narrow_dataframe(scanner, total=args.num_reads)
+            plot_density_kdes(
+                densities_matrix, target_kmers={target_kmer, target_rc_kmer},
+                imgfile=args.density_kde_plot
+            )
+        else:
+            print("Dry run", file=stderr, flush=True)
+            for _ in scanner:
+                pass
     return 0
 
 
@@ -240,5 +239,8 @@ if __name__ == "__main__":
     for rule_args, rule_kwargs in ARG_RULES.items():
         parser.add_argument(*rule_args, **rule_kwargs)
     args = parser.parse_args()
-    returncode = main(args)
+    if args.dump and args.density_kde_plot:
+        raise ValueError("Cannot both dump and plot at the same time")
+    else:
+        returncode = main(args)
     exit(returncode)
