@@ -9,10 +9,9 @@ from tqdm import tqdm
 from pysam import FastxFile
 from functools import partial
 from numpy import array, zeros, cumsum
-from pandas import DataFrame, concat
+from pandas import DataFrame, Series, concat
 from matplotlib.pyplot import subplots, switch_backend
 from seaborn import kdeplot
-from collections import OrderedDict
 
 ARG_RULES = {
     ("fastq",): {
@@ -99,24 +98,60 @@ def choose_background_kmers(kmer_identity, n_background_kmers, exclude):
         return sample(population, n_background_kmers)
 
 
-def apply_density_filter(sequence, pattern, overlapped, head=None, tail=None, cutoff=0):
-    """Check if density of head (or tail) is above cutoff"""
+def get_edge_density(sequence, pattern, overlapped, head=None, tail=None):
+    """Calculate density of pattern in head or tail of sequence"""
     if len(sequence) == 0:
-        return False
+        return 0
     if head:
         subsequence = sequence[:head]
     elif tail:
         subsequence = sequence[-tail:]
     pattern_matches = pattern.findall(sequence, overlapped=overlapped)
-    return len(pattern_matches) / len(subsequence) >= cutoff
+    return len(pattern_matches) / len(subsequence)
+
+
+def get_edge_densities(read, patterns, overlapped, head=None, tail=None):
+    """Thin wrapper for get_edge_density(): calculate edge densities of multiple patterns in read"""
+    return {
+        kmer: get_edge_density(read.sequence, pattern, overlapped, head, tail)
+        for kmer, pattern in patterns.items()
+    }
+
+
+def determine_cutoff(fastq, patterns, target_kmer, overlapped=True, head=None, tail=None, num_reads=None, jobs=1):
+    """Determine significant density cutoff"""
+    with FastxFile(fastq) as read_iterator:
+        # only take the first num_reads entries (`None` takes all):
+        capped_read_iterator = islice(read_iterator, num_reads)
+        # parallelize scan (all patterns at once):
+        with Pool(jobs) as pool:
+            # imap_unordered() only accepts single-argument functions:
+            edge_densities_calculator = partial(
+                get_edge_densities, patterns=patterns,
+                overlapped=overlapped, head=head, tail=tail
+            )
+            # lazy multiprocess evaluation:
+            edge_densities_iterator = pool.imap_unordered(
+                edge_densities_calculator, read_iterator
+            )
+            # combine results into DataFrame:
+            decorated_iterator = tqdm(
+                edge_densities_iterator, desc="Calculating significance cutoff",
+                unit="read", total=num_reads
+            )
+            edge_densities_dataframe = concat(
+                (Series(ed) for ed in decorated_iterator),
+                axis=1
+            )
+    print(edge_densities_dataframe.T.to_csv(sep="\t"))
 
 
 def calculate_density(read, pattern, overlapped, window_size, head=None, tail=None, cutoff=0):
     """Calculate density of pattern hits in a rolling window along given read"""
-    passes_filter = apply_density_filter(
-        read.sequence, pattern, overlapped,
-        head, tail, cutoff
+    edge_density = get_edge_density(
+        read.sequence, pattern, overlapped, head, tail
     )
+    passes_filter = (edge_density >= cutoff)
     if not passes_filter: # nothing to search for
         density_array = zeros(1)
     else: # create array of hits; axis 0 is positions, axis 1 is patterns
@@ -162,7 +197,7 @@ def fastq_scanner(fastq, pattern, overlapped=True, window_size=120, head=None, t
     with FastxFile(fastq) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
         capped_read_iterator = islice(read_iterator, num_reads)
-        # parallelize scan (all patterns at once):
+        # parallelize scan:
         yield from pattern_scanner(
             capped_read_iterator, pattern, jobs=jobs,
             window_size=window_size, head=head, tail=tail, cutoff=cutoff,
@@ -221,12 +256,18 @@ def main(args):
     background_kmers = choose_background_kmers(
         kmer_identity, args.n_background_kmers, exclude={args.kmer}
     )
-    # prepare scanner patterns:
-    patterns = OrderedDict((
-        (kmer, kmer_identity.pattern(kmer))
+    # prepare scanner patterns for target and background kmers:
+    patterns = {
+        kmer: kmer_identity.pattern(kmer)
         for kmer in [args.kmer] + background_kmers
-    ))
-    cutoff = .1
+    }
+    # decide on density cutoff:
+    cutoff = determine_cutoff(
+        args.fastq, patterns, target_kmer=args.kmer, jobs=args.jobs,
+        head=args.head, tail=args.tail,
+        num_reads=args.num_reads
+    )
+    raise NotImplementedError("Determining cutoff")
     # scan fastq for target kmer query, parallelizing on reads:
     scanner = fastq_scanner(
         args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
