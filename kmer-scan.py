@@ -106,7 +106,7 @@ def get_edge_density(sequence, pattern, overlapped, head=None, tail=None):
         subsequence = sequence[:head]
     elif tail:
         subsequence = sequence[-tail:]
-    pattern_matches = pattern.findall(sequence, overlapped=overlapped)
+    pattern_matches = pattern.findall(subsequence, overlapped=overlapped)
     return len(pattern_matches) / len(subsequence)
 
 
@@ -143,7 +143,7 @@ def determine_cutoff(fastq, patterns, target_kmer, overlapped=True, head=None, t
                 (Series(ed) for ed in decorated_iterator),
                 axis=1
             )
-    print(edge_densities_dataframe.T.to_csv(sep="\t"))
+    print(edge_densities_dataframe.T.to_csv(sep="\t", index=None))
 
 
 def calculate_density(read, pattern, overlapped, window_size, head=None, tail=None, cutoff=0):
