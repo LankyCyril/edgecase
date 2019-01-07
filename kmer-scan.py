@@ -3,13 +3,11 @@ from sys import stderr
 from argparse import ArgumentParser
 from itertools import product, islice
 from regex import compile, IGNORECASE
-from random import sample
 from multiprocessing import Pool
 from tqdm import tqdm
 from pysam import FastxFile
 from functools import partial
 from numpy import array, zeros, cumsum, fromiter
-from pandas import DataFrame, Series, concat
 from matplotlib.pyplot import subplots, switch_backend
 from seaborn import kdeplot
 from sklearn.mixture import GaussianMixture
@@ -85,18 +83,6 @@ class KmerIdentity:
         anchor_kmers = set(self._one2many.keys())
         excluded_anchors = {self._many2one[kmer] for kmer in exclude}
         return anchor_kmers - excluded_anchors
-
-
-def choose_background_kmers(kmer_identity, n_background_kmers, exclude):
-    """Choose background kmers at random, throw sensible errors"""
-    population = kmer_identity.anchors(exclude=exclude)
-    if n_background_kmers > len(population):
-        raise ValueError(
-            "Requested number of background kmers " +
-            "bigger than number of possible kmers"
-        )
-    else:
-        return sample(population, n_background_kmers)
 
 
 def get_edge_density(read, pattern, overlapped, head=None, tail=None):
@@ -213,50 +199,6 @@ def fastq_scanner(fastq, pattern, gmm, target_component, overlapped=True, window
             gmm=gmm, target_component=target_component,
             num_reads=num_reads
         )
-
-
-def to_narrow_dataframe(scanner):
-    """Convert multilevel data reads->kmers->densities to narrow-form DataFrame"""
-    sections = []
-    for read_name, kmers, density_array in scanner:
-        section = DataFrame(data=density_array, columns=kmers)
-        section.index.name = "position"
-        section = section.reset_index().melt(
-            id_vars="position", var_name="kmer", value_name="density"
-        )
-        section["read_name"] = read_name
-        sections.append(section)
-    print("Merging DataFrame entries... ", end="", file=stderr, flush=True)
-    matrix = concat(sections)[["kmer", "read_name", "position", "density"]]
-    print("done", file=stderr, flush=True)
-    return matrix
-
-
-def plot_density_kdes(densities_matrix, target_kmers, imgfile, figsize=(10, 12)):
-    """Plot combined density kde to imgfile"""
-    print("Plotting density KDEs... ", end="", file=stderr, flush=True)
-    switch_backend("Agg")
-    figure, [target_ax, background_ax] = subplots(
-        nrows=2, figsize=figsize, sharex=True
-    )
-    target_indexer = densities_matrix["kmer"].isin(target_kmers)
-    kdeplot(
-        densities_matrix.loc[target_indexer, "density"],
-        color="green", ax=target_ax, legend=False
-    )
-    kdeplot(
-        densities_matrix.loc[~target_indexer, "density"],
-        color="gray", ax=background_ax, legend=False
-    )
-    title_mask = "Density distribution of {}"
-    target_ax.set(
-        title=title_mask.format(target_kmers)
-    )
-    background_ax.set(
-        title=title_mask.format("background kmers")
-    )
-    figure.savefig(imgfile)
-    print("done", file=stderr, flush=True)
 
 
 def main(args):
