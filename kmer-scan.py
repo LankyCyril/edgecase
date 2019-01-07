@@ -3,16 +3,14 @@ from sys import stderr
 from argparse import ArgumentParser
 from itertools import product, islice
 from regex import compile, IGNORECASE
-from random import sample
 from multiprocessing import Pool
 from tqdm import tqdm
 from pysam import FastxFile
 from functools import partial
-from numpy import array, zeros, cumsum
-from pandas import DataFrame, concat
+from numpy import array, zeros, cumsum, fromiter
 from matplotlib.pyplot import subplots, switch_backend
 from seaborn import kdeplot
-from collections import OrderedDict
+from sklearn.mixture import GaussianMixture
 
 ARG_RULES = {
     ("fastq",): {
@@ -22,13 +20,21 @@ ARG_RULES = {
         "help": "target kmer sequence (default TTAGGG)",
         "default": "TTAGGG", "metavar": "M"
     },
+    ("--head-test",): {
+        "help": "length of head to use for density filter (default 768)",
+        "default": None, "type": int, "metavar": "H"
+    },
+    ("--tail-test",): {
+        "help": "length of tail to use for density filter (default 768)",
+        "default": None, "type": int, "metavar": "T"
+    },
+    ("--plot-gmm",): {
+        "help": "if filename provided, plot GMM components into it",
+        "default": None, "type": str, "metavar": "P"
+    },
     ("-w", "--window-size"): {
         "help": "size of the rolling window (default 120)",
         "default": 120, "type": int, "metavar": "W"
-    },
-    ("-b", "--n-background-kmers"): {
-        "help": "number of random kmers for significance threshold estimation (default 9)",
-        "default": 9, "type": int, "metavar": "B"
     },
     ("-n", "--num-reads"): {
         "help": "process at most N reads (default all)",
@@ -37,24 +43,10 @@ ARG_RULES = {
     ("-j", "--jobs"): {
         "help": "number of jobs to run in parallel (default 1)",
         "default": 1, "type": int, "metavar": "J"
-    },
-    ("--dump",): {
-        "help": "(temporary) dump all output to text file",
-        "action": "store_true"
-    },
-    ("--density-kde-plot",): {
-        "help": "if filename provided, will plot densities of checked kmers",
-        "default": None, "metavar": "P"
-    },
+    }
 }
 
 ALPHABET = list("ACGT")
-COMPLEMENT = dict(zip(ALPHABET, ALPHABET[::-1]))
-
-
-def revcomp(sequence):
-    """Reverse complement a nucleotide sequence"""
-    return "".join(COMPLEMENT[c] for c in reversed(sequence))
 
 
 class KmerIdentity:
@@ -93,49 +85,99 @@ class KmerIdentity:
         return anchor_kmers - excluded_anchors
 
 
-def choose_background_kmers(kmer_identity, n_background_kmers, exclude):
-    """Choose background kmers at random, throw sensible errors"""
-    population = kmer_identity.anchors(exclude=exclude)
-    if n_background_kmers > len(population):
-        raise ValueError(
-            "Requested number of background kmers " +
-            "bigger than number of possible kmers"
+def get_edge_density(read, pattern, overlapped, head=None, tail=None):
+    """Calculate density of pattern in head or tail of read"""
+    if len(read.sequence) == 0:
+        return 0
+    if head:
+        subsequence = read.sequence[:head]
+    elif tail:
+        subsequence = read.sequence[-tail:]
+    pattern_matches = pattern.findall(subsequence, overlapped=overlapped)
+    return len(pattern_matches) / len(subsequence)
+
+
+def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=None, plot_gmm=None, jobs=1):
+    """Train Gaussian Mixture to determine distribution components"""
+    with FastxFile(fastq) as read_iterator:
+        # only take the first num_reads entries (`None` takes all):
+        capped_read_iterator = islice(read_iterator, num_reads)
+        # parallelize scan (all patterns at once):
+        with Pool(jobs) as pool:
+            # imap_unordered() only accepts single-argument functions:
+            edge_densities_calculator = partial(
+                get_edge_density, pattern=pattern,
+                overlapped=overlapped, head=head, tail=tail
+            )
+            # lazy multiprocess evaluation:
+            edge_densities_iterator = pool.imap_unordered(
+                edge_densities_calculator, read_iterator
+            )
+            # collect results into an array:
+            decorated_iterator = tqdm(
+                edge_densities_iterator,
+                desc="Collecting edge densities for training",
+                unit="read", total=num_reads
+            )
+            edge_densities = fromiter(decorated_iterator, dtype="float32")
+    # find best n_components based on AIC:
+    X = edge_densities.reshape(-1, 1)
+    aics = []
+    for n_components in tqdm(range(2, 6), desc="Training GMM"):
+        gmm = GaussianMixture(n_components=n_components).fit(X)
+        aics.append(gmm.aic(X))
+    n_components = array(aics).argmin() + 2
+    # train final Gaussian Mixture model and determine significant component:
+    gmm = GaussianMixture(n_components=n_components).fit(X)
+    target_component = gmm.predict([[edge_densities.max()]])
+    if plot_gmm is not None: # visualize components if requested
+        switch_backend("Agg")
+        labels = gmm.predict(X)
+        figure, axs = subplots(nrows=n_components, sharex=True)
+        decorated_iterator = tqdm(
+            zip(set(labels), axs), desc="Plotting GMM", total=n_components
         )
-    else:
-        return sample(population, n_background_kmers)
+        for label, ax in decorated_iterator:
+            kdeplot(edge_densities[labels==label], ax=ax)
+        figure.savefig(plot_gmm)
+    return gmm, target_component
 
 
-def calculate_density(read, patterns, overlapped, window_size):
+def calculate_density(read, pattern, gmm, target_component, overlapped, window_size, head=None, tail=None, cutoff=0):
     """Calculate density of pattern hits in a rolling window along given read"""
-    read_length = len(read.sequence)
-    if read_length == 0: # nothing to search for
-        density_array = zeros((1, len(patterns)))
-    else: # create array of hits; axis 0 is positions, axis 1 is patterns:
-        canvas = zeros((read_length, len(patterns)), dtype=bool)
-        for i, pattern in enumerate(patterns.values()):
-            pattern_positions = array([
-                match.start() for match
-                in pattern.finditer(read.sequence, overlapped=overlapped)
-            ])
-            if len(pattern_positions):
-                canvas[pattern_positions, i] = True
+    edge_density = get_edge_density(
+        read, pattern, overlapped, head, tail
+    )
+    passes_filter = (gmm.predict([[edge_density]])[0] == target_component)
+    if not passes_filter: # nothing to search for
+        density_array = zeros(1)
+    else: # create array of hits; axis 0 is positions, axis 1 is patterns
+        read_length = len(read.sequence)
+        canvas = zeros(read_length, dtype=bool)
+        pattern_positions = array([
+            match.start() for match
+            in pattern.finditer(read.sequence, overlapped=overlapped)
+        ])
+        if len(pattern_positions):
+            canvas[pattern_positions] = True
         if read_length <= window_size: # use one window:
-            # [None, :] ensures two dimensions in output:
-            density_array = (canvas.sum(axis=0) / read_length)[None, :]
+            density_array = (canvas.sum(axis=0) / read_length)
         else: # use rolling window:
             roller = cumsum(canvas, axis=0)
             roller[window_size:] = roller[window_size:] - roller[:-window_size]
             density_array = roller[window_size-1:] / window_size
-    return read.name, list(patterns.keys()), density_array
+    return read.name, density_array, passes_filter
 
 
-def pattern_scanner(read_iterator, patterns, overlapped=True, window_size=120, num_reads=None, jobs=1):
+def pattern_scanner(read_iterator, pattern, gmm, target_component, overlapped=True, window_size=120, head=None, tail=None, cutoff=0, num_reads=None, jobs=1):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
-            calculate_density, patterns=patterns,
-            overlapped=overlapped, window_size=window_size
+            calculate_density, pattern=pattern,
+            overlapped=overlapped, window_size=window_size,
+            head=head, tail=tail,
+            gmm=gmm, target_component=target_component
         )
         # lazy multiprocess evaluation:
         read_density_iterator = pool.imap_unordered(
@@ -148,101 +190,40 @@ def pattern_scanner(read_iterator, patterns, overlapped=True, window_size=120, n
         )
 
 
-def fastq_scanner(fastq, patterns, overlapped=True, window_size=120, num_reads=None, jobs=1):
+def fastq_scanner(fastq, pattern, gmm, target_component, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
     """Thin wrapper over pattern_scanner() providing read_iterator from fastq file"""
-    with FastxFile(args.fastq) as read_iterator:
+    with FastxFile(fastq) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
-        capped_read_iterator = islice(read_iterator, args.num_reads)
-        # parallelize scan (all patterns at once):
+        capped_read_iterator = islice(read_iterator, num_reads)
+        # parallelize scan:
         yield from pattern_scanner(
-            capped_read_iterator, patterns, jobs=args.jobs,
-            window_size=args.window_size, num_reads=args.num_reads
+            capped_read_iterator, pattern, jobs=jobs,
+            window_size=window_size, head=head, tail=tail,
+            gmm=gmm, target_component=target_component,
+            num_reads=num_reads
         )
-
-
-def to_narrow_dataframe(scanner):
-    """Convert multilevel data reads->kmers->densities to narrow-form DataFrame"""
-    sections = []
-    for read_name, kmers, density_array in scanner:
-        section = DataFrame(data=density_array, columns=kmers)
-        section.index.name = "position"
-        section = section.reset_index().melt(
-            id_vars="position", var_name="kmer", value_name="density"
-        )
-        section["read_name"] = read_name
-        sections.append(section)
-    print("Merging DataFrame entries... ", end="", file=stderr, flush=True)
-    matrix = concat(sections)[["kmer", "read_name", "position", "density"]]
-    print("done", file=stderr, flush=True)
-    return matrix
-
-
-def dump_scan_results(scanner):
-    """Print scanner results to stdout"""
-    for read_name, kmers, density_array in scanner:
-        for kmer, kmer_density in zip(kmers, density_array.T):
-            print(read_name, kmer, *kmer_density, sep="\t")
-
-
-def plot_density_kdes(densities_matrix, target_kmers, imgfile, figsize=(10, 12)):
-    """Plot combined density kde to imgfile"""
-    print("Plotting density KDEs... ", end="", file=stderr, flush=True)
-    switch_backend("Agg")
-    figure, [target_ax, background_ax] = subplots(
-        nrows=2, figsize=figsize, sharex=True
-    )
-    target_indexer = densities_matrix["kmer"].isin(target_kmers)
-    kdeplot(
-        densities_matrix.loc[target_indexer, "density"],
-        color="green", ax=target_ax, legend=False
-    )
-    kdeplot(
-        densities_matrix.loc[~target_indexer, "density"],
-        color="gray", ax=background_ax, legend=False
-    )
-    title_mask = "Density distribution of {}"
-    target_ax.set(
-        title=title_mask.format(target_kmers)
-    )
-    background_ax.set(
-        title=title_mask.format("background kmers")
-    )
-    figure.savefig(imgfile)
-    print("done", file=stderr, flush=True)
 
 
 def main(args):
     """Dispatch data to subroutines"""
-    target_kmer, target_rc_kmer = args.kmer, revcomp(args.kmer)
-    # precompute circular shifts of all possible kmers of same length as target:
-    kmer_identity = KmerIdentity(k=len(target_kmer))
-    # randomly select n_background_kmers kmers different from target:
-    background_kmers = choose_background_kmers(
-        kmer_identity, args.n_background_kmers,
-        exclude={target_kmer, target_rc_kmer}
+    kmer_identity = KmerIdentity(k=len(args.kmer))
+    # decide on density cutoff:
+    gmm, target_component = train_gmm(
+        args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
+        head=args.head_test, tail=args.tail_test,
+        plot_gmm=args.plot_gmm, num_reads=args.num_reads
     )
-    # prepare scanner patterns:
-    patterns = OrderedDict((
-        (kmer, kmer_identity.pattern(kmer))
-        for kmer in [target_kmer, target_rc_kmer] + background_kmers
-    ))
-    # scan fastq for each unique kmer query, parallelizing on reads:
+    # scan fastq for target kmer query, parallelizing on reads:
     scanner = fastq_scanner(
-        args.fastq, patterns, jobs=args.jobs,
-        window_size=args.window_size, num_reads=args.num_reads
+        args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
+        window_size=args.window_size, head=args.head_test, tail=args.tail_test,
+        gmm=gmm, target_component=target_component,
+        num_reads=args.num_reads
     )
-    if args.dump: # print everything to stdout:
-        dump_scan_results(scanner)
-    elif args.density_kde_plot: # make narrow-form DataFrame and plot:
-        densities_matrix = to_narrow_dataframe(scanner)
-        plot_density_kdes(
-            densities_matrix, target_kmers={target_kmer, target_rc_kmer},
-            imgfile=args.density_kde_plot
-        )
-    else: # perform searches without further action:
-        print("Dry run", file=stderr, flush=True)
-        for _ in scanner:
-            pass
+    # output densities of reads that pass filter:
+    for read_name, density_array, passes_filter in scanner:
+        if passes_filter:
+            print(read_name, *density_array, sep="\t")
 
 
 if __name__ == "__main__":
@@ -250,7 +231,9 @@ if __name__ == "__main__":
     for rule_args, rule_kwargs in ARG_RULES.items():
         parser.add_argument(*rule_args, **rule_kwargs)
     args = parser.parse_args()
-    if args.dump and args.density_kde_plot:
-        raise ValueError("Cannot both dump and plot at the same time")
+    if (args.head_test is None) and (args.tail_test is None):
+        raise ValueError("Must specify --head or --tail for filtering")
+    elif (args.head_test is not None) and (args.tail_test is not None):
+        raise ValueError("Can only specify one of --head, --tail")
     else:
         main(args)
