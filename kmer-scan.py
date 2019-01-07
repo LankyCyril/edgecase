@@ -133,8 +133,11 @@ def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=N
     if plot_gmm is not None: # visualize components if requested
         switch_backend("Agg")
         labels = gmm.predict(X)
-        figure, ax = subplots()
-        for label in tqdm(set(labels), desc="Plotting GMM"):
+        figure, axs = subplots(nrows=n_components, sharex=True)
+        decorated_iterator = tqdm(
+            zip(set(labels), axs), desc="Plotting GMM", total=n_components
+        )
+        for label, ax in decorated_iterator:
             kdeplot(edge_densities[labels==label], ax=ax)
         figure.savefig(plot_gmm)
     return gmm, target_component
