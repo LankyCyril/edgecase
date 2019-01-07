@@ -20,11 +20,11 @@ ARG_RULES = {
         "help": "target kmer sequence (default TTAGGG)",
         "default": "TTAGGG", "metavar": "M"
     },
-    ("--head",): {
+    ("--head-test",): {
         "help": "length of head to use for density filter (default 768)",
         "default": None, "type": int, "metavar": "H"
     },
-    ("--tail",): {
+    ("--tail-test",): {
         "help": "length of tail to use for density filter (default 768)",
         "default": None, "type": int, "metavar": "T"
     },
@@ -210,13 +210,13 @@ def main(args):
     # decide on density cutoff:
     gmm, target_component = train_gmm(
         args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
-        head=args.head, tail=args.tail,
+        head=args.head_test, tail=args.tail_test,
         plot_gmm=args.plot_gmm, num_reads=args.num_reads
     )
     # scan fastq for target kmer query, parallelizing on reads:
     scanner = fastq_scanner(
         args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
-        window_size=args.window_size, head=args.head, tail=args.tail,
+        window_size=args.window_size, head=args.head_test, tail=args.tail_test,
         gmm=gmm, target_component=target_component,
         num_reads=args.num_reads
     )
@@ -231,9 +231,9 @@ if __name__ == "__main__":
     for rule_args, rule_kwargs in ARG_RULES.items():
         parser.add_argument(*rule_args, **rule_kwargs)
     args = parser.parse_args()
-    if (args.head is None) and (args.tail is None):
+    if (args.head_test is None) and (args.tail_test is None):
         raise ValueError("Must specify --head or --tail for filtering")
-    elif (args.head is not None) and (args.tail is not None):
+    elif (args.head_test is not None) and (args.tail_test is not None):
         raise ValueError("Can only specify one of --head, --tail")
     else:
         main(args)
