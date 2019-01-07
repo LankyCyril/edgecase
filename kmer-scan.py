@@ -8,10 +8,11 @@ from multiprocessing import Pool
 from tqdm import tqdm
 from pysam import FastxFile
 from functools import partial
-from numpy import array, zeros, cumsum
+from numpy import array, zeros, cumsum, fromiter
 from pandas import DataFrame, Series, concat
 from matplotlib.pyplot import subplots, switch_backend
 from seaborn import kdeplot
+from sklearn.mixture import GaussianMixture
 
 ARG_RULES = {
     ("fastq",): {
@@ -23,19 +24,19 @@ ARG_RULES = {
     },
     ("--head",): {
         "help": "length of head to use for density filter (default 768)",
-        "default": None, "type": int, "metavar": "H",
+        "default": None, "type": int, "metavar": "H"
     },
     ("--tail",): {
         "help": "length of tail to use for density filter (default 768)",
-        "default": None, "type": int, "metavar": "T",
+        "default": None, "type": int, "metavar": "T"
+    },
+    ("--plot-gmm",): {
+        "help": "if filename provided, plot GMM components into it",
+        "default": None, "type": str, "metavar": "P"
     },
     ("-w", "--window-size"): {
         "help": "size of the rolling window (default 120)",
         "default": 120, "type": int, "metavar": "W"
-    },
-    ("-b", "--n-background-kmers"): {
-        "help": "number of random kmers for significance threshold estimation (default 9)",
-        "default": 9, "type": int, "metavar": "B"
     },
     ("-n", "--num-reads"): {
         "help": "process at most N reads (default all)",
@@ -98,28 +99,20 @@ def choose_background_kmers(kmer_identity, n_background_kmers, exclude):
         return sample(population, n_background_kmers)
 
 
-def get_edge_density(sequence, pattern, overlapped, head=None, tail=None):
-    """Calculate density of pattern in head or tail of sequence"""
-    if len(sequence) == 0:
+def get_edge_density(read, pattern, overlapped, head=None, tail=None):
+    """Calculate density of pattern in head or tail of read"""
+    if len(read.sequence) == 0:
         return 0
     if head:
-        subsequence = sequence[:head]
+        subsequence = read.sequence[:head]
     elif tail:
-        subsequence = sequence[-tail:]
+        subsequence = read.sequence[-tail:]
     pattern_matches = pattern.findall(subsequence, overlapped=overlapped)
     return len(pattern_matches) / len(subsequence)
 
 
-def get_edge_densities(read, patterns, overlapped, head=None, tail=None):
-    """Thin wrapper for get_edge_density(): calculate edge densities of multiple patterns in read"""
-    return {
-        kmer: get_edge_density(read.sequence, pattern, overlapped, head, tail)
-        for kmer, pattern in patterns.items()
-    }
-
-
-def determine_cutoff(fastq, patterns, target_kmer, overlapped=True, head=None, tail=None, num_reads=None, jobs=1):
-    """Determine significant density cutoff"""
+def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=None, plot_gmm=None, jobs=1):
+    """Train Gaussian Mixture to determine distribution components"""
     with FastxFile(fastq) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
         capped_read_iterator = islice(read_iterator, num_reads)
@@ -127,31 +120,46 @@ def determine_cutoff(fastq, patterns, target_kmer, overlapped=True, head=None, t
         with Pool(jobs) as pool:
             # imap_unordered() only accepts single-argument functions:
             edge_densities_calculator = partial(
-                get_edge_densities, patterns=patterns,
+                get_edge_density, pattern=pattern,
                 overlapped=overlapped, head=head, tail=tail
             )
             # lazy multiprocess evaluation:
             edge_densities_iterator = pool.imap_unordered(
                 edge_densities_calculator, read_iterator
             )
-            # combine results into DataFrame:
+            # collect results into an array:
             decorated_iterator = tqdm(
-                edge_densities_iterator, desc="Calculating significance cutoff",
+                edge_densities_iterator,
+                desc="Collecting edge densities for training",
                 unit="read", total=num_reads
             )
-            edge_densities_dataframe = concat(
-                (Series(ed) for ed in decorated_iterator),
-                axis=1
-            )
-    print(edge_densities_dataframe.T.to_csv(sep="\t", index=None))
+            edge_densities = fromiter(decorated_iterator, dtype="float32")
+    # find best n_components based on AIC:
+    X = edge_densities.reshape(-1, 1)
+    aics = []
+    for n_components in tqdm(range(2, 6), desc="Training GMM"):
+        gmm = GaussianMixture(n_components=n_components).fit(X)
+        aics.append(gmm.aic(X))
+    n_components = array(aics).argmin() + 2
+    # train final Gaussian Mixture model and determine significant component:
+    gmm = GaussianMixture(n_components=n_components).fit(X)
+    target_component = gmm.predict([[edge_densities.max()]])
+    if plot_gmm is not None: # visualize components if requested
+        switch_backend("Agg")
+        labels = gmm.predict(X)
+        figure, ax = subplots()
+        for label in tqdm(set(labels), desc="Plotting GMM"):
+            kdeplot(edge_densities[labels==label], ax=ax)
+        figure.savefig(plot_gmm)
+    return gmm, target_component
 
 
-def calculate_density(read, pattern, overlapped, window_size, head=None, tail=None, cutoff=0):
+def calculate_density(read, pattern, gmm, target_component, overlapped, window_size, head=None, tail=None, cutoff=0):
     """Calculate density of pattern hits in a rolling window along given read"""
     edge_density = get_edge_density(
-        read.sequence, pattern, overlapped, head, tail
+        read, pattern, overlapped, head, tail
     )
-    passes_filter = (edge_density >= cutoff)
+    passes_filter = (gmm.predict([[edge_density]])[0] == target_component)
     if not passes_filter: # nothing to search for
         density_array = zeros(1)
     else: # create array of hits; axis 0 is positions, axis 1 is patterns
@@ -172,14 +180,15 @@ def calculate_density(read, pattern, overlapped, window_size, head=None, tail=No
     return read.name, density_array, passes_filter
 
 
-def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, head=None, tail=None, cutoff=0, num_reads=None, jobs=1):
+def pattern_scanner(read_iterator, pattern, gmm, target_component, overlapped=True, window_size=120, head=None, tail=None, cutoff=0, num_reads=None, jobs=1):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
             calculate_density, pattern=pattern,
             overlapped=overlapped, window_size=window_size,
-            head=head, tail=tail, cutoff=cutoff
+            head=head, tail=tail,
+            gmm=gmm, target_component=target_component
         )
         # lazy multiprocess evaluation:
         read_density_iterator = pool.imap_unordered(
@@ -192,7 +201,7 @@ def pattern_scanner(read_iterator, pattern, overlapped=True, window_size=120, he
         )
 
 
-def fastq_scanner(fastq, pattern, overlapped=True, window_size=120, head=None, tail=None, cutoff=0, num_reads=None, jobs=1):
+def fastq_scanner(fastq, pattern, gmm, target_component, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
     """Thin wrapper over pattern_scanner() providing read_iterator from fastq file"""
     with FastxFile(fastq) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
@@ -200,7 +209,8 @@ def fastq_scanner(fastq, pattern, overlapped=True, window_size=120, head=None, t
         # parallelize scan:
         yield from pattern_scanner(
             capped_read_iterator, pattern, jobs=jobs,
-            window_size=window_size, head=head, tail=tail, cutoff=cutoff,
+            window_size=window_size, head=head, tail=tail,
+            gmm=gmm, target_component=target_component,
             num_reads=num_reads
         )
 
@@ -252,27 +262,18 @@ def plot_density_kdes(densities_matrix, target_kmers, imgfile, figsize=(10, 12))
 def main(args):
     """Dispatch data to subroutines"""
     kmer_identity = KmerIdentity(k=len(args.kmer))
-    # randomly select n_background_kmers kmers different from target:
-    background_kmers = choose_background_kmers(
-        kmer_identity, args.n_background_kmers, exclude={args.kmer}
-    )
-    # prepare scanner patterns for target and background kmers:
-    patterns = {
-        kmer: kmer_identity.pattern(kmer)
-        for kmer in [args.kmer] + background_kmers
-    }
     # decide on density cutoff:
-    cutoff = determine_cutoff(
-        args.fastq, patterns, target_kmer=args.kmer, jobs=args.jobs,
+    gmm, target_component = train_gmm(
+        args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
         head=args.head, tail=args.tail,
-        num_reads=args.num_reads
+        plot_gmm=args.plot_gmm, num_reads=args.num_reads
     )
-    raise NotImplementedError("Determining cutoff")
     # scan fastq for target kmer query, parallelizing on reads:
     scanner = fastq_scanner(
         args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
         window_size=args.window_size, head=args.head, tail=args.tail,
-        cutoff=cutoff, num_reads=args.num_reads
+        gmm=gmm, target_component=target_component,
+        num_reads=args.num_reads
     )
     # output densities of reads that pass filter:
     for read_name, density_array, passes_filter in scanner:
