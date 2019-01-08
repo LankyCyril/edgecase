@@ -8,8 +8,6 @@ from tqdm import tqdm
 from pysam import FastxFile
 from functools import partial
 from numpy import array, zeros, cumsum, fromiter
-from matplotlib.pyplot import subplots, switch_backend
-from seaborn import kdeplot
 from sklearn.mixture import GaussianMixture
 
 ARG_RULES = {
@@ -28,9 +26,9 @@ ARG_RULES = {
         "help": "length of tail to use for density filter (default 768)",
         "default": None, "type": int, "metavar": "T"
     },
-    ("--plot-gmm",): {
-        "help": "if filename provided, plot GMM components into it",
-        "default": None, "type": str, "metavar": "P"
+    ("--output-gmm",): {
+        "help": "if filename provided, store GMM components in it",
+        "default": None, "type": str, "metavar": "G"
     },
     ("-w", "--window-size"): {
         "help": "size of the rolling window (default 120)",
@@ -97,7 +95,15 @@ def get_edge_density(read, pattern, overlapped, head=None, tail=None):
     return len(pattern_matches) / len(subsequence)
 
 
-def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=None, plot_gmm=None, jobs=1):
+def output_gmm_components(gmm, X, edge_densities, tsv):
+    """Save discovered components to file"""
+    labels = gmm.predict(X)
+    with open(tsv, mode="wt") as handle:
+        for row in zip(edge_densities, labels):
+            print(*row, sep="\t", file=handle)
+
+
+def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, jobs=1):
     """Train Gaussian Mixture to determine distribution components"""
     with FastxFile(fastq) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
@@ -130,16 +136,8 @@ def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=N
     # train final Gaussian Mixture model and determine significant component:
     gmm = GaussianMixture(n_components=n_components).fit(X)
     target_component = gmm.predict([[edge_densities.max()]])
-    if plot_gmm is not None: # visualize components if requested
-        switch_backend("Agg")
-        labels = gmm.predict(X)
-        figure, axs = subplots(nrows=n_components, sharex=True)
-        decorated_iterator = tqdm(
-            zip(set(labels), axs), desc="Plotting GMM", total=n_components
-        )
-        for label, ax in decorated_iterator:
-            kdeplot(edge_densities[labels==label], ax=ax)
-        figure.savefig(plot_gmm)
+    if output_gmm is not None: # visualize components if requested
+        output_gmm_components(gmm, X, edge_densities, tsv=output_gmm)
     return gmm, target_component
 
 
@@ -211,7 +209,7 @@ def main(args):
     gmm, target_component = train_gmm(
         args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
         head=args.head_test, tail=args.tail_test,
-        plot_gmm=args.plot_gmm, num_reads=args.num_reads
+        output_gmm=args.output_gmm, num_reads=args.num_reads
     )
     # scan fastq for target kmer query, parallelizing on reads:
     scanner = fastq_scanner(
