@@ -10,6 +10,8 @@ from functools import partial
 from numpy import array, zeros, cumsum, fromiter
 from sklearn.mixture import GaussianMixture
 
+USAGE = "python3 {} [options] fastq > txt"
+
 ARG_RULES = {
     ("fastq",): {
         "help": "name of input FASTQ file",
@@ -19,11 +21,11 @@ ARG_RULES = {
         "default": "TTAGGG", "metavar": "M"
     },
     ("--head-test",): {
-        "help": "length of head to use for density filter (768)",
+        "help": "length of head to use for density filter (if specified)",
         "default": None, "type": int, "metavar": "H"
     },
     ("--tail-test",): {
-        "help": "length of tail to use for density filter (768)",
+        "help": "length of tail to use for density filter (if specified)",
         "default": None, "type": int, "metavar": "T"
     },
     ("-p", "--pmax"): {
@@ -148,11 +150,14 @@ def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=N
 
 def calculate_density(read, pattern, gmm, target_component, pmax, overlapped, window_size, head=None, tail=None, cutoff=0):
     """Calculate density of pattern hits in a rolling window along given read"""
-    edge_density = get_edge_density(
-        read, pattern, overlapped, head, tail
-    )
-    probas = gmm.predict_proba([[edge_density]])
-    passes_filter = (1 - probas[0][target_component] < pmax)
+    if gmm: # if GMM trained, filter by predict_proba
+        edge_density = get_edge_density(
+            read, pattern, overlapped, head, tail
+        )
+        probas = gmm.predict_proba([[edge_density]])
+        passes_filter = (1 - probas[0][target_component] < pmax)
+    else: # otherwise, allow all
+        passes_filter = True
     if not passes_filter: # nothing to search for
         density_array = zeros(1)
     else: # create array of hits; axis 0 is positions, axis 1 is patterns
@@ -212,11 +217,14 @@ def main(args):
     """Dispatch data to subroutines"""
     kmer_identity = KmerIdentity(k=len(args.kmer))
     # decide on density cutoff:
-    gmm, target_component = train_gmm(
-        args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
-        head=args.head_test, tail=args.tail_test,
-        output_gmm=args.output_gmm, num_reads=args.num_reads
-    )
+    if (args.head_test is not None) or (args.tail_test is not None):
+        gmm, target_component = train_gmm(
+            args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
+            head=args.head_test, tail=args.tail_test,
+            output_gmm=args.output_gmm, num_reads=args.num_reads
+        )
+    else:
+        gmm, target_component = None, None
     # scan fastq for target kmer query, parallelizing on reads:
     scanner = fastq_scanner(
         args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
@@ -231,13 +239,11 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
+    parser = ArgumentParser(usage=USAGE)
     for rule_args, rule_kwargs in ARG_RULES.items():
         parser.add_argument(*rule_args, **rule_kwargs)
     args = parser.parse_args()
-    if (args.head_test is None) and (args.tail_test is None):
-        raise ValueError("Must specify --head or --tail for filtering")
-    elif (args.head_test is not None) and (args.tail_test is not None):
+    if (args.head_test is not None) and (args.tail_test is not None):
         raise ValueError("Can only specify one of --head, --tail")
     else:
         main(args)
