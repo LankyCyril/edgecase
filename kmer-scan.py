@@ -32,6 +32,10 @@ ARG_RULES = {
         "help": "p-value cutoff (1 - proba) for target GMM component (1e-5)",
         "default": 1e-5, "type": float, "metavar": "P"
     },
+    ("-c", "--cutoff"): {
+        "help": "use hard cutoff for density instead of GMM training",
+        "default": None, "type": float, "metavar": "C"
+    },
     ("--output-gmm",): {
         "help": "if filename provided, store GMM components in it",
         "default": None, "type": str, "metavar": "G"
@@ -148,7 +152,7 @@ def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=N
     return gmm, target_component
 
 
-def calculate_density(read, pattern, gmm, target_component, pmax, overlapped, window_size, head=None, tail=None, cutoff=0):
+def calculate_density(read, pattern, gmm, target_component, pmax, cutoff, overlapped, window_size, head=None, tail=None):
     """Calculate density of pattern hits in a rolling window along given read"""
     if gmm: # if GMM trained, filter by predict_proba
         edge_density = get_edge_density(
@@ -156,6 +160,11 @@ def calculate_density(read, pattern, gmm, target_component, pmax, overlapped, wi
         )
         probas = gmm.predict_proba([[edge_density]])
         passes_filter = (1 - probas[0][target_component] < pmax)
+    elif cutoff: # if cutoff specified, filter by hard cutoff
+        edge_density = get_edge_density(
+            read, pattern, overlapped, head, tail
+        )
+        passes_filter = (edge_density > cutoff)
     else: # otherwise, allow all
         passes_filter = True
     if not passes_filter: # nothing to search for
@@ -178,14 +187,14 @@ def calculate_density(read, pattern, gmm, target_component, pmax, overlapped, wi
     return read.name, density_array, passes_filter
 
 
-def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, overlapped=True, window_size=120, head=None, tail=None, cutoff=0, num_reads=None, jobs=1):
+def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, cutoff=None, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
             calculate_density, pattern=pattern,
             overlapped=overlapped, window_size=window_size,
-            head=head, tail=tail,
+            head=head, tail=tail, cutoff=cutoff,
             gmm=gmm, target_component=target_component, pmax=args.pmax
         )
         # lazy multiprocess evaluation:
@@ -199,7 +208,7 @@ def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, overlap
         )
 
 
-def fastq_scanner(fastq, pattern, gmm, target_component, pmax, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
+def fastq_scanner(fastq, pattern, gmm, target_component, pmax, cutoff=None, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
     """Thin wrapper over pattern_scanner() providing read_iterator from fastq file"""
     with FastxFile(fastq) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
@@ -209,7 +218,7 @@ def fastq_scanner(fastq, pattern, gmm, target_component, pmax, overlapped=True, 
             capped_read_iterator, pattern, jobs=jobs,
             window_size=window_size, head=head, tail=tail,
             gmm=gmm, target_component=target_component, pmax=args.pmax,
-            num_reads=num_reads
+            cutoff=cutoff, num_reads=num_reads
         )
 
 
@@ -218,19 +227,23 @@ def main(args):
     kmer_identity = KmerIdentity(k=len(args.kmer))
     # decide on density cutoff:
     if (args.head_test is not None) or (args.tail_test is not None):
-        gmm, target_component = train_gmm(
-            args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
-            head=args.head_test, tail=args.tail_test,
-            output_gmm=args.output_gmm, num_reads=args.num_reads
-        )
-    else:
-        gmm, target_component = None, None
+        if args.cutoff is None: # use GMM instead of hard cutoff
+            gmm, target_component = train_gmm(
+                args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
+                head=args.head_test, tail=args.tail_test,
+                output_gmm=args.output_gmm, num_reads=args.num_reads
+            )
+            cutoff = None
+        else: # use hard cutoff
+            gmm, target_component, cutoff = None, None, args.cutoff
+    else: # no cutoffs, process all reads
+        gmm, target_component, cutoff = None, None, None
     # scan fastq for target kmer query, parallelizing on reads:
     scanner = fastq_scanner(
         args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
         window_size=args.window_size, head=args.head_test, tail=args.tail_test,
         gmm=gmm, target_component=target_component, pmax=args.pmax,
-        num_reads=args.num_reads
+        cutoff=cutoff, num_reads=args.num_reads
     )
     # output densities of reads that pass filter:
     for read_name, density_array, passes_filter in scanner:
@@ -245,5 +258,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if (args.head_test is not None) and (args.tail_test is not None):
         raise ValueError("Can only specify one of --head, --tail")
+    elif (args.cutoff is not None) and (args.head_test is None) and (args.tail_test is None):
+        raise ValueError("--cutoff has no effect without a head/tail test")
+    elif (args.cutoff is not None) and (args.output_gmm is not None):
+        raise ValueError("Cannot output GMM if hard cutoff specified")
     else:
         main(args)
