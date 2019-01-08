@@ -14,8 +14,8 @@ ARG_RULES = {
         "help": "name of input (each line is 'name\\tvalue\\tvalue\\tvalue...')"
     },
     ("-b", "--bin-size"): {
-        "help": "size of each bin in compressed visualization (120)",
-        "default": 120, "type": int, "metavar": "B"
+        "help": "size of each bin in visualization (1)",
+        "default": 1, "type": int, "metavar": "B"
     },
     ("-a", "--align"): {
         "help": "alignment of visualized reads (right)",
@@ -38,11 +38,14 @@ ARG_RULES = {
 
 def binned(A, bins, func=mean):
     """Return array data compressed into bins (smoothed by func)"""
-    coords = linspace(0, len(A), bins+1).astype(int)
-    return array([
-        func(A[start:end])
-        for start, end in zip(coords, coords[1:])
-    ])
+    if bins > 1:
+        coords = linspace(0, len(A), bins+1).astype(int)
+        return array([
+            func(A[start:end])
+            for start, end in zip(coords, coords[1:])
+        ])
+    else:
+        return A
 
 
 def load_metrics(txt, bin_size=120, align="right"):
@@ -86,11 +89,13 @@ def main(args):
     metrics = load_metrics(
         args.txt, bin_size=args.bin_size, align=args.align
     )
+    if args.bin_size > 1:
+        xlabel = "position (x{})".format(args.bin_size)
+    else:
+        xlabel = "position"
     plot_metrics(
         metrics, args.figsize, args.palette, args.hide_names,
-        title=args.txt.split("/")[-1],
-        xlabel="position (x{})".format(args.bin_size),
-        png=stdout.buffer
+        title=args.txt.split("/")[-1], xlabel=xlabel, png=stdout.buffer
     )
     return 0
 
