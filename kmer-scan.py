@@ -19,12 +19,16 @@ ARG_RULES = {
         "default": "TTAGGG", "metavar": "M"
     },
     ("--head-test",): {
-        "help": "length of head to use for density filter (default 768)",
+        "help": "length of head to use for density filter (768)",
         "default": None, "type": int, "metavar": "H"
     },
     ("--tail-test",): {
-        "help": "length of tail to use for density filter (default 768)",
+        "help": "length of tail to use for density filter (768)",
         "default": None, "type": int, "metavar": "T"
+    },
+    ("-p", "--pmax"): {
+        "help": "p-value cutoff (1 - proba) for target GMM component (1e-5)",
+        "default": 1e-5, "type": float, "metavar": "P"
     },
     ("--output-gmm",): {
         "help": "if filename provided, store GMM components in it",
@@ -98,9 +102,10 @@ def get_edge_density(read, pattern, overlapped, head=None, tail=None):
 def output_gmm_components(gmm, X, edge_densities, tsv):
     """Save discovered components to file"""
     labels = gmm.predict(X)
+    probas = gmm.predict_proba(X)
     with open(tsv, mode="wt") as handle:
-        for row in zip(edge_densities, labels):
-            print(*row, sep="\t", file=handle)
+        for ed, label, ps in zip(edge_densities, labels, probas):
+            print(ed, label, *ps, sep="\t", file=handle)
 
 
 def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, jobs=1):
@@ -141,12 +146,13 @@ def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=N
     return gmm, target_component
 
 
-def calculate_density(read, pattern, gmm, target_component, overlapped, window_size, head=None, tail=None, cutoff=0):
+def calculate_density(read, pattern, gmm, target_component, pmax, overlapped, window_size, head=None, tail=None, cutoff=0):
     """Calculate density of pattern hits in a rolling window along given read"""
     edge_density = get_edge_density(
         read, pattern, overlapped, head, tail
     )
-    passes_filter = (gmm.predict([[edge_density]])[0] == target_component)
+    probas = gmm.predict_proba([[edge_density]])
+    passes_filter = (1 - probas[0][target_component] < pmax)
     if not passes_filter: # nothing to search for
         density_array = zeros(1)
     else: # create array of hits; axis 0 is positions, axis 1 is patterns
@@ -167,7 +173,7 @@ def calculate_density(read, pattern, gmm, target_component, overlapped, window_s
     return read.name, density_array, passes_filter
 
 
-def pattern_scanner(read_iterator, pattern, gmm, target_component, overlapped=True, window_size=120, head=None, tail=None, cutoff=0, num_reads=None, jobs=1):
+def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, overlapped=True, window_size=120, head=None, tail=None, cutoff=0, num_reads=None, jobs=1):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
@@ -175,7 +181,7 @@ def pattern_scanner(read_iterator, pattern, gmm, target_component, overlapped=Tr
             calculate_density, pattern=pattern,
             overlapped=overlapped, window_size=window_size,
             head=head, tail=tail,
-            gmm=gmm, target_component=target_component
+            gmm=gmm, target_component=target_component, pmax=args.pmax
         )
         # lazy multiprocess evaluation:
         read_density_iterator = pool.imap_unordered(
@@ -188,7 +194,7 @@ def pattern_scanner(read_iterator, pattern, gmm, target_component, overlapped=Tr
         )
 
 
-def fastq_scanner(fastq, pattern, gmm, target_component, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
+def fastq_scanner(fastq, pattern, gmm, target_component, pmax, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
     """Thin wrapper over pattern_scanner() providing read_iterator from fastq file"""
     with FastxFile(fastq) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
@@ -197,7 +203,7 @@ def fastq_scanner(fastq, pattern, gmm, target_component, overlapped=True, window
         yield from pattern_scanner(
             capped_read_iterator, pattern, jobs=jobs,
             window_size=window_size, head=head, tail=tail,
-            gmm=gmm, target_component=target_component,
+            gmm=gmm, target_component=target_component, pmax=args.pmax,
             num_reads=num_reads
         )
 
@@ -215,7 +221,7 @@ def main(args):
     scanner = fastq_scanner(
         args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
         window_size=args.window_size, head=args.head_test, tail=args.tail_test,
-        gmm=gmm, target_component=target_component,
+        gmm=gmm, target_component=target_component, pmax=args.pmax,
         num_reads=args.num_reads
     )
     # output densities of reads that pass filter:
