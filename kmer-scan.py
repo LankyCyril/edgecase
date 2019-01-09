@@ -10,7 +10,7 @@ from functools import partial
 from numpy import array, zeros, cumsum, fromiter
 from sklearn.mixture import GaussianMixture
 
-USAGE = "python3 {} [options] fastq > txt"
+USAGE = "python3 {} [options] fastq > txt".format(__file__)
 
 ARG_RULES = {
     ("fastq",): {
