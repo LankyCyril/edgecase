@@ -108,8 +108,9 @@ def get_edge_density(read, pattern, overlapped, head=None, tail=None):
     return len(pattern_matches) / len(subsequence)
 
 
-def output_gmm_components(gmm, X, edge_densities, tsv):
+def output_gmm_components(gmm, edge_densities, tsv):
     """Save discovered components to file"""
+    X = edge_densities.reshape(-1, 1)
     labels = gmm.predict(X)
     probas = gmm.predict_proba(X)
     with open(tsv, mode="wt") as handle:
@@ -159,7 +160,7 @@ def train_density_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num
     target_component = gmm.predict([[edge_densities.max()]])
     # visualize components if requested:
     if output_gmm is not None:
-        output_gmm_components(gmm, X, edge_densities, tsv=output_gmm)
+        output_gmm_components(gmm, edge_densities, tsv=output_gmm)
     return gmm, target_component
 
 
