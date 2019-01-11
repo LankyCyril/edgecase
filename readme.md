@@ -38,8 +38,7 @@ density. The advantage of this approach is that we are still able to select
 candidate reads regardless of how much like a repeat their ends look; however,
 we are biasing the search by providing a hard cutoff.
 
-#### If neither --cutoff nor --head-test nor --tail-test are specified, performs only
-one pass:
+#### If neither --cutoff nor --head-test nor --tail-test are specified, performs only one pass:
 
 1. Calculates and outputs densities in the rolling window along each read.
 
