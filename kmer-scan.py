@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from sys import stderr
 from argparse import ArgumentParser
-from itertools import product, islice
+from itertools import product, islice, chain
 from regex import compile, IGNORECASE
 from multiprocessing import Pool
 from tqdm import tqdm
@@ -55,6 +55,9 @@ ARG_RULES = {
 }
 
 ALPHABET = list("ACGT")
+
+GMM_NCOMPONENTS_RANGE = range(2, 6)
+GMM_TRAIN_ROUNDS = 5
 
 
 class KmerIdentity:
@@ -114,8 +117,22 @@ def output_gmm_components(gmm, X, edge_densities, tsv):
             print(ed, label, *ps, sep="\t", file=handle)
 
 
-def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, jobs=1):
-    """Train Gaussian Mixture to determine distribution components"""
+def train_gmm(mixed_distribution):
+    """Train Gaussian Mixture to determine distribution components; choose model with lowest AIC"""
+    aic2gmm = {}
+    decorated_iterator = tqdm(
+        chain(*[GMM_NCOMPONENTS_RANGE]*GMM_TRAIN_ROUNDS),
+        desc="Training GMM", total=len(GMM_NCOMPONENTS_RANGE)*GMM_TRAIN_ROUNDS
+    )
+    for n_components in decorated_iterator:
+        gmm = GaussianMixture(n_components=n_components).fit(mixed_distribution)
+        aic2gmm[gmm.aic(mixed_distribution)] = gmm
+    min_aic = min(aic2gmm.keys())
+    return aic2gmm[min_aic]
+
+
+def train_density_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, jobs=1):
+    """Train Gaussian Mixture to determine component containing significant edge densities"""
     with FastxFile(fastq) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
         capped_read_iterator = islice(read_iterator, num_reads)
@@ -137,17 +154,11 @@ def train_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=N
                 unit="read", total=num_reads
             )
             edge_densities = fromiter(decorated_iterator, dtype="float32")
-    # find best n_components based on AIC:
-    X = edge_densities.reshape(-1, 1)
-    aics = []
-    for n_components in tqdm(range(2, 6), desc="Training GMM"):
-        gmm = GaussianMixture(n_components=n_components).fit(X)
-        aics.append(gmm.aic(X))
-    n_components = array(aics).argmin() + 2
-    # train final Gaussian Mixture model and determine significant component:
-    gmm = GaussianMixture(n_components=n_components).fit(X)
+    # train Gaussian Mixture model and determine significant component:
+    gmm = train_gmm(edge_densities.reshape(-1, 1))
     target_component = gmm.predict([[edge_densities.max()]])
-    if output_gmm is not None: # visualize components if requested
+    # visualize components if requested:
+    if output_gmm is not None:
         output_gmm_components(gmm, X, edge_densities, tsv=output_gmm)
     return gmm, target_component
 
@@ -228,7 +239,7 @@ def main(args):
     # decide on density cutoff:
     if (args.head_test is not None) or (args.tail_test is not None):
         if args.cutoff is None: # use GMM instead of hard cutoff
-            gmm, target_component = train_gmm(
+            gmm, target_component = train_density_gmm(
                 args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
                 head=args.head_test, tail=args.tail_test,
                 output_gmm=args.output_gmm, num_reads=args.num_reads
