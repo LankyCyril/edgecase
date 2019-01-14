@@ -2,6 +2,7 @@
 from sys import stderr
 from argparse import ArgumentParser
 from itertools import product, islice, chain
+from contextlib import contextmanager, ExitStack
 from regex import compile, IGNORECASE
 from multiprocessing import Pool
 from tqdm import tqdm
@@ -13,8 +14,9 @@ from sklearn.mixture import GaussianMixture
 USAGE = "python3 {} [options] fastq > txt".format(__file__)
 
 ARG_RULES = {
-    ("fastq",): {
+    ("fastqs",): {
         "help": "name of input FASTQ file",
+        "nargs": "+"
     },
     ("--kmer",): {
         "help": "target kmer sequence (default TTAGGG)",
@@ -58,6 +60,16 @@ ALPHABET = list("ACGT")
 
 GMM_NCOMPONENTS_RANGE = range(2, 6)
 GMM_TRAIN_ROUNDS = 5
+
+
+@contextmanager
+def FastxChain(fastxs):
+    """Chain fastx records from all filenames in list fastxs, replicating behavior of pysam.FastxFile"""
+    with ExitStack() as stack:
+        yield chain(*(
+            stack.enter_context(FastxFile(fastx))
+            for fastx in fastxs
+        ))
 
 
 class KmerIdentity:
@@ -132,9 +144,9 @@ def train_gmm(mixed_distribution):
     return aic2gmm[min_aic]
 
 
-def train_density_gmm(fastq, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, jobs=1):
+def train_density_gmm(fastqs, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, jobs=1):
     """Train Gaussian Mixture to determine component containing significant edge densities"""
-    with FastxFile(fastq) as read_iterator:
+    with FastxChain(fastqs) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
         capped_read_iterator = islice(read_iterator, num_reads)
         # parallelize scan (all patterns at once):
@@ -220,9 +232,9 @@ def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, cutoff=
         )
 
 
-def fastq_scanner(fastq, pattern, gmm, target_component, pmax, cutoff=None, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
+def fastq_scanner(fastqs, pattern, gmm, target_component, pmax, cutoff=None, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
     """Thin wrapper over pattern_scanner() providing read_iterator from fastq file"""
-    with FastxFile(fastq) as read_iterator:
+    with FastxChain(fastqs) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
         capped_read_iterator = islice(read_iterator, num_reads)
         # parallelize scan:
@@ -241,7 +253,7 @@ def main(args):
     if (args.head_test is not None) or (args.tail_test is not None):
         if args.cutoff is None: # use GMM instead of hard cutoff
             gmm, target_component = train_density_gmm(
-                args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
+                args.fastqs, kmer_identity.pattern(args.kmer), jobs=args.jobs,
                 head=args.head_test, tail=args.tail_test,
                 output_gmm=args.output_gmm, num_reads=args.num_reads
             )
@@ -252,7 +264,7 @@ def main(args):
         gmm, target_component, cutoff = None, None, None
     # scan fastq for target kmer query, parallelizing on reads:
     scanner = fastq_scanner(
-        args.fastq, kmer_identity.pattern(args.kmer), jobs=args.jobs,
+        args.fastqs, kmer_identity.pattern(args.kmer), jobs=args.jobs,
         window_size=args.window_size, head=args.head_test, tail=args.tail_test,
         gmm=gmm, target_component=target_component, pmax=args.pmax,
         cutoff=cutoff, num_reads=args.num_reads
