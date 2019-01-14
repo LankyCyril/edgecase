@@ -158,7 +158,7 @@ def train_density_gmm(fastqs, pattern, overlapped=True, head=None, tail=None, nu
             )
             # lazy multiprocess evaluation:
             edge_densities_iterator = pool.imap_unordered(
-                edge_densities_calculator, read_iterator
+                edge_densities_calculator, capped_read_iterator
             )
             # collect results into an array:
             decorated_iterator = tqdm(
