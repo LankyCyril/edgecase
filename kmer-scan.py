@@ -65,7 +65,7 @@ ARG_RULES = {
 }
 
 ALPHABET = list("ACGT")
-GMM_NCOMPONENTS_RANGE = range(2, 6)
+GMM_NCOMPONENTS_RANGE = range(2, 3)
 
 
 @contextmanager
