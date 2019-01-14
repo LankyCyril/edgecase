@@ -114,7 +114,7 @@ class KmerIdentity:
         return anchor_kmers - excluded_anchors
 
 
-def get_edge_density(read, pattern, head=None, tail=None):
+def get_edge_density(read, pattern, head, tail):
     """Calculate density of pattern in head or tail of read"""
     if len(read.sequence) == 0:
         return 0
@@ -156,7 +156,7 @@ def train_gmm(mixed_distribution, gmm_train_rounds, gmm_metric, pmax):
     return metric2gmm[min_metric]
 
 
-def train_density_gmm(fastqs, pattern, head=None, tail=None, num_reads=None, output_gmm=None, gmm_train_rounds=5, gmm_metric="aic", pmax=1e-5, jobs=1):
+def train_density_gmm(fastqs, pattern, head, tail, num_reads, output_gmm, gmm_train_rounds, gmm_metric, pmax, jobs):
     """Train Gaussian Mixture to determine component containing significant edge densities"""
     with FastxChain(fastqs) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
@@ -190,7 +190,7 @@ def train_density_gmm(fastqs, pattern, head=None, tail=None, num_reads=None, out
     return gmm, target_component
 
 
-def calculate_density(read, pattern, gmm, target_component, pmax, cutoff, window_size, head=None, tail=None):
+def calculate_density(read, pattern, gmm, target_component, pmax, cutoff, window_size, head, tail):
     """Calculate density of pattern hits in a rolling window along given read"""
     if gmm: # if GMM trained, filter by predict_proba
         edge_density = get_edge_density(
@@ -225,7 +225,7 @@ def calculate_density(read, pattern, gmm, target_component, pmax, cutoff, window
     return read.name, density_array, passes_filter
 
 
-def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, cutoff=None, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
+def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, cutoff, window_size, head, tail, num_reads, jobs):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
@@ -245,7 +245,7 @@ def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, cutoff=
         )
 
 
-def fastq_scanner(fastqs, pattern, gmm, target_component, pmax, cutoff=None, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
+def fastq_scanner(fastqs, pattern, gmm, target_component, pmax, cutoff, window_size, head, tail, num_reads, jobs):
     """Thin wrapper over pattern_scanner() providing read_iterator from fastq file"""
     with FastxChain(fastqs) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
@@ -268,10 +268,9 @@ def main(args):
             gmm, target_component = train_density_gmm(
                 args.fastqs, kmer_identity.pattern(args.kmer), jobs=args.jobs,
                 head=args.head_test, tail=args.tail_test,
-                output_gmm=args.output_gmm,
                 gmm_train_rounds=args.gmm_train_rounds,
-                gmm_metric=args.gmm_metric,
-                num_reads=args.num_reads
+                gmm_metric=args.gmm_metric, pmax=args.pmax,
+                output_gmm=args.output_gmm, num_reads=args.num_reads
             )
             cutoff = None
         else: # use hard cutoff
