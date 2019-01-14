@@ -14,8 +14,8 @@ ARG_RULES = {
         "help": "name of input (each line is 'name\\tvalue\\tvalue\\tvalue...')"
     },
     ("-b", "--bin-size"): {
-        "help": "size of each bin in visualization (1)",
-        "default": 1, "type": int, "metavar": "B"
+        "help": "size of each bin in bp for visualization speedup (100)",
+        "default": 100, "type": int, "metavar": "B"
     },
     ("-a", "--align"): {
         "help": "alignment of visualized reads (left)",
@@ -45,7 +45,7 @@ def binned(A, bins, func=mean):
     ])
 
 
-def load_metrics(txt, bin_size=120, align="left"):
+def load_metrics(txt, bin_size, align):
     """Load metrics from a text file, bin and convert into dataframe"""
     read_metrics = {}
     # load and bin all metrics first:
@@ -69,15 +69,26 @@ def load_metrics(txt, bin_size=120, align="left"):
     return concat(rows, axis=1).T
 
 
-def plot_metrics(metrics, figsize="16x9", palette="viridis", hide_names=False, title="", xlabel="", png=stdout.buffer):
+def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, title="", png=stdout.buffer):
     """Plot binned metrics as a heatmap"""
     switch_backend("Agg")
     width, height = tuple(map(int, figsize.split("x")))
     figure, ax = subplots(figsize=(width, height))
     heatmap(metrics, vmin=0, vmax=1, ax=ax, cmap=palette)
-    ax.set(xlabel=xlabel, title=title)
+    xticks = [
+        int(tick.get_text()) for tick in ax.get_xticklabels()
+    ]
+    if align == "right":
+        xticks = [
+            tick * -1 for tick in reversed(xticks)
+        ]
+    ax.set_xticklabels(
+        [tick * bin_size for tick in xticks],
+        rotation=60
+    )
     if hide_names:
         ax.set(yticks=[])
+    ax.set(title=title, xlabel="position (bp)")
     figure.savefig(png)
 
 
@@ -92,7 +103,8 @@ def main(args):
         xlabel = "position"
     plot_metrics(
         metrics, args.figsize, args.palette, args.hide_names,
-        title=args.txt.split("/")[-1], xlabel=xlabel, png=stdout.buffer
+        bin_size=args.bin_size, align=args.align,
+        title=args.txt.split("/")[-1], png=stdout.buffer
     )
     return 0
 
