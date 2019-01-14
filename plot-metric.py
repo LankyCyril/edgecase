@@ -38,14 +38,11 @@ ARG_RULES = {
 
 def binned(A, bins, func=mean):
     """Return array data compressed into bins (smoothed by func)"""
-    if bins > 1:
-        coords = linspace(0, len(A), bins+1).astype(int)
-        return array([
-            func(A[start:end])
-            for start, end in zip(coords, coords[1:])
-        ])
-    else:
-        return A
+    coords = linspace(0, len(A), bins+1).astype(int)
+    return array([
+        func(A[start:end])
+        for start, end in zip(coords, coords[1:])
+    ])
 
 
 def load_metrics(txt, bin_size=120, align="left"):
