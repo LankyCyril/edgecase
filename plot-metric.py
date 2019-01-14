@@ -18,8 +18,8 @@ ARG_RULES = {
         "default": 1, "type": int, "metavar": "B"
     },
     ("-a", "--align"): {
-        "help": "alignment of visualized reads (right)",
-        "default": "right", "metavar": "A"
+        "help": "alignment of visualized reads (left)",
+        "default": "left", "metavar": "A"
     },
     ("-s", "--figsize"): {
         "help": "figure size (16x9)",
@@ -48,7 +48,7 @@ def binned(A, bins, func=mean):
         return A
 
 
-def load_metrics(txt, bin_size=120, align="right"):
+def load_metrics(txt, bin_size=120, align="left"):
     """Load metrics from a text file, bin and convert into dataframe"""
     read_metrics = {}
     # load and bin all metrics first:
