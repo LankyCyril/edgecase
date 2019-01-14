@@ -114,7 +114,7 @@ class KmerIdentity:
         return anchor_kmers - excluded_anchors
 
 
-def get_edge_density(read, pattern, overlapped, head=None, tail=None):
+def get_edge_density(read, pattern, head=None, tail=None):
     """Calculate density of pattern in head or tail of read"""
     if len(read.sequence) == 0:
         return 0
@@ -122,7 +122,7 @@ def get_edge_density(read, pattern, overlapped, head=None, tail=None):
         subsequence = read.sequence[:head]
     elif tail:
         subsequence = read.sequence[-tail:]
-    pattern_matches = pattern.findall(subsequence, overlapped=overlapped)
+    pattern_matches = pattern.findall(subsequence, overlapped=True)
     return len(pattern_matches) / len(subsequence)
 
 
@@ -156,7 +156,7 @@ def train_gmm(mixed_distribution, gmm_train_rounds, gmm_metric, pmax):
     return metric2gmm[min_metric]
 
 
-def train_density_gmm(fastqs, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, gmm_train_rounds=5, gmm_metric="aic", pmax=1e-5, jobs=1):
+def train_density_gmm(fastqs, pattern, head=None, tail=None, num_reads=None, output_gmm=None, gmm_train_rounds=5, gmm_metric="aic", pmax=1e-5, jobs=1):
     """Train Gaussian Mixture to determine component containing significant edge densities"""
     with FastxChain(fastqs) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
@@ -165,8 +165,7 @@ def train_density_gmm(fastqs, pattern, overlapped=True, head=None, tail=None, nu
         with Pool(jobs) as pool:
             # imap_unordered() only accepts single-argument functions:
             edge_densities_calculator = partial(
-                get_edge_density, pattern=pattern,
-                overlapped=overlapped, head=head, tail=tail
+                get_edge_density, pattern=pattern, head=head, tail=tail
             )
             # lazy multiprocess evaluation:
             edge_densities_iterator = pool.imap_unordered(
@@ -191,17 +190,17 @@ def train_density_gmm(fastqs, pattern, overlapped=True, head=None, tail=None, nu
     return gmm, target_component
 
 
-def calculate_density(read, pattern, gmm, target_component, pmax, cutoff, overlapped, window_size, head=None, tail=None):
+def calculate_density(read, pattern, gmm, target_component, pmax, cutoff, window_size, head=None, tail=None):
     """Calculate density of pattern hits in a rolling window along given read"""
     if gmm: # if GMM trained, filter by predict_proba
         edge_density = get_edge_density(
-            read, pattern, overlapped, head, tail
+            read, pattern, head, tail
         )
         probas = gmm.predict_proba([[edge_density]])
         passes_filter = (1 - probas[0][target_component] < pmax)
     elif cutoff: # if cutoff specified, filter by hard cutoff
         edge_density = get_edge_density(
-            read, pattern, overlapped, head, tail
+            read, pattern, head, tail
         )
         passes_filter = (edge_density > cutoff)
     else: # otherwise, allow all
@@ -213,7 +212,7 @@ def calculate_density(read, pattern, gmm, target_component, pmax, cutoff, overla
         canvas = zeros(read_length, dtype=bool)
         pattern_positions = array([
             match.start() for match
-            in pattern.finditer(read.sequence, overlapped=overlapped)
+            in pattern.finditer(read.sequence, overlapped=True)
         ])
         if len(pattern_positions):
             canvas[pattern_positions] = True
@@ -226,14 +225,13 @@ def calculate_density(read, pattern, gmm, target_component, pmax, cutoff, overla
     return read.name, density_array, passes_filter
 
 
-def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, cutoff=None, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
+def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, cutoff=None, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
     """Calculate density of pattern hits in a rolling window along each read"""
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
             calculate_density, pattern=pattern,
-            overlapped=overlapped, window_size=window_size,
-            head=head, tail=tail, cutoff=cutoff,
+            window_size=window_size, head=head, tail=tail, cutoff=cutoff,
             gmm=gmm, target_component=target_component, pmax=args.pmax
         )
         # lazy multiprocess evaluation:
@@ -247,7 +245,7 @@ def pattern_scanner(read_iterator, pattern, gmm, target_component, pmax, cutoff=
         )
 
 
-def fastq_scanner(fastqs, pattern, gmm, target_component, pmax, cutoff=None, overlapped=True, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
+def fastq_scanner(fastqs, pattern, gmm, target_component, pmax, cutoff=None, window_size=120, head=None, tail=None, num_reads=None, jobs=1):
     """Thin wrapper over pattern_scanner() providing read_iterator from fastq file"""
     with FastxChain(fastqs) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
