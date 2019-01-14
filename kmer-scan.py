@@ -34,6 +34,14 @@ ARG_RULES = {
         "help": "p-value cutoff (1 - proba) for target GMM component (1e-5)",
         "default": 1e-5, "type": float, "metavar": "P"
     },
+    ("--gmm-train-rounds",): {
+        "help": "number of rounds of GMM training (10)",
+        "default": 10, "type": int, "metavar": "R"
+    },
+    ("--gmm-metric",): {
+        "help": "how to evaluate GMMs: aic (or maxreads)",
+        "default": "aic", "metavar": "E",
+    },
     ("-c", "--cutoff"): {
         "help": "use hard cutoff for density instead of GMM training",
         "default": None, "type": float, "metavar": "C"
@@ -57,9 +65,7 @@ ARG_RULES = {
 }
 
 ALPHABET = list("ACGT")
-
 GMM_NCOMPONENTS_RANGE = range(2, 6)
-GMM_TRAIN_ROUNDS = 5
 
 
 @contextmanager
@@ -130,21 +136,27 @@ def output_gmm_components(gmm, edge_densities, tsv):
             print(ed, label, *ps, sep="\t", file=handle)
 
 
-def train_gmm(mixed_distribution):
-    """Train Gaussian Mixture to determine distribution components; choose model with lowest AIC"""
-    aic2gmm = {}
+def train_gmm(mixed_distribution, gmm_train_rounds, gmm_metric, pmax):
+    """Train Gaussian Mixture to determine distribution components; choose model with lowest AIC or maximum reads"""
+    metric2gmm = {}
     decorated_iterator = tqdm(
-        chain(*[GMM_NCOMPONENTS_RANGE]*GMM_TRAIN_ROUNDS),
-        desc="Training GMM", total=len(GMM_NCOMPONENTS_RANGE)*GMM_TRAIN_ROUNDS
+        chain(*[GMM_NCOMPONENTS_RANGE]*gmm_train_rounds),
+        desc="Training GMM", total=len(GMM_NCOMPONENTS_RANGE)*gmm_train_rounds
     )
     for n_components in decorated_iterator:
         gmm = GaussianMixture(n_components=n_components).fit(mixed_distribution)
-        aic2gmm[gmm.aic(mixed_distribution)] = gmm
-    min_aic = min(aic2gmm.keys())
-    return aic2gmm[min_aic]
+        if gmm_metric == "aic":
+            metric2gmm[gmm.aic(mixed_distribution)] = gmm
+        elif gmm_metric == "maxreads":
+            target_component = gmm.predict([[mixed_distribution.max()]])
+            probas = gmm.predict_proba(mixed_distribution)
+            metric = (probas[:,target_component] <= 1 - pmax).sum()
+            metric2gmm[metric] = gmm
+    min_metric = min(metric2gmm.keys())
+    return metric2gmm[min_metric]
 
 
-def train_density_gmm(fastqs, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, jobs=1):
+def train_density_gmm(fastqs, pattern, overlapped=True, head=None, tail=None, num_reads=None, output_gmm=None, gmm_train_rounds=5, gmm_metric="aic", pmax=1e-5, jobs=1):
     """Train Gaussian Mixture to determine component containing significant edge densities"""
     with FastxChain(fastqs) as read_iterator:
         # only take the first num_reads entries (`None` takes all):
@@ -168,7 +180,10 @@ def train_density_gmm(fastqs, pattern, overlapped=True, head=None, tail=None, nu
             )
             edge_densities = fromiter(decorated_iterator, dtype="float32")
     # train Gaussian Mixture model and determine significant component:
-    gmm = train_gmm(edge_densities.reshape(-1, 1))
+    gmm = train_gmm(
+        edge_densities.reshape(-1, 1),
+        gmm_train_rounds, gmm_metric, pmax
+    )
     target_component = gmm.predict([[edge_densities.max()]])
     # visualize components if requested:
     if output_gmm is not None:
@@ -255,7 +270,10 @@ def main(args):
             gmm, target_component = train_density_gmm(
                 args.fastqs, kmer_identity.pattern(args.kmer), jobs=args.jobs,
                 head=args.head_test, tail=args.tail_test,
-                output_gmm=args.output_gmm, num_reads=args.num_reads
+                output_gmm=args.output_gmm,
+                gmm_train_rounds=args.gmm_train_rounds,
+                gmm_metric=args.gmm_metric,
+                num_reads=args.num_reads
             )
             cutoff = None
         else: # use hard cutoff
