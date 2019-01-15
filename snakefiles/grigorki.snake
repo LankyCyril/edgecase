@@ -106,6 +106,24 @@ rule all_eulers:
             timepoint=["pre", "flight", "post"]
         )
 
+def plot_metrics(input, output, wildcards, title, names):
+    with open(input.kmerscan) as kmerscan:
+        with NamedTemporaryFile(delete=False, mode="wt") as tmp_txt:
+            for line in map(str.strip, kmerscan):
+                if line.split()[0] in names:
+                    print(line, file=tmp_txt)
+    if wildcards.kmer == "TTAGGG":
+        align = "right"
+    elif wildcards.kmer == "CCCTAA":
+        align = "left"
+    else:
+        raise ValueError("Unsupported kmer: {}".format(wildcards.kmer))
+    shell("""
+        python plot-metric.py -a {align} --hide-names --title '{title}' \
+            {tmp_txt.name} > {output.png}
+    """)
+    os.remove(tmp_txt.name)
+
 rule TP_metrics_plot:
     input:
         kmerscan="data/kmers/combined/{subject}-{timepoint}-{kmer}.txt",
@@ -117,20 +135,23 @@ rule TP_metrics_plot:
     run:
         read_sets = get_read_sets(input)
         tp_names = set.intersection(*read_sets.values())
-        with open(input.kmerscan) as kmerscan:
-            with NamedTemporaryFile(delete=False, mode="wt") as tmp_txt:
-                for line in map(str.strip, kmerscan):
-                    if line.split()[0] in tp_names:
-                        print(line, file=tmp_txt)
-        if wildcards.kmer == "TTAGGG":
-            align = "right"
-        elif wildcards.kmer == "CCCTAA":
-            align = "left"
-        else:
-            raise ValueError("Unsupported kmer: {}".format(wildcards.kmer))
-        shell("""
-            python plot-metric.py -a {align} --hide-names \
-                --title {wildcards.subject}-{wildcards.timepoint} \
-                {tmp_txt.name} > {output.png}
-        """)
-        os.remove(tmp_txt.name)
+        title = "{}-{}: {} true positives".format(
+            wildcards.subject, wildcards.timepoint, wildcards.kmer
+        )
+        plot_metrics(input, output, wildcards, title, tp_names)
+
+rule kmerscan_FP_metrics_plot:
+    input:
+        kmerscan="data/kmers/combined/{subject}-{timepoint}-{kmer}.txt",
+        basecomp="data/basecomp/{subject}-{timepoint}.fq",
+        hmmer_v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
+        hmmer_v2="data/hmmer/twins-ont-2019/{subject}-{timepoint}.fq"
+    output:
+        png="data/plots/{subject}-{timepoint}/kmerscan-fp-{kmer}.png"
+    run:
+        read_sets = get_read_sets(input)
+        fp_names = read_sets["kmerscan"] - read_sets["basecomp"]
+        title = "{}-{}: {} kmer-scan false? positives".format(
+            wildcards.subject, wildcards.timepoint, wildcards.kmer
+        )
+        plot_metrics(input, output, wildcards, title, fp_names)
