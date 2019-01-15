@@ -32,6 +32,9 @@ ARG_RULES = {
     ("--hide-names",): {
         "help": "hide names of reads on heatmap",
         "action": "store_true"
+    },
+    ("--title",): {
+        "help": "figure title (defaults to input filename)"
     }
 }
 
@@ -100,10 +103,14 @@ def main(args):
     metrics = load_metrics(
         args.txt, bin_size=args.bin_size, align=args.align
     )
+    if args.title:
+        title = args.title
+    else:
+        title = args.txt.split("/")[-1]
     plot_metrics(
         metrics, args.figsize, args.palette, args.hide_names,
         bin_size=args.bin_size, align=args.align,
-        title=args.txt.split("/")[-1], png=stdout.buffer
+        title=title, png=stdout.buffer
     )
     return 0
 

@@ -130,6 +130,7 @@ rule TP_metrics_plot:
             raise ValueError("Unsupported kmer: {}".format(wildcards.kmer))
         shell("""
             python plot-metric.py -a {align} --hide-names \
+                --title {wildcards.subject}-{wildcards.timepoint} \
                 {tmp_txt.name} > {output.png}
         """)
         os.remove(tmp_txt.name)
