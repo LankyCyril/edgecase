@@ -55,9 +55,13 @@ def get_read_sets(input):
             set(names_from_txt(input.kmerscan_TTAGGG)) |
             set(names_from_txt(input.kmerscan_CCCTAA))
         )
+    if hasattr(input, "basecomp"):
+        basecomp = set(names_from_fq(input.basecomp))
+    else:
+        basecomp = kmerscan
     return OrderedDict([
         ("kmerscan", kmerscan),
-        ("basecomp", set(names_from_fq(input.basecomp))),
+        ("basecomp", basecomp),
         ("hmmer", (
             set(names_from_fq(input.hmmer_v1)) |
             set(names_from_fq(input.hmmer_v2))
@@ -156,12 +160,40 @@ rule kmerscan_FP_metrics_plot:
         )
         plot_metrics(input, output, wildcards, title, fp_names)
 
+rule combined_basecomp_kmerscan:
+    input:
+        fq="data/basecomp/{subject}-{timepoint}.fq"
+    output:
+        densities="data/kmers/combined/basecomp/{subject}-{timepoint}-{kmer}.txt"
+    run:
+        shell("""
+            python kmer-scan.py -j {threads} \
+                --kmer {wildcards.kmer} \
+                {input.fq} \
+                > {output.densities}
+        """)
+
+rule basecomp_FP_metrics_plot:
+    input:
+        kmerscan="data/kmers/combined/basecomp/{subject}-{timepoint}-{kmer}.txt",
+        hmmer_v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
+        hmmer_v2="data/hmmer/twins-ont-2019/{subject}-{timepoint}.fq"
+    output:
+        png="data/plots/{subject}-{timepoint}/basecomp-unique-{kmer}.png"
+    run:
+        read_sets = get_read_sets(input)
+        fp_names = read_sets["kmerscan"] - read_sets["hmmer"]
+        title = "{}-{}: {} basecomp false? positives".format(
+            wildcards.subject, wildcards.timepoint, wildcards.kmer
+        )
+        plot_metrics(input, output, wildcards, title, fp_names)
+
 rule all_metrics:
     input:
         pngs=expand(
             "data/plots/{subject}-{timepoint}/{kind}-{kmer}.png",
             subject=["TW", "HR"],
             timepoint=["pre", "flight", "post"],
-            kind=["tp", "kmerscan-fp"],
+            kind=["tp", "kmerscan-fp", "basecomp-unique"],
             kmer=["TTAGGG", "CCCTAA"]
         )
