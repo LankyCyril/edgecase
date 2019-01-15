@@ -101,7 +101,7 @@ rule threeway_venn:
 rule all_eulers:
     input:
         pngs=expand(
-            "data/plots/{subject}-{timepoint}/euler.png",
+            "data/plots/{subject}-{timepoint}/euler-diagram.png",
             subject=["TW", "HR"],
             timepoint=["pre", "flight", "post"]
         )
