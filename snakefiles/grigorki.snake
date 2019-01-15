@@ -1,8 +1,8 @@
 from pysam import FastxFile
 from matplotlib.pyplot import switch_backend, subplots
 from collections import OrderedDict
-from venn import generate_petal_labels
-from matplotlib_venn import venn3
+from venn import venn, generate_petal_labels
+from matplotlib_venn import venn3 as euler3
 switch_backend("Agg")
 
 rule combined_hmmer_kmerscan:
@@ -52,7 +52,7 @@ def euler_labels(read_sets):
         for logic in ("100", "010", "110", "001", "101", "011", "111")
     ]
 
-rule threeway_euler:
+rule threeway_venn:
     input:
         kmerscan_TTAGGG="data/kmers/combined/{subject}-{timepoint}-TTAGGG.txt",
         kmerscan_CCCTAA="data/kmers/combined/{subject}-{timepoint}-CCCTAA.txt",
@@ -60,9 +60,9 @@ rule threeway_euler:
         hmmer_v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
         hmmer_v2="data/hmmer/twins-ont-2019/{subject}-{timepoint}.fq"
     output:
-        png="data/plots/{subject}-{timepoint}/euler.png"
+        png="data/plots/{subject}-{timepoint}/{diagram_type}.png"
     params:
-        figsize=(12, 12)
+        figsize=(8, 8)
     run:
         read_sets = OrderedDict([
             ("kmerscan", (
@@ -76,9 +76,15 @@ rule threeway_euler:
             ))
         ])
         figure, ax = subplots(figsize=params.figsize)
-        venn3(
-            subsets=euler_labels(read_sets),
-            set_labels=read_sets.keys(),
-            ax=ax
-        )
+        if wildcards.diagram_type == "venn":
+            venn(read_sets, ax=ax)
+        elif wildcards.diagram_type == "euler":
+            euler3(
+                subsets=euler_labels(read_sets),
+                set_labels=read_sets.keys(),
+                ax=ax
+            )
+        else:
+            raise ValueError("Unsupported diagram type")
+        ax.set(title="{} {}".format(wildcards.subject, wildcards.timepoint))
         figure.savefig(output.png)
