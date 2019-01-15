@@ -3,6 +3,8 @@ from matplotlib.pyplot import switch_backend, subplots
 from collections import OrderedDict
 from venn import venn, generate_petal_labels
 from matplotlib_venn import venn3 as euler3
+from tempfile import NamedTemporaryFile
+from os import remove
 switch_backend("Agg")
 
 rule combined_hmmer_kmerscan:
@@ -45,6 +47,23 @@ def names_from_fq(filename):
     with FastxFile(filename) as fastx:
         return [read.name for read in fastx]
 
+def get_read_sets(input):
+    if hasattr(input, "kmerscan"):
+        kmerscan = set(names_from_txt(input.kmerscan))
+    else:
+        kmerscan = (
+            set(names_from_txt(input.kmerscan_TTAGGG)) |
+            set(names_from_txt(input.kmerscan_CCCTAA))
+        )
+    return OrderedDict([
+        ("kmerscan", kmerscan),
+        ("basecomp", set(names_from_fq(input.basecomp))),
+        ("hmmer", (
+            set(names_from_fq(input.hmmer_v1)) |
+            set(names_from_fq(input.hmmer_v2))
+        ))
+    ])
+
 def euler_labels(read_sets):
     venn_labels = generate_petal_labels(read_sets.values())
     return [
@@ -60,21 +79,11 @@ rule threeway_venn:
         hmmer_v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
         hmmer_v2="data/hmmer/twins-ont-2019/{subject}-{timepoint}.fq"
     output:
-        png="data/plots/{subject}-{timepoint}/{diagram_type}.png"
+        png="data/plots/{subject}-{timepoint}/{diagram_type}-diagram.png"
     params:
         figsize=(8, 8)
     run:
-        read_sets = OrderedDict([
-            ("kmerscan", (
-                set(names_from_txt(input.kmerscan_TTAGGG)) |
-                set(names_from_txt(input.kmerscan_CCCTAA))
-            )),
-            ("basecomp", set(names_from_fq(input.basecomp))),
-            ("hmmer", (
-                set(names_from_fq(input.hmmer_v1)) |
-                set(names_from_fq(input.hmmer_v2))
-            ))
-        ])
+        read_sets = get_read_sets(input)
         figure, ax = subplots(figsize=params.figsize)
         if wildcards.diagram_type == "venn":
             venn(read_sets, ax=ax)
@@ -96,3 +105,31 @@ rule all_eulers:
             subject=["TW", "HR"],
             timepoint=["pre", "flight", "post"]
         )
+
+rule TP_metrics_plot:
+    input:
+        kmerscan="data/kmers/combined/{subject}-{timepoint}-{kmer}.txt",
+        basecomp="data/basecomp/{subject}-{timepoint}.fq",
+        hmmer_v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
+        hmmer_v2="data/hmmer/twins-ont-2019/{subject}-{timepoint}.fq"
+    output:
+        png="data/plots/{subject}-{timepoint}/tp-{kmer}.png"
+    run:
+        read_sets = get_read_sets(input)
+        tp_names = set.intersection(*read_sets.values())
+        with open(input.kmerscan) as kmerscan:
+            with NamedTemporaryFile(delete=False, mode="wt") as tmp_txt:
+                for line in map(str.strip, kmerscan):
+                    if line.split()[0] in tp_names:
+                        print(line, file=tmp_txt)
+        if wildcards.kmer == "TTAGGG":
+            align = "right"
+        elif wildcards.kmer == "CCCTAA":
+            align = "left"
+        else:
+            raise ValueError("Unsupported kmer: {}".format(wildcards.kmer))
+        shell("""
+            python plot-metric.py -a {align} --hide-names \
+                {tmp_txt.name} > {output.png}
+        """)
+        os.remove(tmp_txt.name)
