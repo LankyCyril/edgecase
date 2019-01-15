@@ -1,3 +1,8 @@
+from pysam import FastxFile
+from matplotlib.pyplot import switch_backend, subplots
+from venn import venn
+switch_backend("Agg")
+
 rule combined_hmmer_kmerscan:
     input:
         v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
@@ -29,3 +34,38 @@ rule combined_hmmer_kmerscan:
                 {input.v1} {input.v2} \
                 > {output.densities}
         """)
+
+def names_from_txt(filename):
+    with open(filename) as txt:
+        return [line.strip().split()[0] for line in txt]
+
+def names_from_fq(filename):
+    with FastxFile(filename) as fastx:
+        return [read.name for read in fastx]
+
+rule threeway_venn:
+    input:
+        kmerscan_TTAGGG="data/kmers/combined/{subject}-{timepoint}-TTAGGG.txt",
+        kmerscan_CCCTAA="data/kmers/combined/{subject}-{timepoint}-CCCTAA.txt",
+        basecomp="data/basecomp/{subject}-{timepoint}.fq",
+        hmmer_v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
+        hmmer_v2="data/hmmer/twins-ont-2019/{subject}-{timepoint}.fq"
+    output:
+        png="data/plots/{subject}-{timepoint}/venn.png"
+    params:
+        figsize=(12, 12)
+    run:
+        read_sets = {
+            "kmerscan": (
+                set(names_from_txt(input.kmerscan_TTAGGG)) |
+                set(names_from_txt(input.kmerscan_CCCTAA))
+            ),
+            "basecomp": set(names_from_fq(input.basecomp)),
+            "hmmer": (
+                set(names_from_fq(input.hmmer_v1)) |
+                set(names_from_fq(input.hmmer_v2))
+            )
+        }
+        figure, ax = subplots(figsize=params.figsize)
+        venn(read_sets, ax=ax)
+        figure.savefig(output.png)
