@@ -74,7 +74,9 @@ def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, title="
     switch_backend("Agg")
     width, height = tuple(map(int, figsize.split("x")))
     figure, ax = subplots(figsize=(width, height))
+    # force vmin and vmax for consistency between plots:
     heatmap(metrics, vmin=0, vmax=1, ax=ax, cmap=palette)
+    # adjust xticks according to bin size and alignment:
     xticks = [
         int(tick.get_text()) for tick in ax.get_xticklabels()
     ]
@@ -86,6 +88,7 @@ def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, title="
         [tick * bin_size for tick in xticks],
         rotation=60
     )
+    # drop yticks (useful for long names / big sets):
     if hide_names:
         ax.set(yticks=[])
     ax.set(title=title, xlabel="position (bp)")
@@ -97,10 +100,6 @@ def main(args):
     metrics = load_metrics(
         args.txt, bin_size=args.bin_size, align=args.align
     )
-    if args.bin_size > 1:
-        xlabel = "position (x{})".format(args.bin_size)
-    else:
-        xlabel = "position"
     plot_metrics(
         metrics, args.figsize, args.palette, args.hide_names,
         bin_size=args.bin_size, align=args.align,
