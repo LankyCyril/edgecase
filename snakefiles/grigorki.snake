@@ -1,6 +1,8 @@
 from pysam import FastxFile
 from matplotlib.pyplot import switch_backend, subplots
-from venn import venn
+from collections import OrderedDict
+from venn import generate_petal_labels
+from matplotlib_venn import venn3
 switch_backend("Agg")
 
 rule combined_hmmer_kmerscan:
@@ -43,7 +45,14 @@ def names_from_fq(filename):
     with FastxFile(filename) as fastx:
         return [read.name for read in fastx]
 
-rule threeway_venn:
+def euler_labels(read_sets):
+    venn_labels = generate_petal_labels(read_sets.values())
+    return [
+        int(venn_labels[logic])
+        for logic in ("100", "010", "110", "001", "101", "011", "111")
+    ]
+
+rule threeway_euler:
     input:
         kmerscan_TTAGGG="data/kmers/combined/{subject}-{timepoint}-TTAGGG.txt",
         kmerscan_CCCTAA="data/kmers/combined/{subject}-{timepoint}-CCCTAA.txt",
@@ -51,21 +60,25 @@ rule threeway_venn:
         hmmer_v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
         hmmer_v2="data/hmmer/twins-ont-2019/{subject}-{timepoint}.fq"
     output:
-        png="data/plots/{subject}-{timepoint}/venn.png"
+        png="data/plots/{subject}-{timepoint}/euler.png"
     params:
         figsize=(12, 12)
     run:
-        read_sets = {
-            "kmerscan": (
+        read_sets = OrderedDict([
+            ("kmerscan", (
                 set(names_from_txt(input.kmerscan_TTAGGG)) |
                 set(names_from_txt(input.kmerscan_CCCTAA))
-            ),
-            "basecomp": set(names_from_fq(input.basecomp)),
-            "hmmer": (
+            )),
+            ("basecomp", set(names_from_fq(input.basecomp))),
+            ("hmmer", (
                 set(names_from_fq(input.hmmer_v1)) |
                 set(names_from_fq(input.hmmer_v2))
-            )
-        }
+            ))
+        ])
         figure, ax = subplots(figsize=params.figsize)
-        venn(read_sets, ax=ax)
+        venn3(
+            subsets=euler_labels(read_sets),
+            set_labels=read_sets.keys(),
+            ax=ax
+        )
         figure.savefig(output.png)
