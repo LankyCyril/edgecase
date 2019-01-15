@@ -35,8 +35,8 @@ ARG_RULES = {
         "default": 1e-5, "type": float, "metavar": "P"
     },
     ("--gmm-train-rounds",): {
-        "help": "number of rounds of GMM training (10)",
-        "default": 10, "type": int, "metavar": "R"
+        "help": "number of rounds of GMM training (50)",
+        "default": 50, "type": int, "metavar": "R"
     },
     ("--gmm-metric",): {
         "help": "how to evaluate GMMs: aic (or maxreads)",

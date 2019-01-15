@@ -1,0 +1,31 @@
+rule combined_hmmer_kmerscan:
+    input:
+        v1="data/hmmer/twins-ont-2018/{subject}-{timepoint}.fq",
+        v2="data/hmmer/twins-ont-2019/{subject}-{timepoint}.fq"
+    output:
+        densities="data/kmers/combined/{subject}-{timepoint}-{kmer}.txt"
+    params:
+        edge_size=600,
+        window_size=120,
+        cutoff=.2 # use hard cutoff if int/float, GMM if False
+    threads: 24
+    run:
+        if wildcards.kmer == "TTAGGG":
+            test_mode = "--tail-test"
+        elif wildcards.kmer == "CCCTAA":
+            test_mode = "--head-test"
+        else:
+            raise ValueError("Unsupported kmer: {}".format(wildcards.kmer))
+        if isinstance(params.cutoff, (int, float)):
+            cutoff_mode = "--cutoff {}".format(params.cutoff)
+        else:
+            cutoff_mode = ""
+        shell("""
+            python kmer-scan.py -j {threads} \
+                --kmer {wildcards.kmer} \
+                --window-size {params.window_size} \
+                {test_mode} {params.edge_size} \
+                {cutoff_mode} \
+                {input.v1} {input.v2} \
+                > {output.densities}
+        """)
