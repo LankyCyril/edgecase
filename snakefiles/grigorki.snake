@@ -88,3 +88,11 @@ rule threeway_venn:
             raise ValueError("Unsupported diagram type")
         ax.set(title="{} {}".format(wildcards.subject, wildcards.timepoint))
         figure.savefig(output.png)
+
+rule all_eulers:
+    input:
+        pngs=expand(
+            "data/plots/{subject}-{timepoint}/euler.png",
+            subject=["TW", "HR"],
+            timepoint=["pre", "flight", "post"]
+        )
