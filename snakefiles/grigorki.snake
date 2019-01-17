@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 from os import remove
 from gzip import open as gzopen
 from re import search, split
+from pandas import read_csv, merge
 switch_backend("Agg")
 
 rule combined_hmmer_kmerscan:
@@ -260,3 +261,33 @@ rule bam_to_fiveprimeclip:
                             entry.pos, entry.mapq, leftclip
                         ]
                         print(*fields, sep="\t", file=tsv)
+
+rule aligned_density:
+    input:
+        tsv="data/alignments/hs37d5/{subject}-{timepoint}-5primeclip.tsv", # TODO: 3primeclip logic
+        kmerscan="data/kmers/combined/{subject}-{timepoint}-{kmer}.txt"
+    output:
+        kmerscan="data/alignments/hs37d5/{subject}-{timepoint}-5primeclip-chr{chrom}-{kmer}.txt"
+    params:
+        clipmax=50000 # TODO: infer from reference, for 5primeclip and 3primeclip
+        # TODO: filter by MAPQ
+    run:
+        # load subset of densities for target chromosome:
+        clipstats = read_csv(input.tsv, sep="\t")
+        clipstats = clipstats[clipstats["RNAME"].astype(str)==wildcards.chrom]
+        # calculate leftpad for each density, subset to sensible candidates:
+        clipstats["LEFTPAD"] = clipstats["POS"] - clipstats["CLIP"]
+        clipstats = clipstats[clipstats["LEFTPAD"]<params.clipmax]
+        # load densities for selected reads:
+        read_metrics = {}
+        with open(input.kmerscan, mode="rt") as in_txt:
+            with open(output.kmerscan, mode="wt") as out_txt:
+                for line in in_txt:
+                    name, *metrics = line.strip().split()
+                    if (clipstats["QNAME"]==name).any():
+                        # for 5 prime, need to reverse visualization:
+                        leftpad = clipstats.loc[
+                            clipstats["QNAME"]==name, "LEFTPAD"
+                        ].iloc[0] # TODO: if more than one (w/ more lax filters)
+                        padded_metrics = [""] * leftpad + metrics[::-1]
+                        print(name, *padded_metrics, sep="\t", file=out_txt)
