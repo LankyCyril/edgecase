@@ -281,18 +281,23 @@ rule aligned_density_txt: # TODO: 3primeclip
         # load densities for selected reads:
         read_metrics = {}
         with open(input.kmerscan, mode="rt") as in_txt:
-            with open(output.kmerscan, mode="wt") as out_txt:
-                for line in in_txt:
-                    name, *metrics = line.strip().split()
-                    if (clipstats["QNAME"]==name).any():
-                        # for 5 prime, need to reverse visualization:
-                        leftpad = clipstats.loc[
-                            clipstats["QNAME"]==name, "LEFTPAD"
-                        ].iloc[0] # TODO: if more than one (w/ more lax filters)
-                        padded_metrics = [""] * leftpad + metrics[::-1]
-                        print(name, *padded_metrics, sep="\t", file=out_txt)
+            for line in in_txt:
+                name, *metrics = line.strip().split()
+                if (clipstats["QNAME"]==name).any():
+                    # for 5 prime, need to reverse visualization:
+                    leftpad = clipstats.loc[
+                        clipstats["QNAME"]==name, "LEFTPAD"
+                    ].iloc[0] # TODO: if more than one (w/ more lax filters)
+                    padded_metrics = [""] * leftpad + metrics[::-1]
+                    read_metrics[name] = padded_metrics
+        # sort reads by increasing telomeric length:
+        clipstats = clipstats.sort_values(by="LEFTPAD", ascending=False)
+        with open(output.kmerscan, mode="wt") as out_txt:
+            for name in clipstats["QNAME"]:
+                if name in read_metrics:
+                    print(name, *read_metrics[name], sep="\t", file=out_txt)
 
-rule aligned_density_plot: # TODO: 3primeclip
+rule aligned_density_plot: # TODO: 3primeclip; TODO: empty txts
     input:
         txt="data/alignments/hs37d5/{subject}-{timepoint}-5primeclip-chr{chrom}-{kmer}.txt"
     output:
@@ -307,6 +312,6 @@ rule all_aligned_plots:
             "data/alignments/hs37d5/{subject}-{timepoint}-5primeclip-chr{chrom}-{kmer}.png",
             subject=["TW", "HR"],
             timepoint=["pre", "flight", "post"],
-            chrom=["1", "2", "3"],
+            chrom=["1"],
             kmer=["TTAGGG", "CCCTAA"]
         )
