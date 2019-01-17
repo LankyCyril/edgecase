@@ -2,7 +2,7 @@
 from sys import stdout
 from re import search
 from argparse import ArgumentParser
-from numpy import linspace, array, mean, nan, concatenate
+from numpy import linspace, array, mean, nan, concatenate, fromiter
 from pandas import Series, concat
 from matplotlib.pyplot import switch_backend, subplots
 from seaborn import heatmap
@@ -54,9 +54,13 @@ def load_metrics(txt, bin_size, align):
     # load and bin all metrics first:
     with open(txt, mode="rt") as handle:
         for line in handle:
-            name, *metrics = line.strip().split()
+            name, *metrics = line.strip().split("\t")
+            metrics_array = fromiter(map(
+                lambda s: float(s) if s!="" else nan,
+                metrics
+            ), dtype="float32")
             read_metrics[name] = binned(
-                array(metrics, dtype="float32"),
+                metrics_array,
                 bins=len(metrics)/bin_size
             )
     # coerce to same lengths and convert into DataFrame:
