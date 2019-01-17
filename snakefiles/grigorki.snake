@@ -5,6 +5,7 @@ from venn import venn, generate_petal_labels
 from matplotlib_venn import venn3 as euler3
 from tempfile import NamedTemporaryFile
 from os import remove
+from gzip import open as gzopen
 switch_backend("Agg")
 
 rule combined_hmmer_kmerscan:
@@ -196,4 +197,31 @@ rule all_metrics:
             timepoint=["pre", "flight", "post"],
             kind=["tp", "kmerscan-fp", "basecomp-unique"],
             kmer=["TTAGGG", "CCCTAA"]
+        )
+
+rule hmmfail_fa:
+    input:
+        full="data/reads/{batch}/{subject}-{timepoint}.fq.gz",
+        hmmer="data/hmmer/{batch}/{subject}-{timepoint}.fq"
+    output:
+        fail="data/hmmer/{batch}/fail/{subject}-{timepoint}.fa.gz"
+    run:
+        with FastxFile(input.hmmer) as hmmer:
+            hmmer_passed = {
+                read.name for read in hmmer
+            }
+        with FastxFile(input.full) as full:
+            with gzopen(output.fail, mode="wt", compresslevel=1) as fail:
+                for read in full:
+                    if read.name not in hmmer_passed:
+                        print(">" + read.name, file=fail)
+                        print(read.sequence, file=fail)
+
+rule all_hmmfail:
+    input:
+        fqs=expand(
+            "data/hmmer/{batch}/fail/{subject}-{timepoint}.fa.gz",
+            batch=["twins-ont-2018", "twins-ont-2019"],
+            subject=["TW", "HR"],
+            timepoint=["pre", "flight", "post"]
         )
