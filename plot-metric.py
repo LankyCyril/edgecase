@@ -14,12 +14,12 @@ ARG_RULES = {
         "help": "name of input (each line is 'name\\tvalue\\tvalue\\tvalue...')"
     },
     ("-b", "--bin-size"): {
-        "help": "size of each bin in visualization (1)",
-        "default": 1, "type": int, "metavar": "B"
+        "help": "size of each bin in bp for visualization speedup (100)",
+        "default": 100, "type": int, "metavar": "B"
     },
     ("-a", "--align"): {
-        "help": "alignment of visualized reads (right)",
-        "default": "right", "metavar": "A"
+        "help": "alignment of visualized reads (left)",
+        "default": "left", "metavar": "A"
     },
     ("-s", "--figsize"): {
         "help": "figure size (16x9)",
@@ -32,23 +32,23 @@ ARG_RULES = {
     ("--hide-names",): {
         "help": "hide names of reads on heatmap",
         "action": "store_true"
+    },
+    ("--title",): {
+        "help": "figure title (defaults to input filename)"
     }
 }
 
 
 def binned(A, bins, func=mean):
     """Return array data compressed into bins (smoothed by func)"""
-    if bins > 1:
-        coords = linspace(0, len(A), bins+1).astype(int)
-        return array([
-            func(A[start:end])
-            for start, end in zip(coords, coords[1:])
-        ])
-    else:
-        return A
+    coords = linspace(0, len(A), bins+1).astype(int)
+    return array([
+        func(A[start:end])
+        for start, end in zip(coords, coords[1:])
+    ])
 
 
-def load_metrics(txt, bin_size=120, align="right"):
+def load_metrics(txt, bin_size, align):
     """Load metrics from a text file, bin and convert into dataframe"""
     read_metrics = {}
     # load and bin all metrics first:
@@ -72,15 +72,29 @@ def load_metrics(txt, bin_size=120, align="right"):
     return concat(rows, axis=1).T
 
 
-def plot_metrics(metrics, figsize="16x9", palette="viridis", hide_names=False, title="", xlabel="", png=stdout.buffer):
+def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, title="", png=stdout.buffer):
     """Plot binned metrics as a heatmap"""
     switch_backend("Agg")
     width, height = tuple(map(int, figsize.split("x")))
     figure, ax = subplots(figsize=(width, height))
+    # force vmin and vmax for consistency between plots:
     heatmap(metrics, vmin=0, vmax=1, ax=ax, cmap=palette)
-    ax.set(xlabel=xlabel, title=title)
+    # adjust xticks according to bin size and alignment:
+    xticks = [
+        int(tick.get_text()) for tick in ax.get_xticklabels()
+    ]
+    if align == "right":
+        xticks = [
+            tick * -1 for tick in reversed(xticks)
+        ]
+    ax.set_xticklabels(
+        [tick * bin_size for tick in xticks],
+        rotation=60
+    )
+    # drop yticks (useful for long names / big sets):
     if hide_names:
         ax.set(yticks=[])
+    ax.set(title=title, xlabel="position (bp)")
     figure.savefig(png)
 
 
@@ -89,13 +103,14 @@ def main(args):
     metrics = load_metrics(
         args.txt, bin_size=args.bin_size, align=args.align
     )
-    if args.bin_size > 1:
-        xlabel = "position (x{})".format(args.bin_size)
+    if args.title:
+        title = args.title
     else:
-        xlabel = "position"
+        title = args.txt.split("/")[-1]
     plot_metrics(
         metrics, args.figsize, args.palette, args.hide_names,
-        title=args.txt.split("/")[-1], xlabel=xlabel, png=stdout.buffer
+        bin_size=args.bin_size, align=args.align,
+        title=title, png=stdout.buffer
     )
     return 0
 
