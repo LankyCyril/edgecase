@@ -1,4 +1,4 @@
-from pysam import FastxFile
+from pysam import FastxFile, AlignmentFile
 from matplotlib.pyplot import switch_backend, subplots
 from collections import OrderedDict
 from venn import venn, generate_petal_labels
@@ -6,6 +6,7 @@ from matplotlib_venn import venn3 as euler3
 from tempfile import NamedTemporaryFile
 from os import remove
 from gzip import open as gzopen
+from re import search, split
 switch_backend("Agg")
 
 rule combined_hmmer_kmerscan:
@@ -225,3 +226,37 @@ rule all_hmmfail:
             subject=["TW", "HR"],
             timepoint=["pre", "flight", "post"]
         )
+
+def is_good_entry(entry, reverse=False):
+    if (not entry.is_unmapped) and (entry.is_reverse == reverse):
+        if (not entry.is_secondary) and (not entry.is_supplementary):
+            return True
+    return False
+
+rule bam_to_fiveprimeclip:
+    input:
+        bam="data/alignments/hs37d5/{subject}-{timepoint}.bam",
+        bai="data/alignments/hs37d5/{subject}-{timepoint}.bam.bai"
+    output:
+        tsv="data/alignments/hs37d5/{subject}-{timepoint}-5primeclip.tsv"
+    run:
+        with AlignmentFile(input.bam) as bam, open(output.tsv, "wt") as tsv:
+            print(
+                "QNAME", "FLAG", "RNAME", "POS", "MAPQ", "CLIP",
+                sep="\t", file=tsv
+            )
+            for entry in bam:
+                if is_good_entry(entry, reverse=True):
+                    leftclip_match = search(r'^(\d+[SH])+', entry.cigarstring)
+                    if leftclip_match:
+                        leftclip_string = leftclip_match.group()
+                        leftclip = sum(
+                            int(field)
+                            for field in split(r'[HS]', leftclip_string)
+                            if field.isdigit()
+                        )
+                        fields = [
+                            entry.query_name, entry.flag, entry.reference_name,
+                            entry.pos, entry.mapq, leftclip
+                        ]
+                        print(*fields, sep="\t", file=tsv)
