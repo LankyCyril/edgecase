@@ -97,8 +97,6 @@ def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, xtick_d
         ]
     if xtick_density != 1:
         each = int(len(xticks)*xtick_density)
-        from sys import stderr
-        print(each, file=stderr)
         xticks = [
             xtick if i%each==0 else ""
             for i, xtick in enumerate(xticks)

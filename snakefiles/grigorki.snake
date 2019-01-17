@@ -262,7 +262,7 @@ rule bam_to_fiveprimeclip:
                         ]
                         print(*fields, sep="\t", file=tsv)
 
-rule aligned_density:
+rule aligned_density_txt: # TODO: 3primeclip
     input:
         tsv="data/alignments/hs37d5/{subject}-{timepoint}-5primeclip.tsv", # TODO: 3primeclip logic
         kmerscan="data/kmers/combined/{subject}-{timepoint}-{kmer}.txt"
@@ -291,3 +291,22 @@ rule aligned_density:
                         ].iloc[0] # TODO: if more than one (w/ more lax filters)
                         padded_metrics = [""] * leftpad + metrics[::-1]
                         print(name, *padded_metrics, sep="\t", file=out_txt)
+
+rule aligned_density_plot: # TODO: 3primeclip
+    input:
+        txt="data/alignments/hs37d5/{subject}-{timepoint}-5primeclip-chr{chrom}-{kmer}.txt"
+    output:
+        png="data/alignments/hs37d5/{subject}-{timepoint}-5primeclip-chr{chrom}-{kmer}.png"
+    shell: """
+        python plot-metric.py -a left --hide-names {input.txt} > {output.png}
+    """
+
+rule all_aligned_plots:
+    input:
+        png=expand(
+            "data/alignments/hs37d5/{subject}-{timepoint}-5primeclip-chr{chrom}-{kmer}.png",
+            subject=["TW", "HR"],
+            timepoint=["pre", "flight", "post"],
+            chrom=["1", "2", "3"],
+            kmer=["TTAGGG", "CCCTAA"]
+        )
