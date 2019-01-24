@@ -118,6 +118,9 @@ def chop(entry, anchors, target):
 def main(args):
     """Dispatch data to subroutines"""
     anchors = get_anchors(args.reference)
+    if args.format == "SAM":
+        with AlignmentFile(args.bams[0]) as bam:
+            print(str(bam.header).rstrip("\n"))
     for entry in filter_bams(args.bams, anchors, args.target):
         if args.target.endswith("AC"):
             print(entry.to_string())
