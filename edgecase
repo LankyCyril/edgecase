@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, ArgumentTypeError
 from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
 from re import search
 
@@ -16,6 +16,14 @@ def create_subparser(subparsers, name, help, usage, rules):
     )
     for rule_args, rule_kwargs in rules.items():
         _subparser.add_argument(*rule_args, **rule_kwargs)
+
+
+def figsize_type(figsize):
+    """Validate --figsize for densityplot"""
+    if not search(r'^\d+x\d+$', figsize):
+        raise ArgumentTypeError("--figsize must be in format WxH: e.g., 5x7")
+    else:
+        return figsize
 
 
 parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
@@ -107,9 +115,9 @@ create_subparser(
         },
         ("-s", "--figsize"): {
             "help": "figure size (16x9)",
-            "default": "16x9", "metavar": "S"
+            "default": "16x9", "metavar": "S", "type": figsize_type
         },
-        ("-p", "--palette"): {
+        ("--palette",): {
             "help": "heatmap palette (viridis)",
             "default": "viridis", "metavar": "P"
         },
@@ -135,8 +143,6 @@ elif kwargs["subparser"] == "tailpuller":
 elif kwargs["subparser"] == "tailchopper":
     tailchopper.main(**kwargs)
 elif kwargs["subparser"] == "densityplot":
-    if not search(r'^\d+x\d+$', kwargs["figsize"]):
-        raise ValueError("--figsize must be in format WxH: e.g., 5x7")
     densityplot.main(**kwargs)
 else:
     raise ValueError("A valid subparser (subcommand) must be specified")
