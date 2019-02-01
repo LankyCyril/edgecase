@@ -1,3 +1,4 @@
+from regex import compile, IGNORECASE
 from numpy import zeros, array, cumsum
 from multiprocessing import Pool
 from edgecaselib.io import ReadFileChain
@@ -5,6 +6,12 @@ from pysam import FastxFile
 from functools import partial
 from tqdm import tqdm
 from sys import stderr
+
+
+def get_circular_pattern(kmer):
+    """Convert kmer into circular regex pattern (e.g., r'TCGA|CGAT|GATC|ATCG' for TCGA)"""
+    inversions = {kmer[i:]+kmer[:i] for i in range(len(kmer))}
+    return compile(r'|'.join(inversions), flags=IGNORECASE)
 
 
 def get_edge_density(read, pattern, head_test, tail_test):
@@ -76,7 +83,7 @@ def main(args):
     elif ((args.head_test is not None) or (args.tail_test is not None)) and (args.cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
     # dispatch data to subroutines:
-    pattern = "FIXME"
+    pattern = get_circular_pattern(args.kmer)
     # scan fastq for target kmer query, parallelizing on reads:
     with ReadFileChain(args.fastqs, FastxFile) as read_iterator:
         scanner = pattern_scanner(
