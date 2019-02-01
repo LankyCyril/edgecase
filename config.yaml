@@ -1,12 +1,13 @@
 data_dir: "data"
 reads_dir: "processedReads"
+analysis_dir: "analysis"
+
 reference: "data/references/hs37d5.fa"
 
-timepoints:
-  - _1_pre
-  - _2_flight
-  - _3_post
-
-subjects:
-  - TW
-  - HR
+datasets:
+  - _1_pre_TW
+  - _2_flight_TW
+  - _3_post_TW
+  - _1_pre_HR
+  - _2_flight_HR
+  - _3_post_HR
