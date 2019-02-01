@@ -34,7 +34,7 @@ def is_good_entry(entry):
         return False
 
 
-def filter_aligned_segments(bam_data, anchors, target):
+def filter_aligned_segments(bam_data, anchors, prime):
     """Only pass reads extending past anchors"""
     isnone = lambda p: p is None
     for entry in bam_data:
@@ -48,11 +48,11 @@ def filter_aligned_segments(bam_data, anchors, target):
                 True for _ in takewhile(isnone, reversed(positions))
             )
             right_mappos = next(filterfalse(isnone, reversed(positions)))
-            if target[0] == "5":
+            if prime == 5:
                 anchor = anchors.loc[entry.reference_name, "5prime"]
                 if left_mappos - left_clip < anchor:
                     yield entry
-            if target[0] == "3":
+            if prime == 3:
                 anchor = anchors.loc[entry.reference_name, "3prime"]
                 if right_mappos + right_clip > anchor:
                     yield entry
@@ -65,5 +65,5 @@ def main(args):
     # dispatch data to subroutines:
     anchors = get_anchors(args.reference)
     with ReadFileChain(args.bams, AlignmentFile) as bam_data:
-        for entry in filter_aligned_segments(bam_data, anchors, args.target):
+        for entry in filter_aligned_segments(bam_data, anchors, args.prime):
             print(entry.to_string())

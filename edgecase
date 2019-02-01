@@ -71,7 +71,7 @@ create_subparser(
             "help": "reference FASTA",
             "required": True, "metavar": "R", "default": "no default, required"
         },
-        ("-t", "--target"): {
+        ("-p", "--prime"): {
             "help": "which 'prime' end to output",
             "default": 5, "type": int, "choices": [5, 3]
         }
