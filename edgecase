@@ -32,8 +32,8 @@ create_subparser(
             "help": "name(s) of input BAM/SAM file(s)",
             "nargs": "+"
         },
-        ("--kmer",): {
-            "help": "target kmer sequence",
+        ("--motif",): {
+            "help": "target motif sequence",
             "default": "TTAGGG", "metavar": "M"
         },
         ("--head-test",): {

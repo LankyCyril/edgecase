@@ -41,14 +41,14 @@ rule candidate_densities:
     params: window_size=120
     threads: 16
     run:
-        with open(input.motifs) as motifs:
-            kmers = {line.strip() for line in motifs}
+        with open(input.motifs) as motif_data:
+            motifs = {line.strip() for line in motif_data}
         with gzopen(output.dat, mode="wt") as dat:
-            for kmer in kmers:
+            for motif in motifs:
                 kmerscanner.main(
                     args=Namespace(
                         bams=[input.sam], num_reads=None,
-                        kmer=kmer, window_size=params.window_size,
+                        motif=motif, window_size=params.window_size,
                         head_test=None, tail_test=None, cutoff=None,
                         jobs=threads
                     ),
