@@ -1,5 +1,7 @@
 data_dir: "data"
 reads_dir: "processedReads"
+analysis_dir: "analysis"
+
 reference: "data/references/hs37d5.fa"
 
 datasets:

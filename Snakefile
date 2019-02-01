@@ -34,7 +34,7 @@ rule tailchopper:
 
 rule candidate_densities:
     input: sam=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam")
-    output: dat=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC-densities.dat")
+    output: dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
     params: kmer="TTAGGG", window_size=120
     threads: 1
     run:
@@ -55,5 +55,13 @@ rule all_dataset_tails:
             join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}{kind}"),
             dataset=config["datasets"],
             prime=[5, 3],
-            kind=["AC.sam", "OOB.fa", "AC-densities.dat"]
+            kind=["AC.sam", "OOB.fa"]
+        )
+
+rule all_dataset_candidate_densities:
+    input:
+        targets=expand(
+            join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat"),
+            dataset=config["datasets"],
+            prime=[5, 3]
         )
