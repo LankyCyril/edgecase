@@ -16,11 +16,8 @@ def binned(A, bins, func=mean):
 
 def load_metrics(dat, bin_size):
     """Load metrics from a text file, bin and convert into dataframe"""
-    raw_data = read_csv(
-        dat, compression="gzip", sep="\t",
-        names=["name", "flag", "chrom", "pos", "mapq", "motif", "density"]
-    )
-    metadata = raw_data.iloc[:,:6]
+    raw_data = read_csv(dat, compression="gzip", sep="\t", escapechar="#")
+    metadata = raw_data.iloc[:,:8]
     print(metadata[:3])
     exit(1)
     # old:
