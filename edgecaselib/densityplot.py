@@ -1,8 +1,6 @@
 from sys import stdout
-from re import search
-from argparse import ArgumentParser
 from numpy import linspace, array, mean, nan, concatenate, fromiter
-from pandas import Series, concat
+from pandas import read_csv, Series, concat
 from matplotlib.pyplot import switch_backend, subplots
 from seaborn import heatmap
 
@@ -16,8 +14,16 @@ def binned(A, bins, func=mean):
     ])
 
 
-def load_metrics(dat, bin_size, align="left"):
+def load_metrics(dat, bin_size):
     """Load metrics from a text file, bin and convert into dataframe"""
+    raw_data = read_csv(
+        dat, compression="gzip", sep="\t",
+        names=["name", "flag", "chrom", "pos", "mapq", "motif", "density"]
+    )
+    metadata = raw_data.iloc[:,:6]
+    print(metadata[:3])
+    exit(1)
+    # old:
     read_metrics = {}
     # load and bin all metrics first:
     with open(dat, mode="rt") as handle:
@@ -78,9 +84,7 @@ def plot_metrics(metrics, figsize, palette, hide_names, bin_size, xtick_density,
 
 def main(dat, bin_size=100, figsize="16x9", palette="viridis", hide_names=False, title=None, xtick_density=.05, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
-    metrics = load_metrics(
-        dat, bin_size=bin_size
-    )
+    metrics = load_metrics(dat, bin_size=bin_size)
     if title:
         title = title
     else:
