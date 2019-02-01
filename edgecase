@@ -79,17 +79,12 @@ create_subparser(
 )
 
 create_subparser(
-    subparsers, "tailchopper",
-    help="get overhanging regions of overhanging reads",
+    subparsers, "tailchopper", help="get clipped heads/tails of reads",
     usage="{} [-j J] tailchopper [options] bams > fasta".format(__file__),
     rules={
         ("bams",): {
             "help": "name(s) of input BAM/SAM file(s)",
             "nargs": "+"
-        },
-        ("-r", "--reference"): {
-            "help": "reference FASTA, or TSV with anchor coordinates",
-            "required": True, "metavar": "R", "default": "no default, required"
         },
         ("-p", "--prime"): {
             "help": "which 'prime' end to output",

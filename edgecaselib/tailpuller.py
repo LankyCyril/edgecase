@@ -53,11 +53,13 @@ def filter_aligned_segments(bam_data, anchors, prime):
                 True for _ in takewhile(isnone, reversed(positions))
             )
             right_mappos = next(filterfalse(isnone, reversed(positions)))
-            if prime == 5:
+            if prime not in {5, 3}:
+                raise ValueError("`prime` can only be 5 or 3")
+            elif prime == 5:
                 anchor = anchors.loc[entry.reference_name, "5prime"]
                 if left_mappos - left_clip < anchor:
                     yield entry
-            if prime == 3:
+            elif prime == 3:
                 anchor = anchors.loc[entry.reference_name, "3prime"]
                 if right_mappos + right_clip > anchor:
                     yield entry
