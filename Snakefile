@@ -1,6 +1,6 @@
 from os.path import join
-from argparse import Namespace
 from edgecaselib import tailpuller, tailchopper, kmerscanner
+from edgecaselib.util import motif_revcomp
 from gzip import open as gzopen
 
 configfile: "config.yaml"
@@ -14,11 +14,9 @@ rule tailpuller:
     run:
         with open(output.ac, mode="wt") as sam:
             tailpuller.main(
-                args=Namespace(
-                    bams=[input.ar],
-                    reference=input.reference,
-                    prime=int(wildcards.prime)
-                ),
+                bams=[input.ar],
+                reference=input.reference,
+                prime=int(wildcards.prime),
                 file=sam
             )
 
@@ -28,7 +26,8 @@ rule tailchopper:
     run:
         with open(output.fa, mode="wt") as fasta:
             tailchopper.main(
-                args=Namespace(bams=[input.sam], prime=int(wildcards.prime)),
+                bams=[input.sam],
+                prime=int(wildcards.prime),
                 file=fasta
             )
 
@@ -38,20 +37,20 @@ rule candidate_densities:
         motifs=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-motifs.txt")
     output:
         dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
-    params: window_size=120
+    params: window_size=120, revcomp=True
     threads: 16
     run:
-        with open(input.motifs) as motifs:
-            kmers = {line.strip() for line in motifs}
+        with open(input.motifs) as motif_data:
+            motifs = {line.strip() for line in motif_data}
+        if params.revcomp:
+            motifs |= {motif_revcomp(motif) for motif in set(motifs)}
         with gzopen(output.dat, mode="wt") as dat:
-            for kmer in kmers:
+            for motif in motifs:
                 kmerscanner.main(
-                    args=Namespace(
-                        bams=[input.sam], num_reads=None,
-                        kmer=kmer, window_size=params.window_size,
-                        head_test=None, tail_test=None, cutoff=None,
-                        jobs=threads
-                    ),
+                    bams=[input.sam], num_reads=None,
+                    motif=motif, window_size=params.window_size,
+                    head_test=None, tail_test=None, cutoff=None,
+                    jobs=threads,
                     file=dat
                 )
 

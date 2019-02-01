@@ -16,11 +16,11 @@ def binned(A, bins, func=mean):
     ])
 
 
-def load_metrics(txt, bin_size, align):
+def load_metrics(dat, bin_size, align="left"):
     """Load metrics from a text file, bin and convert into dataframe"""
     read_metrics = {}
     # load and bin all metrics first:
-    with open(txt, mode="rt") as handle:
+    with open(dat, mode="rt") as handle:
         for line in handle:
             name, *metrics = line.strip().split("\t")
             metrics_array = fromiter(map(
@@ -44,7 +44,7 @@ def load_metrics(txt, bin_size, align):
     return concat(rows, axis=1).T
 
 
-def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, xtick_density, title="", png=stdout.buffer):
+def plot_metrics(metrics, figsize, palette, hide_names, bin_size, xtick_density, align="left", title="", png=stdout.buffer):
     """Plot binned metrics as a heatmap"""
     switch_backend("Agg")
     width, height = tuple(map(int, figsize.split("x")))
@@ -76,18 +76,18 @@ def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, xtick_d
     figure.savefig(png)
 
 
-def main(args):
+def main(dat, bin_size=100, figsize="16x9", palette="viridis", hide_names=False, title=None, xtick_density=.05, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     metrics = load_metrics(
-        args.txt, bin_size=args.bin_size, align=args.align
+        dat, bin_size=bin_size
     )
-    if args.title:
-        title = args.title
+    if title:
+        title = title
     else:
-        title = args.txt.split("/")[-1]
+        title = dat.split("/")[-1]
     plot_metrics(
-        metrics, args.figsize, args.palette, args.hide_names,
-        bin_size=args.bin_size, align=args.align,
-        xtick_density=args.xtick_density, title=title, png=stdout.buffer
+        metrics, figsize, palette, hide_names,
+        bin_size=bin_size,
+        xtick_density=xtick_density, title=title, png=stdout.buffer
     )
     return 0

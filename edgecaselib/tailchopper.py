@@ -1,6 +1,6 @@
 from sys import stdout
 from types import SimpleNamespace
-from edgecaselib.io import ReadFileChain
+from edgecaselib.util import ReadFileChain
 from edgecaselib.tailpuller import is_good_entry
 from pysam import AlignmentFile
 from re import search, split
@@ -34,10 +34,10 @@ def chop(entry, prime):
             )
 
 
-def main(args, file=stdout):
-    with ReadFileChain(args.bams, AlignmentFile) as bam_data:
+def main(bams, prime, file=stdout, **kwargs):
+    with ReadFileChain(bams, AlignmentFile) as bam_data:
         for entry in bam_data:
             if is_good_entry(entry):
-                chopped_entry = chop(entry, args.prime)
+                chopped_entry = chop(entry, prime)
                 print(">" + chopped_entry.name, file=file)
                 print(chopped_entry.sequence, file=file)

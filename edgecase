@@ -33,8 +33,8 @@ create_subparser(
             "help": "name(s) of input BAM/SAM file(s)",
             "nargs": "+"
         },
-        ("--kmer",): {
-            "help": "target kmer sequence",
+        ("--motif",): {
+            "help": "target motif sequence",
             "default": "TTAGGG", "metavar": "M"
         },
         ("--head-test",): {
@@ -127,16 +127,16 @@ create_subparser(
     }
 )
 
-args = parser.parse_args()
-if args.subparser == "kmerscanner":
-    kmerscanner.main(args)
-elif args.subparser == "tailpuller":
-    tailpuller.main(args)
-elif args.subparser == "tailchopper":
-    tailchopper.main(args)
-elif args.subparser == "densityplot":
-    if not search(r'^\d+x\d+$', args.figsize):
+kwargs = dict(parser.parse_args()._get_kwargs())
+if kwargs["subparser"] == "kmerscanner":
+    kmerscanner.main(**kwargs)
+elif kwargs["subparser"] == "tailpuller":
+    tailpuller.main(**kwargs)
+elif kwargs["subparser"] == "tailchopper":
+    tailchopper.main(**kwargs)
+elif kwargs["subparser"] == "densityplot":
+    if not search(r'^\d+x\d+$', kwargs["figsize"]):
         raise ValueError("--figsize must be in format WxH: e.g., 5x7")
-    densityplot.main(args)
+    densityplot.main(**kwargs)
 else:
     raise ValueError("A valid subparser (subcommand) must be specified")
