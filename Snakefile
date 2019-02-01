@@ -1,6 +1,7 @@
 from os.path import join
 from argparse import Namespace
 from edgecaselib import tailpuller, tailchopper, kmerscanner
+from edgecaselib.util import motif_revcomp
 from gzip import open as gzopen
 
 configfile: "config.yaml"
@@ -38,11 +39,13 @@ rule candidate_densities:
         motifs=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-motifs.txt")
     output:
         dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
-    params: window_size=120
+    params: window_size=120, revcomp=True
     threads: 16
     run:
         with open(input.motifs) as motif_data:
             motifs = {line.strip() for line in motif_data}
+        if params.revcomp:
+            motifs |= {motif_revcomp(motif) for motif in set(motifs)}
         with gzopen(output.dat, mode="wt") as dat:
             for motif in motifs:
                 kmerscanner.main(

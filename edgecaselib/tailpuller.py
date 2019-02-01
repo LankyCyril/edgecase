@@ -1,6 +1,6 @@
 from sys import stdout
 from re import compile, IGNORECASE
-from edgecaselib.io import ReadFileChain, MAINCHROMS
+from edgecaselib.util import ReadFileChain, MAINCHROMS
 from tqdm import tqdm
 from pysam import FastxFile, AlignmentFile
 from pandas import read_csv, DataFrame

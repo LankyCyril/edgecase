@@ -2,7 +2,7 @@ from sys import stdout, stderr
 from regex import compile, IGNORECASE
 from numpy import zeros, array, cumsum
 from multiprocessing import Pool
-from edgecaselib.io import ReadFileChain
+from edgecaselib.util import ReadFileChain
 from pysam import AlignmentFile
 from types import SimpleNamespace
 from functools import partial
