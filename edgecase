@@ -61,7 +61,7 @@ create_subparser(
 
 create_subparser(
     subparsers, "tailpuller", help="select overhanging reads",
-    usage="{} [-j J] tailpuller [options] bams > sam".format(__file__),
+    usage="{} tailpuller [options] bams > sam".format(__file__),
     rules={
         ("bams",): {
             "help": "name(s) of input BAM/SAM file(s)",
@@ -80,7 +80,7 @@ create_subparser(
 
 create_subparser(
     subparsers, "tailchopper", help="get clipped heads/tails of reads",
-    usage="{} [-j J] tailchopper [options] bams > fasta".format(__file__),
+    usage="{} tailchopper [options] bams > fasta".format(__file__),
     rules={
         ("bams",): {
             "help": "name(s) of input BAM/SAM file(s)",
