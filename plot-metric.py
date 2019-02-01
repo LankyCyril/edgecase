@@ -2,7 +2,7 @@
 from sys import stdout
 from re import search
 from argparse import ArgumentParser
-from numpy import linspace, array, mean, nan, concatenate
+from numpy import linspace, array, mean, nan, concatenate, fromiter
 from pandas import Series, concat
 from matplotlib.pyplot import switch_backend, subplots
 from seaborn import heatmap
@@ -35,6 +35,10 @@ ARG_RULES = {
     },
     ("--title",): {
         "help": "figure title (defaults to input filename)"
+    },
+    ("--xtick-density",): {
+        "help": "xtick density compared to heatmap default (.05)",
+        "default": .05, "type": float, "metavar": "X"
     }
 }
 
@@ -54,9 +58,13 @@ def load_metrics(txt, bin_size, align):
     # load and bin all metrics first:
     with open(txt, mode="rt") as handle:
         for line in handle:
-            name, *metrics = line.strip().split()
+            name, *metrics = line.strip().split("\t")
+            metrics_array = fromiter(map(
+                lambda s: float(s) if s!="" else nan,
+                metrics
+            ), dtype="float32")
             read_metrics[name] = binned(
-                array(metrics, dtype="float32"),
+                metrics_array,
                 bins=len(metrics)/bin_size
             )
     # coerce to same lengths and convert into DataFrame:
@@ -72,7 +80,7 @@ def load_metrics(txt, bin_size, align):
     return concat(rows, axis=1).T
 
 
-def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, title="", png=stdout.buffer):
+def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, xtick_density, title="", png=stdout.buffer):
     """Plot binned metrics as a heatmap"""
     switch_backend("Agg")
     width, height = tuple(map(int, figsize.split("x")))
@@ -86,6 +94,12 @@ def plot_metrics(metrics, figsize, palette, hide_names, bin_size, align, title="
     if align == "right":
         xticks = [
             tick * -1 for tick in reversed(xticks)
+        ]
+    if xtick_density != 1:
+        each = int(len(xticks)*xtick_density)
+        xticks = [
+            xtick if i%each==0 else ""
+            for i, xtick in enumerate(xticks)
         ]
     ax.set_xticklabels(
         [tick * bin_size for tick in xticks],
@@ -110,7 +124,7 @@ def main(args):
     plot_metrics(
         metrics, args.figsize, args.palette, args.hide_names,
         bin_size=args.bin_size, align=args.align,
-        title=title, png=stdout.buffer
+        xtick_density=args.xtick_density, title=title, png=stdout.buffer
     )
     return 0
 

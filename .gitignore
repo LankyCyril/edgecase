@@ -1,3 +1,4 @@
 .snakemake
 data
 sandbox
+edgecaselib/__pycache__
