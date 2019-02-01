@@ -84,4 +84,4 @@ if args.subparser == "kmerscanner":
 elif args.subparser == "tailpuller":
     tailpuller.main(args)
 else:
-    raise ValueError("A subparser (subcommand) must be specified")
+    raise ValueError("A valid subparser (subcommand) must be specified")
