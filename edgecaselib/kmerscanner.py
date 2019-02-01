@@ -96,7 +96,7 @@ def main(args, file=stdout):
     # dispatch data to subroutines:
     pattern = get_circular_pattern(args.kmer)
     # scan fastq for target kmer query, parallelizing on reads:
-    with ReadFileChain(args.fastqs, AlignmentFile) as entry_iterator:
+    with ReadFileChain(args.bams, AlignmentFile) as entry_iterator:
         scanner = pattern_scanner(
             entry_iterator, pattern, window_size=args.window_size,
             head_test=args.head_test, tail_test=args.tail_test,

@@ -28,8 +28,8 @@ create_subparser(
     subparsers, "kmerscanner", help="perform kmer scan",
     usage="{} [-j J] kmerscanner [options] fastqs > txt".format(__file__),
     rules={
-        ("fastqs",): {
-            "help": "name(s) of input FASTQ file(s)",
+        ("bams",): {
+            "help": "name(s) of input BAM/SAM file(s)",
             "nargs": "+"
         },
         ("--kmer",): {
