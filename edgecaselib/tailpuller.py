@@ -1,3 +1,4 @@
+from sys import stdout
 from re import compile, IGNORECASE
 from edgecaselib.io import ReadFileChain, MAINCHROMS
 from tqdm import tqdm
@@ -65,7 +66,7 @@ def filter_aligned_segments(bam_data, anchors, prime):
                     yield entry
 
 
-def main(args):
+def main(args, file=stdout):
     # use header of first input file (NB! fragile):
     with AlignmentFile(args.bams[0]) as bam:
         print(str(bam.header).rstrip("\n"))
@@ -73,4 +74,4 @@ def main(args):
     anchors = get_anchors(args.reference)
     with ReadFileChain(args.bams, AlignmentFile) as bam_data:
         for entry in filter_aligned_segments(bam_data, anchors, args.prime):
-            print(entry.to_string())
+            print(entry.to_string(), file=file)

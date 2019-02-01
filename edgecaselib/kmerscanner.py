@@ -1,3 +1,4 @@
+from sys import stdout, stderr
 from regex import compile, IGNORECASE
 from numpy import zeros, array, cumsum
 from multiprocessing import Pool
@@ -5,7 +6,6 @@ from edgecaselib.io import ReadFileChain
 from pysam import FastxFile
 from functools import partial
 from tqdm import tqdm
-from sys import stderr
 
 
 def get_circular_pattern(kmer):
@@ -74,7 +74,7 @@ def pattern_scanner(read_iterator, pattern, cutoff, window_size, head_test, tail
         )
 
 
-def main(args):
+def main(args, file=stdout):
     # parse and check arguments:
     if (args.head_test is not None) and (args.tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
@@ -94,4 +94,4 @@ def main(args):
         # output densities of reads that pass filter:
         for read_name, density_array, passes_filter in scanner:
             if passes_filter:
-                print(read_name, *density_array, sep="\t")
+                print(read_name, *density_array, sep="\t", file=file)
