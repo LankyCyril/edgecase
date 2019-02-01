@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from sys import stdout
 from re import search
 from argparse import ArgumentParser
@@ -6,41 +5,6 @@ from numpy import linspace, array, mean, nan, concatenate, fromiter
 from pandas import Series, concat
 from matplotlib.pyplot import switch_backend, subplots
 from seaborn import heatmap
-
-USAGE = "python3 {} [options] txt > png".format(__file__)
-
-ARG_RULES = {
-    ("txt",): {
-        "help": "name of input (each line is 'name\\tvalue\\tvalue\\tvalue...')"
-    },
-    ("-b", "--bin-size"): {
-        "help": "size of each bin in bp for visualization speedup (100)",
-        "default": 100, "type": int, "metavar": "B"
-    },
-    ("-a", "--align"): {
-        "help": "alignment of visualized reads (left)",
-        "default": "left", "metavar": "A"
-    },
-    ("-s", "--figsize"): {
-        "help": "figure size (16x9)",
-        "default": "16x9", "metavar": "S"
-    },
-    ("-p", "--palette"): {
-        "help": "heatmap palette (viridis)",
-        "default": "viridis", "metavar": "P"
-    },
-    ("--hide-names",): {
-        "help": "hide names of reads on heatmap",
-        "action": "store_true"
-    },
-    ("--title",): {
-        "help": "figure title (defaults to input filename)"
-    },
-    ("--xtick-density",): {
-        "help": "xtick density compared to heatmap default (.05)",
-        "default": .05, "type": float, "metavar": "X"
-    }
-}
 
 
 def binned(A, bins, func=mean):
@@ -127,17 +91,3 @@ def main(args):
         xtick_density=args.xtick_density, title=title, png=stdout.buffer
     )
     return 0
-
-
-if __name__ == "__main__":
-    parser = ArgumentParser(usage=USAGE)
-    for rule_args, rule_kwargs in ARG_RULES.items():
-        parser.add_argument(*rule_args, **rule_kwargs)
-    args = parser.parse_args()
-    if args.align not in {"left", "right"}:
-        raise ValueError("--align must be 'left' or 'right'")
-    if not search(r'^\d+x\d+$', args.figsize):
-        raise ValueError("--figsize must be in format WxH: e.g., 5x7")
-    else:
-        returncode = main(args)
-        exit(returncode)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from edgecaselib import kmerscanner, tailpuller, tailchopper
+from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
+from re import search
 
 
 def WideHelpFormatter(prog):
@@ -93,6 +94,39 @@ create_subparser(
     }
 )
 
+create_subparser(
+    subparsers, "densityplot", help="visualize densities of candidate reads",
+    usage="{} densityplot [options] dat > png".format(__file__),
+    rules={
+        ("dat",): {
+            "help": "input density file"
+        },
+        ("-b", "--bin-size"): {
+            "help": "size of each bin in bp for visualization speedup",
+            "default": 100, "type": int, "metavar": "B"
+        },
+        ("-s", "--figsize"): {
+            "help": "figure size (16x9)",
+            "default": "16x9", "metavar": "S"
+        },
+        ("-p", "--palette"): {
+            "help": "heatmap palette (viridis)",
+            "default": "viridis", "metavar": "P"
+        },
+        ("--hide-names",): {
+            "help": "hide names of reads on heatmap",
+            "action": "store_true"
+        },
+        ("--title",): {
+            "help": "figure title (defaults to input filename)"
+        },
+        ("--xtick-density",): {
+            "help": "xtick density compared to heatmap default (.05)",
+            "default": .05, "type": float, "metavar": "X"
+        }
+    }
+)
+
 args = parser.parse_args()
 if args.subparser == "kmerscanner":
     kmerscanner.main(args)
@@ -100,5 +134,9 @@ elif args.subparser == "tailpuller":
     tailpuller.main(args)
 elif args.subparser == "tailchopper":
     tailchopper.main(args)
+elif args.subparser == "densityplot":
+    if not search(r'^\d+x\d+$', args.figsize):
+        raise ValueError("--figsize must be in format WxH: e.g., 5x7")
+    densityplot.main(args)
 else:
     raise ValueError("A valid subparser (subcommand) must be specified")
