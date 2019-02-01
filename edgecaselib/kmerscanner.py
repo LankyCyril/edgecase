@@ -2,16 +2,23 @@ from sys import stdout, stderr
 from regex import compile, IGNORECASE
 from numpy import zeros, array, cumsum
 from multiprocessing import Pool
-from edgecaselib.io import ReadFileChain
+from edgecaselib.util import ReadFileChain
 from pysam import AlignmentFile
 from types import SimpleNamespace
 from functools import partial
 from tqdm import tqdm
 
 
-def get_circular_pattern(kmer):
-    """Convert kmer into circular regex pattern (e.g., r'TCGA|CGAT|GATC|ATCG' for TCGA)"""
-    inversions = {kmer[i:]+kmer[:i] for i in range(len(kmer))}
+def get_circular_pattern(motif):
+    """Convert motif into circular regex pattern (e.g., r'TCGA|CGAT|GATC|ATCG' for TCGA)"""
+    atom_pattern = compile(r'[ACGT.]|\[[ACGT]+\]', flags=IGNORECASE)
+    atoms = atom_pattern.findall(motif)
+    if "".join(atoms) != motif:
+        raise ValueError("Could not parse motif: {}".format(motif))
+    inversions = {
+        "".join(atoms[i:] + atoms[:i])
+        for i in range(len(atoms))
+    }
     return compile(r'|'.join(inversions), flags=IGNORECASE)
 
 
@@ -95,8 +102,8 @@ def main(args, file=stdout):
     elif ((args.head_test is not None) or (args.tail_test is not None)) and (args.cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
     # dispatch data to subroutines:
-    pattern = get_circular_pattern(args.kmer)
-    # scan fastq for target kmer query, parallelizing on reads:
+    pattern = get_circular_pattern(args.motif)
+    # scan fastq for target motif query, parallelizing on reads:
     with ReadFileChain(args.bams, AlignmentFile) as entry_iterator:
         scanner = pattern_scanner(
             entry_iterator, pattern, window_size=args.window_size,
@@ -109,7 +116,7 @@ def main(args, file=stdout):
                 meta_fields = [
                     entry.query_name, entry.flag, entry.reference_name,
                     entry.reference_start, entry.mapping_quality,
-                    args.kmer
+                    args.motif
                 ]
                 print(*meta_fields, sep="\t", end="\t", file=file)
                 print(*density_array, sep=",", file=file)
