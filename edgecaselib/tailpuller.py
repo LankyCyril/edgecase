@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
 from re import compile, IGNORECASE
-from edgecase.io import ReadFileChain, MAINCHROMS
+from edgecaselib.io import ReadFileChain, MAINCHROMS
 from tqdm import tqdm
 from pysam import FastxFile, AlignmentFile
 from pandas import DataFrame
 from itertools import takewhile, filterfalse
-from argparse import ArgumentParser
 
 
 def get_anchors(reference):
@@ -60,38 +58,7 @@ def filter_aligned_segments(bam_data, anchors, target):
                     yield entry
 
 
-USAGE = "python3 {} [options] bams > sam/fasta".format(__file__)
-
-ARG_RULES = {
-    ("bams",): {
-        "help": "name of input BAM/SAM files",
-        "nargs": "+"
-    },
-    ("-r", "--reference"): {
-        "help": "reference FASTA (required)",
-        "required": True, "metavar": "R"
-    },
-    ("-t", "--target"): {
-        "help": "what to output: 5AC, 3AC, 5OOB, 3OOB (required)",
-        "metavar": "T"
-    },
-    ("-j", "--jobs"): {
-        "help": "number of jobs to run in parallel (default 1)",
-        "default": 1, "type": int, "metavar": "J"
-    }
-}
-
-
-if __name__ == "__main__":
-    # parse and check arguments:
-    parser = ArgumentParser(usage=USAGE)
-    for rule_args, rule_kwargs in ARG_RULES.items():
-        parser.add_argument(*rule_args, **rule_kwargs)
-    args = parser.parse_args()
-    if args.target.endswith("AC") and (args.format == "FASTA"):
-        raise NotImplementedError("{} in FASTA format".format(args.target))
-    elif args.target.endswith("OOB") and (args.format == "SAM"):
-        raise NotImplementedError("{} in SAM format".format(args.target))
+def main(args):
     # use header of first input file (NB! fragile):
     with AlignmentFile(args.bams[0]) as bam:
         print(str(bam.header).rstrip("\n"))

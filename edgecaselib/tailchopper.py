@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from types import SimpleNamespace
 
 def chop(entry, anchors, target):

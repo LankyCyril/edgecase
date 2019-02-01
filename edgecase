@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from edgecaselib import kmerscanner, tailpuller
+
+
+def WideHelpFormatter(prog):
+    """Supply formatter class to ArgumentParser with wider fields than default"""
+    return ArgumentDefaultsHelpFormatter(prog, max_help_position=50, width=150)
+
+
+def create_subparser(subparsers, name, help, usage, rules):
+    """Wrapper for easily creating subparsers and pushing into parent parser"""
+    _subparser = subparsers.add_parser(
+        name, help=help, usage=usage, formatter_class=WideHelpFormatter
+    )
+    for rule_args, rule_kwargs in rules.items():
+        _subparser.add_argument(*rule_args, **rule_kwargs)
+
+
+parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
+parser.add_argument(
+    "-j", "--jobs", help="number of jobs to run in parallel",
+    default=1, type=int, metavar="J"
+)
+subparsers = parser.add_subparsers(help="subcommands", dest="subparser")
+
+create_subparser(
+    subparsers, "kmerscanner", help="perform kmer scan",
+    usage="{} [-j J] kmerscanner [options] fastqs > txt".format(__file__),
+    rules={
+        ("fastqs",): {
+            "help": "name(s) of input FASTQ file(s)",
+            "nargs": "+"
+        },
+        ("--kmer",): {
+            "help": "target kmer sequence",
+            "default": "TTAGGG", "metavar": "M"
+        },
+        ("--head-test",): {
+            "help": "length of head to use for density filter (if specified)",
+            "default": None, "type": int, "metavar": "H"
+        },
+        ("--tail-test",): {
+            "help": "length of tail to use for density filter (if specified)",
+            "default": None, "type": int, "metavar": "T"
+        },
+        ("-c", "--cutoff"): {
+            "help": "use hard cutoff for density",
+            "default": None, "type": float, "metavar": "C"
+        },
+        ("-w", "--window-size"): {
+            "help": "size of the rolling window",
+            "default": 120, "type": int, "metavar": "W"
+        },
+        ("-n", "--num-reads"): {
+            "help": "expected number of reads in input (for progress display)",
+            "default": None, "type": int, "metavar": "N"
+        }
+    }
+)
+
+create_subparser(
+    subparsers, "tailpuller", help="select overhanging reads",
+    usage="{} [-j J] tailpuller [options] bams > sam".format(__file__),
+    rules={
+        ("bams",): {
+            "help": "name(s) of input BAM/SAM file(s)",
+            "nargs": "+"
+        },
+        ("-r", "--reference"): {
+            "help": "reference FASTA",
+            "required": True, "metavar": "R", "default": "no default, required"
+        },
+        ("-t", "--target"): {
+            "help": "which 'prime' end to output",
+            "default": 5, "type": int, "choices": [5, 3]
+        }
+    }
+)
+
+args = parser.parse_args()
+if args.subparser == "kmerscanner":
+    kmerscanner.main(args)
+elif args.subparser == "tailpuller":
+    tailpuller.main(args)
+else:
+    raise ValueError("A subparser (subcommand) must be specified")
