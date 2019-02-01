@@ -66,12 +66,12 @@ def filter_aligned_segments(bam_data, anchors, prime):
                     yield entry
 
 
-def main(args, file=stdout):
+def main(bams, reference, prime, file=stdout, **kwargs):
     # use header of first input file (NB! fragile):
-    with AlignmentFile(args.bams[0]) as bam:
+    with AlignmentFile(bams[0]) as bam:
         print(str(bam.header).rstrip("\n"))
     # dispatch data to subroutines:
-    anchors = get_anchors(args.reference)
-    with ReadFileChain(args.bams, AlignmentFile) as bam_data:
-        for entry in filter_aligned_segments(bam_data, anchors, args.prime):
+    anchors = get_anchors(reference)
+    with ReadFileChain(bams, AlignmentFile) as bam_data:
+        for entry in filter_aligned_segments(bam_data, anchors, prime):
             print(entry.to_string(), file=file)

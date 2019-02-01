@@ -1,5 +1,4 @@
 from os.path import join
-from argparse import Namespace
 from edgecaselib import tailpuller, tailchopper, kmerscanner
 from edgecaselib.util import motif_revcomp
 from gzip import open as gzopen
@@ -15,11 +14,9 @@ rule tailpuller:
     run:
         with open(output.ac, mode="wt") as sam:
             tailpuller.main(
-                args=Namespace(
-                    bams=[input.ar],
-                    reference=input.reference,
-                    prime=int(wildcards.prime)
-                ),
+                bams=[input.ar],
+                reference=input.reference,
+                prime=int(wildcards.prime),
                 file=sam
             )
 
@@ -29,7 +26,8 @@ rule tailchopper:
     run:
         with open(output.fa, mode="wt") as fasta:
             tailchopper.main(
-                args=Namespace(bams=[input.sam], prime=int(wildcards.prime)),
+                bams=[input.sam],
+                prime=int(wildcards.prime),
                 file=fasta
             )
 
@@ -49,12 +47,10 @@ rule candidate_densities:
         with gzopen(output.dat, mode="wt") as dat:
             for motif in motifs:
                 kmerscanner.main(
-                    args=Namespace(
-                        bams=[input.sam], num_reads=None,
-                        motif=motif, window_size=params.window_size,
-                        head_test=None, tail_test=None, cutoff=None,
-                        jobs=threads
-                    ),
+                    bams=[input.sam], num_reads=None,
+                    motif=motif, window_size=params.window_size,
+                    head_test=None, tail_test=None, cutoff=None,
+                    jobs=threads,
                     file=dat
                 )
 

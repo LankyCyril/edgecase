@@ -93,22 +93,22 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
         )
 
 
-def main(args, file=stdout):
+def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
-    if (args.head_test is not None) and (args.tail_test is not None):
+    if (head_test is not None) and (tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
-    elif (args.cutoff is not None) and (args.head_test is None) and (args.tail_test is None):
+    elif (cutoff is not None) and (head_test is None) and (tail_test is None):
         raise ValueError("--cutoff has no effect without a head/tail test")
-    elif ((args.head_test is not None) or (args.tail_test is not None)) and (args.cutoff is None):
+    elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
     # dispatch data to subroutines:
-    pattern = get_circular_pattern(args.motif)
+    pattern = get_circular_pattern(motif)
     # scan fastq for target motif query, parallelizing on reads:
-    with ReadFileChain(args.bams, AlignmentFile) as entry_iterator:
+    with ReadFileChain(bams, AlignmentFile) as entry_iterator:
         scanner = pattern_scanner(
-            entry_iterator, pattern, window_size=args.window_size,
-            head_test=args.head_test, tail_test=args.tail_test,
-            cutoff=args.cutoff, num_reads=args.num_reads, jobs=args.jobs
+            entry_iterator, pattern, window_size=window_size,
+            head_test=head_test, tail_test=tail_test,
+            cutoff=cutoff, num_reads=num_reads, jobs=jobs
         )
         # output densities of reads that pass filter:
         for entry, density_array in scanner:
@@ -116,7 +116,7 @@ def main(args, file=stdout):
                 meta_fields = [
                     entry.query_name, entry.flag, entry.reference_name,
                     entry.reference_start, entry.mapping_quality,
-                    args.motif
+                    motif
                 ]
                 print(*meta_fields, sep="\t", end="\t", file=file)
                 print(*density_array, sep=",", file=file)
