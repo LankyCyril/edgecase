@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from edgecaselib import kmerscanner, tailpuller
+from edgecaselib import kmerscanner, tailpuller, tailchopper
 
 
 def WideHelpFormatter(prog):
@@ -78,10 +78,32 @@ create_subparser(
     }
 )
 
+create_subparser(
+    subparsers, "tailchopper",
+    help="get overhanging regions of overhanging reads",
+    usage="{} [-j J] tailchopper [options] bams > fasta".format(__file__),
+    rules={
+        ("bams",): {
+            "help": "name(s) of input BAM/SAM file(s)",
+            "nargs": "+"
+        },
+        ("-r", "--reference"): {
+            "help": "reference FASTA, or TSV with anchor coordinates",
+            "required": True, "metavar": "R", "default": "no default, required"
+        },
+        ("-p", "--prime"): {
+            "help": "which 'prime' end to output",
+            "default": 5, "type": int, "choices": [5, 3]
+        }
+    }
+)
+
 args = parser.parse_args()
 if args.subparser == "kmerscanner":
     kmerscanner.main(args)
 elif args.subparser == "tailpuller":
     tailpuller.main(args)
+elif args.subparser == "tailchopper":
+    tailchopper.main(args)
 else:
     raise ValueError("A valid subparser (subcommand) must be specified")

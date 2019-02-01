@@ -2,26 +2,31 @@ from re import compile, IGNORECASE
 from edgecaselib.io import ReadFileChain, MAINCHROMS
 from tqdm import tqdm
 from pysam import FastxFile, AlignmentFile
-from pandas import DataFrame
+from pandas import read_csv, DataFrame
 from itertools import takewhile, filterfalse
 
 
 def get_anchors(reference):
     """Get coordinates of hard-masked bounds at each end of each main chromosome"""
-    pattern = compile(r'[^n]', flags=IGNORECASE)
-    bar = tqdm(desc="Finding anchors", total=len(MAINCHROMS), unit="chromosome")
-    anchor_data = {}
-    with FastxFile(reference) as genome:
-        for entry in genome:
-            if entry.name in MAINCHROMS:
-                bar.update()
-                bound_5prime = pattern.search(entry.sequence).span()[0]
-                bound_3prime = (
-                    len(entry.sequence) -
-                    pattern.search(entry.sequence[::-1]).span()[0]
-                )
-                anchor_data[entry.name] = bound_5prime, bound_3prime
-    return DataFrame(data=anchor_data, index=["5prime", "3prime"]).T
+    if reference.endswith(".tsv"): # assume precomputed anchors
+        return read_csv(reference, sep="\t", index_col=0)
+    else:
+        pattern = compile(r'[^n]', flags=IGNORECASE)
+        anchor_data = {}
+        bar = tqdm(
+            desc="Finding anchors", total=len(MAINCHROMS), unit="chromosome"
+        )
+        with FastxFile(reference) as genome:
+            for entry in genome:
+                if entry.name in MAINCHROMS:
+                    bar.update()
+                    bound_5prime = pattern.search(entry.sequence).span()[0]
+                    bound_3prime = (
+                        len(entry.sequence) -
+                        pattern.search(entry.sequence[::-1]).span()[0]
+                    )
+                    anchor_data[entry.name] = bound_5prime, bound_3prime
+        return DataFrame(data=anchor_data, index=["5prime", "3prime"]).T
 
 
 def is_good_entry(entry):
