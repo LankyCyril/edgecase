@@ -52,18 +52,8 @@ rule candidate_densities:
 rule all_dataset_tails:
     input:
         targets=expand(
-            join(config["data_dir"], config["reads_dir"], "{timepoint}_{subject}/{prime}{kind}"),
-            timepoint=config["timepoints"],
-            subject=config["subjects"],
+            join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}{kind}"),
+            dataset=config["datasets"],
             prime=[5, 3],
-            kind=["AC.sam", "OOB.fa", "AC-density.dat"]
-        )
-
-rule all_dataset_candidate_densities:
-    input:
-        targets=expand(
-            join(config["data_dir"], config["reads_dir"], "{timepoint}_{subject}/{prime}AC-densities.dat"),
-            timepoint=config["timepoints"],
-            subject=config["subjects"],
-            prime=[5, 3]
+            kind=["AC.sam", "OOB.fa", "AC-densities.dat"]
         )
