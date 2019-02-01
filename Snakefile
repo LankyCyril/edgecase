@@ -15,7 +15,7 @@ rule tailpuller:
         with open(output.ac, mode="wt") as sam:
             tailpuller.main(
                 args=Namespace(
-                    bams=input.ar,
+                    bams=[input.ar],
                     reference=input.reference,
                     prime=int(wildcards.prime)
                 ),
@@ -28,26 +28,32 @@ rule tailchopper:
     run:
         with open(output.fa, mode="wt") as fasta:
             tailchopper.main(
-                args=Namespace(bams=input, prime=int(wildcards.prime)),
+                args=Namespace(bams=[input.sam], prime=int(wildcards.prime)),
                 file=fasta
             )
 
 rule candidate_densities:
-    input: sam=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam")
-    output: dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
-    params: kmer="TTAGGG", window_size=120
-    threads: 1
+    input:
+        sam=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam"),
+        motifs=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-motifs.txt")
+    output:
+        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
+    params: window_size=120
+    threads: 16
     run:
+        with open(input.motifs) as motifs:
+            kmers = {line.strip() for line in motifs}
         with gzopen(output.dat, mode="wt") as dat:
-            kmerscanner.main(
-                args=Namespace(
-                    bams=input, num_reads=None,
-                    kmer=params.kmer, window_size=params.window_size,
-                    head_test=None, tail_test=None, cutoff=None,
-                    jobs=threads
-                ),
-                file=dat
-            )
+            for kmer in kmers:
+                kmerscanner.main(
+                    args=Namespace(
+                        bams=[input.sam], num_reads=None,
+                        kmer=kmer, window_size=params.window_size,
+                        head_test=None, tail_test=None, cutoff=None,
+                        jobs=threads
+                    ),
+                    file=dat
+                )
 
 rule all_dataset_tails:
     input:

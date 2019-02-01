@@ -79,8 +79,9 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
             density_calculator, simple_entry_iterator
         )
         # iterate pairs (entry.query_name, density_array), same as calculate_density():
+        desc = "Calculating density of " + pattern.pattern.split(r'|')[0]
         yield from tqdm(
-            read_density_iterator, desc="Calculating kmer density",
+            read_density_iterator, desc=desc,
             unit="read", total=num_reads
         )
 
