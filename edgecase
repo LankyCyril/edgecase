@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from edgecaselib import kmerscanner, tailpuller, tailchopper
+from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
 
 
 def WideHelpFormatter(prog):
@@ -93,6 +93,23 @@ create_subparser(
     }
 )
 
+create_subparser(
+    subparsers, "densityplot", help="visualize densities of candidate reads",
+    usage="{} densityplot [options] dat > png".format(__file__),
+    rules={
+        ("dat",): {
+            "help": "input density file"
+        },
+        ("-b", "--bin-size"): {
+            "help": "size of each bin in bp for visualization speedup",
+            "default": 100, "type": int, "metavar": "B"
+        },
+        ("--title",): {
+            "help": "figure title (defaults to input filename)"
+        }
+    }
+)
+
 kwargs = dict(parser.parse_args()._get_kwargs())
 if kwargs["subparser"] == "kmerscanner":
     kmerscanner.main(**kwargs)
@@ -100,5 +117,7 @@ elif kwargs["subparser"] == "tailpuller":
     tailpuller.main(**kwargs)
 elif kwargs["subparser"] == "tailchopper":
     tailchopper.main(**kwargs)
+elif kwargs["subparser"] == "densityplot":
+    densityplot.main(**kwargs)
 else:
     raise ValueError("A valid subparser (subcommand) must be specified")

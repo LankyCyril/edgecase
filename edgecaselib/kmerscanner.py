@@ -3,6 +3,7 @@ from regex import compile, IGNORECASE
 from numpy import zeros, array, cumsum
 from multiprocessing import Pool
 from edgecaselib.util import ReadFileChain
+from edgecaselib.tailchopper import chop
 from pysam import AlignmentFile
 from types import SimpleNamespace
 from functools import partial
@@ -71,7 +72,8 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
             reference_name=entry.reference_name,
             reference_start=entry.reference_start,
             mapping_quality=entry.mapping_quality,
-            query_sequence=entry.query_sequence
+            query_sequence=entry.query_sequence,
+            cigarstring=entry.cigarstring
         )
         for entry in entry_iterator
     )
@@ -93,7 +95,7 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
         )
 
 
-def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, file=stdout, **kwargs):
+def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, print_header=True, file=stdout, **kwargs):
     # parse and check arguments:
     if (head_test is not None) and (tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
@@ -101,8 +103,13 @@ def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, wind
         raise ValueError("--cutoff has no effect without a head/tail test")
     elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
-    # dispatch data to subroutines:
     pattern = get_circular_pattern(motif)
+    if print_header:
+        header = [
+            "#name", "flag", "chrom", "pos", "mapq", "motif",
+            "clip_5prime", "clip_3prime", "density"
+        ]
+        print(*header, sep="\t", file=file)
     # scan fastq for target motif query, parallelizing on reads:
     with ReadFileChain(bams, AlignmentFile) as entry_iterator:
         scanner = pattern_scanner(
@@ -115,8 +122,8 @@ def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, wind
             if entry: # non-null result, entry passed filters
                 meta_fields = [
                     entry.query_name, entry.flag, entry.reference_name,
-                    entry.reference_start, entry.mapping_quality,
-                    motif
+                    entry.reference_start, entry.mapping_quality, motif,
+                    len(chop(entry, 5).sequence), len(chop(entry, 3).sequence)
                 ]
                 print(*meta_fields, sep="\t", end="\t", file=file)
                 print(*density_array, sep=",", file=file)

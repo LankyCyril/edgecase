@@ -1,5 +1,5 @@
 from os.path import join
-from edgecaselib import tailpuller, tailchopper, kmerscanner
+from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
 from edgecaselib.util import motif_revcomp
 from gzip import open as gzopen
 
@@ -45,14 +45,33 @@ rule candidate_densities:
         if params.revcomp:
             motifs |= {motif_revcomp(motif) for motif in set(motifs)}
         with gzopen(output.dat, mode="wt") as dat:
-            for motif in motifs:
+            for i, motif in enumerate(motifs):
+                if i == 0:
+                    print_header = True
+                else:
+                    print_header = False
                 kmerscanner.main(
                     bams=[input.sam], num_reads=None,
                     motif=motif, window_size=params.window_size,
                     head_test=None, tail_test=None, cutoff=None,
                     jobs=threads,
-                    file=dat
+                    print_header=print_header, file=dat
                 )
+
+rule densityplot:
+    input:
+        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
+    output:
+        pdf=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.pdf")
+    params: bin_size=100
+    run:
+        with open(output.pdf, mode="wb") as pdf:
+            densityplot.main(
+                dat=input.dat,
+                bin_size=params.bin_size,
+                title="{} {}AC".format(wildcards.dataset, wildcards.prime),
+                file=pdf
+            )
 
 rule all_dataset_tails:
     input:
@@ -66,7 +85,7 @@ rule all_dataset_tails:
 rule all_dataset_candidate_densities:
     input:
         targets=expand(
-            join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat"),
+            join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.pdf"),
             dataset=config["datasets"],
             prime=[5, 3]
         )

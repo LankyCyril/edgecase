@@ -1,4 +1,4 @@
-from sys import stdout
+from sys import stdout, stderr
 from types import SimpleNamespace
 from edgecaselib.util import ReadFileChain
 from edgecaselib.tailpuller import is_good_entry
@@ -15,7 +15,7 @@ def chop(entry, prime):
     elif prime == 3:
         cigar_clip = search(r'(\d+[SH])+$', entry.cigarstring)
     if not cigar_clip:
-        return None
+        return SimpleNamespace(name=entry.query_name, sequence="")
     else:
         clip_length = sum(
             int(clip) for clip in split(r'[SH]', cigar_clip.group())
@@ -39,5 +39,9 @@ def main(bams, prime, file=stdout, **kwargs):
         for entry in bam_data:
             if is_good_entry(entry):
                 chopped_entry = chop(entry, prime)
-                print(">" + chopped_entry.name, file=file)
-                print(chopped_entry.sequence, file=file)
+                if len(chopped_entry.sequence):
+                    print(">" + chopped_entry.name, file=file)
+                    print(chopped_entry.sequence, file=file)
+                else:
+                    warn_mask = "WARNING: omitting {} chopped to zero length"
+                    print(warn_mask.format(chopped_entry.name), file=stderr)
