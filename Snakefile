@@ -1,5 +1,5 @@
 from os.path import join
-from edgecaselib import tailpuller, tailchopper, kmerscanner
+from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
 from edgecaselib.util import motif_revcomp
 from gzip import open as gzopen
 
@@ -57,6 +57,20 @@ rule candidate_densities:
                     jobs=threads,
                     print_header=print_header, file=dat
                 )
+
+rule densityplot:
+    input:
+        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
+    output:
+        pdf=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.pdf")
+    params: bin_size=100
+    run:
+        with open(output.pdf, mode="wb") as pdf:
+            densityplot.main(
+                dat=input.dat,
+                bin_size=params.bin_size,
+                file=pdf
+            )
 
 rule all_dataset_tails:
     input:
