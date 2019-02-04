@@ -127,10 +127,6 @@ create_subparser(
         },
         ("--title",): {
             "help": "figure title (defaults to input filename)"
-        },
-        ("--xtick-density",): {
-            "help": "xtick density compared to heatmap default (.05)",
-            "default": .05, "type": float, "metavar": "X"
         }
     }
 )
