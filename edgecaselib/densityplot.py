@@ -1,8 +1,9 @@
 from sys import stdout
-from numpy import linspace, array, mean, nan, concatenate, fromiter
-from pandas import read_csv, Series, concat
+from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
+from pandas import read_csv, DataFrame, concat
 from matplotlib.pyplot import switch_backend, subplots
-from seaborn import heatmap
+from tqdm import tqdm
+from os import path
 
 
 def binned(A, bins, func=mean):
@@ -14,54 +15,62 @@ def binned(A, bins, func=mean):
     ])
 
 
-def load_metrics(dat, bin_size):
-    """Load metrics from a text file, bin and convert into dataframe"""
-    raw_data = read_csv(dat, compression="gzip", sep="\t", escapechar="#")
-    metadata = raw_data.iloc[:,:8]
-    print(metadata[:3])
-    exit(1)
-    # old:
-    read_metrics = {}
-    # load and bin all metrics first:
-    with open(dat, mode="rt") as handle:
-        for line in handle:
-            name, *metrics = line.strip().split("\t")
-            metrics_array = fromiter(map(
-                lambda s: float(s) if s!="" else nan,
-                metrics
-            ), dtype="float32")
-            read_metrics[name] = binned(
-                metrics_array,
-                bins=len(metrics)/bin_size
-            )
-    # coerce to same lengths and convert into DataFrame:
-    maxlen = max(len(d) for d in read_metrics.values())
-    rows = []
-    for name, metrics in read_metrics.items():
-        padder = array([nan] * (maxlen - len(metrics)))
-        if align == "left":
-            padded_metrics = concatenate([metrics, padder])
-        elif align == "right":
-            padded_metrics = concatenate([padder, metrics])
-        rows.append(Series(padded_metrics, name=name))
-    return concat(rows, axis=1).T
+def get_binned_density_dataframe(raw_densities, chrom, bin_size):
+    """Subset to densities of reads on `chrom`, bin densities, convert to dataframe"""
+    indexer = (raw_densities["chrom"] == chrom)
+    densities_subset = raw_densities[indexer].reset_index(drop=True)
+    leftmost_pos = (densities_subset["pos"] - densities_subset["clip_5prime"]).min()
+    # convert density strings into numpy array:
+    density_arrays = []
+    entry_iterator = tqdm(
+        densities_subset.itertuples(), total=densities_subset.shape[0],
+        desc="Binning densities ({})".format(chrom), unit="entry"
+    )
+    # align density data to reference and bin it:
+    for entry in entry_iterator:
+        unaligned_density = fromstring(entry.density, sep=",", dtype="float32")
+        padder = full(entry.pos - entry.clip_5prime - leftmost_pos, nan)
+        aligned_density = concatenate([padder, unaligned_density])
+        binned_density = binned(
+            aligned_density, bins=aligned_density.shape[0]/bin_size
+        )
+        density_arrays.append(binned_density)
+    # pad densities on the right so they are all the same length:
+    max_density_length = max(
+        binned_density.shape[0] for binned_density in density_arrays
+    )
+    for i, binned_density in enumerate(density_arrays):
+        padder = full(max_density_length - binned_density.shape[0], nan)
+        density_arrays[i] = concatenate([binned_density, padder])
+    naked_binned_density_dataframe = DataFrame(
+        data=vstack(density_arrays),
+        columns=[leftmost_pos + j * bin_size for j in range(max_density_length)]
+    )
+    return concat(
+        [densities_subset.iloc[:,:-1], naked_binned_density_dataframe], axis=1
+    )
 
 
-def plot_metrics(metrics, figsize, palette, hide_names, bin_size, xtick_density, align="left", title="", png=stdout.buffer):
-    """Plot binned metrics as a heatmap"""
-    switch_backend("Agg")
+def load_densities(dat, bin_size):
+    """Load densities from dat file, split into dataframes per chromosome"""
+    raw_densities = read_csv(dat, compression="gzip", sep="\t", escapechar="#")
+    return {
+        chrom: get_binned_density_dataframe(raw_densities, chrom, bin_size)
+        for chrom in raw_densities["chrom"].drop_duplicates()
+    }
+
+
+def plot_densities(densities, figsize, palette, hide_names, bin_size, xtick_density, title="", file=stdout.buffer):
+    """Plot binned densities as a heatmap"""
+    raise NotImplementedError
+    if file is not None:
+        switch_backend("Agg")
     width, height = tuple(map(int, figsize.split("x")))
     figure, ax = subplots(figsize=(width, height))
-    # force vmin and vmax for consistency between plots:
-    heatmap(metrics, vmin=0, vmax=1, ax=ax, cmap=palette)
     # adjust xticks according to bin size and alignment:
     xticks = [
         int(tick.get_text()) for tick in ax.get_xticklabels()
     ]
-    if align == "right":
-        xticks = [
-            tick * -1 for tick in reversed(xticks)
-        ]
     if xtick_density != 1:
         each = int(len(xticks)*xtick_density)
         xticks = [
@@ -76,19 +85,16 @@ def plot_metrics(metrics, figsize, palette, hide_names, bin_size, xtick_density,
     if hide_names:
         ax.set(yticks=[])
     ax.set(title=title, xlabel="position (bp)")
-    figure.savefig(png)
+    figure.savefig(file)
 
 
 def main(dat, bin_size=100, figsize="16x9", palette="viridis", hide_names=False, title=None, xtick_density=.05, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
-    metrics = load_metrics(dat, bin_size=bin_size)
-    if title:
-        title = title
-    else:
-        title = dat.split("/")[-1]
-    plot_metrics(
-        metrics, figsize, palette, hide_names,
-        bin_size=bin_size,
-        xtick_density=xtick_density, title=title, png=stdout.buffer
+    densities = load_densities(dat, bin_size=bin_size)
+    if title is None:
+        title = path.split(dat)[-1]
+    plot_densities(
+        densities, figsize, palette, hide_names, bin_size,
+        xtick_density, title, file
     )
     return 0

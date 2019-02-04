@@ -45,13 +45,17 @@ rule candidate_densities:
         if params.revcomp:
             motifs |= {motif_revcomp(motif) for motif in set(motifs)}
         with gzopen(output.dat, mode="wt") as dat:
-            for motif in motifs:
+            for i, motif in enumerate(motifs):
+                if i == 0:
+                    print_header = True
+                else:
+                    print_header = False
                 kmerscanner.main(
                     bams=[input.sam], num_reads=None,
                     motif=motif, window_size=params.window_size,
                     head_test=None, tail_test=None, cutoff=None,
                     jobs=threads,
-                    file=dat
+                    print_header=print_header, file=dat
                 )
 
 rule all_dataset_tails:
