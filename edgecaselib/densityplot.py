@@ -74,10 +74,15 @@ def motif_subplots(nreads, chrom, max_mapq):
         figsize=(16, nreads*2/3), sharey=True, frameon=False,
         gridspec_kw={"hspace": 0, "wspace": 0, "width_ratios": (15, 1)}
     )
+    # remove subplot borders:
     for ax in axs.flatten():
         for spine in ax.spines.values():
             spine.set_visible(False)
         ax.get_xaxis().get_major_formatter().set_scientific(False)
+    # remove xticks for all reads except bottom one:
+    for ax in axs[:-1, 0]:
+        ax.set(xticks=[])
+    # annotate chromosome and MAPQ:
     axs[-1, 0].set(xlabel="Chromosome {}".format(chrom))
     meta_twiny = axs[0, 1].twiny()
     meta_twiny.set(title="MAPQ", xlim=(0, max_mapq))
