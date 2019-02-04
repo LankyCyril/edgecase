@@ -85,7 +85,7 @@ rule all_dataset_tails:
 rule all_dataset_candidate_densities:
     input:
         targets=expand(
-            join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat"),
+            join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.pdf"),
             dataset=config["datasets"],
             prime=[5, 3]
         )
