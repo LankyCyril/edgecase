@@ -67,7 +67,7 @@ def load_densities(dat, bin_size):
     }
 
 
-def motif_subplots(nreads, chrom):
+def motif_subplots(nreads, chrom, max_mapq):
     """Prepare figure with subplots for each read"""
     page, axs = subplots(
         ncols=2, nrows=nreads, squeeze=False,
@@ -79,7 +79,11 @@ def motif_subplots(nreads, chrom):
             spine.set_visible(False)
         ax.get_xaxis().get_major_formatter().set_scientific(False)
     axs[-1, 0].set(xlabel="Chromosome {}".format(chrom))
-    axs[-1, 1].set(xlabel="MAPQ")
+    meta_twiny = axs[0, 1].twiny()
+    meta_twiny.set(title="MAPQ", xlim=(0, max_mapq))
+    for spine in meta_twiny.spines.values():
+        spine.set_visible(False)
+    axs[-1, 1].set(xticks=[])
     return page, axs
 
 
@@ -128,7 +132,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
 def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title):
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
-    page, axs = motif_subplots(nreads=len(names), chrom=chrom)
+    page, axs = motif_subplots(len(names), chrom, max_mapq)
     pos_range = binned_density_dataframe.columns[8:]
     for i, name, (trace_ax, meta_ax) in zip(count(), names, axs):
         read_data = binned_density_dataframe[
