@@ -46,8 +46,11 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size):
         data=vstack(density_arrays),
         columns=[leftmost_pos + j * bin_size for j in range(max_density_length)]
     )
-    return concat(
+    binned_density_dataframe = concat(
         [densities_subset.iloc[:,:-1], naked_binned_density_dataframe], axis=1
+    )
+    return binned_density_dataframe.sort_values(
+        by=["mapq", "name", "motif"], ascending=[False, True, True]
     )
 
 
@@ -74,6 +77,7 @@ def motif_subplots(nreads, chrom):
     for ax in axs.flatten():
         for spine in ax.spines.values():
             spine.set_visible(False)
+        ax.get_xaxis().get_major_formatter().set_scientific(False)
     axs[-1, 0].set(xlabel="Chromosome {}".format(chrom))
     axs[-1, 1].set(xlabel="MAPQ")
     return page, axs
@@ -85,7 +89,7 @@ def plot_motif_densities(read_data, trace_ax, legend=False):
     trace_data.columns = read_data["motif"]
     lineplot(data=trace_data, ax=trace_ax, legend=legend, dashes=False)
     if legend:
-        trace_ax.legend(loc="lower left", bbox_to_anchor=(0, 1.2))
+        trace_ax.legend(loc="lower left", bbox_to_anchor=(0, 1.4))
     return trace_data
 
 
@@ -121,7 +125,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
     meta_ax.set(xlim=(0, max_mapq))
 
 
-def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq):
+def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title):
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(nreads=len(names), chrom=chrom)
@@ -138,10 +142,11 @@ def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq):
             ylim=(-.2, 1.2), yticks=[]
         )
         plot_read_metadata(read_data, max_mapq, meta_ax)
+    axs[0, 0].set(title=title)
     return page
 
 
-def plot_densities(densities, figsize, palette, hide_names, bin_size, title="", file=stdout.buffer):
+def plot_densities(densities, bin_size, title, file=stdout.buffer):
     """Plot binned densities as a heatmap"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
     chromosome_iterator = tqdm(
@@ -150,17 +155,17 @@ def plot_densities(densities, figsize, palette, hide_names, bin_size, title="", 
     )
     with PdfPages(file) as pdf:
         for chrom, binned_density_dataframe in chromosome_iterator:
-            pdf.savefig(
-                chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq),
-                bbox_inches="tight"
+            page = chromosome_motif_plot(
+                binned_density_dataframe, chrom, max_mapq, title
             )
+            pdf.savefig(page, bbox_inches="tight")
 
 
-def main(dat, bin_size=100, figsize="16x9", palette="viridis", hide_names=False, title=None, file=stdout.buffer, **kwargs):
+def main(dat, bin_size=100, title=None, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     densities = load_densities(dat, bin_size=bin_size)
     if title is None:
         title = path.split(dat)[-1]
     plot_densities(
-        densities, figsize, palette, hide_names, bin_size, title, file
+        densities, bin_size, title, file
     )

@@ -69,6 +69,7 @@ rule densityplot:
             densityplot.main(
                 dat=input.dat,
                 bin_size=params.bin_size,
+                title="{} {}AC".format(wildcards.dataset, wildcards.prime),
                 file=pdf
             )
 

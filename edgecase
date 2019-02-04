@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, ArgumentTypeError
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
-from re import search
 
 
 def WideHelpFormatter(prog):
@@ -16,14 +15,6 @@ def create_subparser(subparsers, name, help, usage, rules):
     )
     for rule_args, rule_kwargs in rules.items():
         _subparser.add_argument(*rule_args, **rule_kwargs)
-
-
-def figsize_type(figsize):
-    """Validate --figsize for densityplot"""
-    if not search(r'^\d+x\d+$', figsize):
-        raise ArgumentTypeError("--figsize must be in format WxH: e.g., 5x7")
-    else:
-        return figsize
 
 
 parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
@@ -112,18 +103,6 @@ create_subparser(
         ("-b", "--bin-size"): {
             "help": "size of each bin in bp for visualization speedup",
             "default": 100, "type": int, "metavar": "B"
-        },
-        ("-s", "--figsize"): {
-            "help": "figure size (16x9)",
-            "default": "16x9", "metavar": "S", "type": figsize_type
-        },
-        ("--palette",): {
-            "help": "heatmap palette (viridis)",
-            "default": "viridis", "metavar": "P"
-        },
-        ("--hide-names",): {
-            "help": "hide names of reads on heatmap",
-            "action": "store_true"
         },
         ("--title",): {
             "help": "figure title (defaults to input filename)"
