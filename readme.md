@@ -39,7 +39,8 @@ optional arguments:
 
 ### tailchopper
 
-Truncates reads in a 5AC or 3AC file to a FASTQ of sequences completely overhanging reference hard mask.  
+Truncates reads in a 5AC or 3AC file to a FASTQ of sequences of soft/hard-clipped ends.  
+(usually, this corresponds to regions completely overhanging onto the reference hard mask).  
 NB! Needs `--prime` to be set, as it has no knowledge of how the SAM was generated.
 
 ```
