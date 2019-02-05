@@ -95,12 +95,12 @@ optional arguments:
 
 ### Visual guide to read terminology
 ```
-  ~~~~~~~~~~~                              5AC: reads that mapped to (and beyond) 5' ends of chromosomes
-  ~~~~~~                                  5OOB: the subsection of a 5AC read that is fully Out Of Bounds     
-               ~~~~~~~~~~                AR-IB: a read that is mapped & fully within chromosome
-                           ~~~~~~~~~~      3AC: reads that mapped to (and beyond) 3' ends of chromosomes
-                               ~~~~~~     3OOB: the subsection of a 5AC read that is fully Out Of Bounds
-*******========================*********
+  ~~~~~~~~~~~                            5AC "5 prime anchored":       reads that map to (and beyond)  5' ends
+  ~~~~~~                                 5OOB "5 prime out of bounds": the soft or hard clipped edges of reads     
+               ~~~~~~~~                  AR-IB "Anchored in bounds":   reads mapped &  fully within chromosome
+                         ~~~~~~~~~~      3AC "3 prime anchored":       reads that map to (and beyond) 3'  ends
+                              ~~~~~      3OOB "3 prime out of bounds": the soft or hard clipped edges of reads
+******===========================******
 
 ~~~  a NanoPore read
 ***  hard-masked region of reference chromosome
