@@ -42,8 +42,8 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
             entry, pattern, head_test, tail_test
         )
         passes_filter = (edge_density > cutoff)
-    else: # otherwise, allow all
-        passes_filter = True
+    else: # otherwise, allow all that have data
+        passes_filter = (entry.query_sequence is not None)
     if passes_filter: # calculations will make sense
         read_length = len(entry.query_sequence)
         canvas = zeros(read_length, dtype=bool)
@@ -54,7 +54,7 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
         if len(pattern_positions):
             canvas[pattern_positions] = True
         if read_length <= window_size: # use one window:
-            density_array = (canvas.sum(axis=0) / read_length)
+            density_array = (canvas.sum(axis=0) / read_length).reshape(1)
         else: # use rolling window:
             roller = cumsum(canvas, axis=0)
             roller[window_size:] = roller[window_size:] - roller[:-window_size]
