@@ -40,7 +40,7 @@ def is_good_entry(entry):
         return False
 
 
-def filter_aligned_segments(bam_data, anchors, prime):
+def filter_entries(bam_data, anchors, prime):
     """Only pass reads extending past anchors"""
     isnone = lambda p: p is None
     for entry in bam_data:
@@ -73,5 +73,5 @@ def main(bams, reference, prime, file=stdout, **kwargs):
     # dispatch data to subroutines:
     anchors = get_anchors(reference)
     with ReadFileChain(bams, AlignmentFile) as bam_data:
-        for entry in filter_aligned_segments(bam_data, anchors, prime):
+        for entry in filter_entries(bam_data, anchors, prime):
             print(entry.to_string(), file=file)
