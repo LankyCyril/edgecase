@@ -1,7 +1,6 @@
 from sys import stdout, stderr
 from types import SimpleNamespace
 from edgecaselib.util import ReadFileChain
-from edgecaselib.tailpuller import is_good_entry
 from pysam import AlignmentFile
 from re import search, split
 
@@ -37,11 +36,10 @@ def chop(entry, prime):
 def main(bams, prime, file=stdout, **kwargs):
     with ReadFileChain(bams, AlignmentFile) as bam_data:
         for entry in bam_data:
-            if is_good_entry(entry):
-                chopped_entry = chop(entry, prime)
-                if len(chopped_entry.sequence):
-                    print(">" + chopped_entry.name, file=file)
-                    print(chopped_entry.sequence, file=file)
-                else:
-                    warn_mask = "WARNING: omitting {} chopped to zero length"
-                    print(warn_mask.format(chopped_entry.name), file=stderr)
+            chopped_entry = chop(entry, prime)
+            if len(chopped_entry.sequence):
+                print(">" + chopped_entry.name, file=file)
+                print(chopped_entry.sequence, file=file)
+            else:
+                warn_mask = "WARNING: omitting {} chopped to zero length"
+                print(warn_mask.format(chopped_entry.name), file=stderr)
