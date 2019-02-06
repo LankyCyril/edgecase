@@ -47,15 +47,15 @@ rule candidate_densities:
         with gzopen(output.dat, mode="wt") as dat:
             for i, motif in enumerate(motifs):
                 if i == 0:
-                    print_header = True
+                    no_print_header = False
                 else:
-                    print_header = False
+                    no_print_header = True
                 kmerscanner.main(
                     bams=[input.sam], num_reads=None,
                     motif=motif, window_size=params.window_size,
                     head_test=None, tail_test=None, cutoff=None,
                     jobs=threads,
-                    print_header=print_header, file=dat
+                    no_print_header=no_print_header, file=dat
                 )
 
 rule densityplot:

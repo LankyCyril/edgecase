@@ -95,7 +95,7 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
         )
 
 
-def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, print_header=True, file=stdout, **kwargs):
+def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, no_print_header=False, file=stdout, **kwargs):
     # parse and check arguments:
     if (head_test is not None) and (tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
@@ -104,7 +104,7 @@ def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, wind
     elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
     pattern = get_circular_pattern(motif)
-    if print_header:
+    if not no_print_header:
         header = [
             "#name", "flag", "chrom", "pos", "mapq", "motif",
             "clip_5prime", "clip_3prime", "density"

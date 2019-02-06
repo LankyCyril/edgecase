@@ -1,6 +1,6 @@
 from sys import stdout
 from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
-from pandas import read_csv, DataFrame, concat
+from pandas import read_csv, DataFrame, concat, merge
 from matplotlib.pyplot import subplots
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle
@@ -19,26 +19,29 @@ def binned(A, bins, func=mean):
     ])
 
 
-def get_binned_density_dataframe(raw_densities, chrom, bin_size):
+def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
     """Subset to densities of reads on `chrom`, bin densities, convert to dataframe"""
     indexer = (raw_densities["chrom"] == chrom)
     densities_subset = raw_densities[indexer].reset_index(drop=True)
-    leftmost_pos = (densities_subset["pos"] - densities_subset["clip_5prime"]).min()
-    # convert density strings into numpy array:
-    density_arrays = []
+    if no_align:
+        leftmost_pos = 0
+    else:
+        offsets = densities_subset["pos"] - densities_subset["clip_5prime"]
+        leftmost_pos = offsets.min()
     # align density data to reference and bin it:
+    density_arrays = []
     for entry in densities_subset.itertuples():
         unaligned_density = fromstring(entry.density, sep=",", dtype="float32")
-        padder = full(entry.pos - entry.clip_5prime - leftmost_pos, nan)
+        if no_align:
+            padder = array([])
+        else:
+            padder = full(entry.pos - entry.clip_5prime - leftmost_pos, nan)
         aligned_density = concatenate([padder, unaligned_density])
-        binned_density = binned(
+        density_arrays.append(binned(
             aligned_density, bins=aligned_density.shape[0]/bin_size
-        )
-        density_arrays.append(binned_density)
+        ))
     # pad densities on the right so they are all the same length:
-    max_density_length = max(
-        binned_density.shape[0] for binned_density in density_arrays
-    )
+    max_density_length = max(bd.shape[0] for bd in density_arrays)
     for i, binned_density in enumerate(density_arrays):
         padder = full(max_density_length - binned_density.shape[0], nan)
         density_arrays[i] = concatenate([binned_density, padder])
@@ -54,15 +57,27 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size):
     )
 
 
-def load_densities(dat, bin_size):
+def load_densities(dat, bin_size, no_align, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
     raw_densities = read_csv(dat, compression="gzip", sep="\t", escapechar="#")
+    if each_once:
+        raw_densities["length"] = raw_densities["density"].apply(
+            lambda d: d.count(",")+1
+        )
+        groups = raw_densities[["name", "motif", "length"]].groupby(
+            ["name", "motif"], as_index=False
+        ).max()
+        raw_densities = merge(groups, raw_densities).drop(columns="length")
+    if no_align:
+        raw_densities["chrom"] = "None"
     chromosome_iterator = tqdm(
         raw_densities["chrom"].drop_duplicates(), desc="Reading data",
         unit="chromosome"
     )
     return {
-        chrom: get_binned_density_dataframe(raw_densities, chrom, bin_size)
+        chrom: get_binned_density_dataframe(
+            raw_densities, chrom, bin_size, no_align
+        )
         for chrom in chromosome_iterator
     }
 
@@ -134,7 +149,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
     meta_ax.set(xlim=(0, max_mapq))
 
 
-def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title):
+def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title, no_align):
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(len(names), chrom, max_mapq)
@@ -145,17 +160,20 @@ def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title):
         ]
         legend = "full" if (i==0) else False
         trace_data = plot_motif_densities(read_data, trace_ax, legend)
-        highlight_mapped_region(read_data, trace_data, name, trace_ax)
-        trace_ax.set(
-            xlim=(pos_range.min(), pos_range.max()),
-            ylim=(-.2, 1.2), yticks=[]
-        )
-        plot_read_metadata(read_data, max_mapq, meta_ax)
+        if no_align:
+            trace_ax.set(ylim=(-.2, 1.2), yticks=[], xticks=[])
+        else:
+            highlight_mapped_region(read_data, trace_data, name, trace_ax)
+            trace_ax.set(
+                xlim=(pos_range.min(), pos_range.max()),
+                ylim=(-.2, 1.2), yticks=[]
+            )
+            plot_read_metadata(read_data, max_mapq, meta_ax)
     axs[0, 0].set(title=title)
     return page
 
 
-def plot_densities(densities, bin_size, title, file=stdout.buffer):
+def plot_densities(densities, bin_size, title, no_align, file=stdout.buffer):
     """Plot binned densities as a heatmap"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
     chromosome_iterator = tqdm(
@@ -165,16 +183,16 @@ def plot_densities(densities, bin_size, title, file=stdout.buffer):
     with PdfPages(file) as pdf:
         for chrom, binned_density_dataframe in chromosome_iterator:
             page = chromosome_motif_plot(
-                binned_density_dataframe, chrom, max_mapq, title
+                binned_density_dataframe, chrom, max_mapq, title, no_align
             )
             pdf.savefig(page, bbox_inches="tight")
 
 
-def main(dat, bin_size=100, title=None, file=stdout.buffer, **kwargs):
+def main(dat, bin_size=100, title=None, no_align=False, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
-    densities = load_densities(dat, bin_size=bin_size)
+    densities = load_densities(dat, bin_size=bin_size, no_align=no_align)
     if title is None:
         title = path.split(dat)[-1]
     plot_densities(
-        densities, bin_size, title, file
+        densities, bin_size, title, no_align, file
     )

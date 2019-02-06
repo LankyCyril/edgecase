@@ -89,6 +89,10 @@ create_subparser(
         ("-n", "--num-reads"): {
             "help": "expected number of reads in input (for progress display)",
             "default": None, "type": int, "metavar": "N"
+        },
+        ("--no-print-header",): {
+            "help": "suppress header",
+            "action": "store_true"
         }
     }
 )
@@ -105,7 +109,12 @@ create_subparser(
             "default": 100, "type": int, "metavar": "B"
         },
         ("--title",): {
-            "help": "figure title (defaults to input filename)"
+            "help": "figure title (defaults to input filename)",
+            "metavar": "T"
+        },
+        ("--no-align",): {
+            "help": "plot unaligned",
+            "action": "store_true"
         }
     }
 )
