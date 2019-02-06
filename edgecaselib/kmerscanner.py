@@ -25,7 +25,7 @@ def get_circular_pattern(motif):
 
 def get_edge_density(entry, pattern, head_test, tail_test):
     """Calculate density of pattern in head_test or tail_test of read"""
-    if len(entry.query_sequence) == 0:
+    if (entry.query_sequence is None) or (len(entry.query_sequence) == 0):
         return 0
     if head_test:
         subsequence = entry.query_sequence[:head_test]
