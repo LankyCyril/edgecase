@@ -69,7 +69,7 @@ def filter_aligned_segments(bam_data, anchors, prime):
 def main(bams, reference, prime, file=stdout, **kwargs):
     # use header of first input file (NB! fragile):
     with AlignmentFile(bams[0]) as bam:
-        print(str(bam.header).rstrip("\n"))
+        print(str(bam.header).rstrip("\n"), file=file)
     # dispatch data to subroutines:
     anchors = get_anchors(reference)
     with ReadFileChain(bams, AlignmentFile) as bam_data:
