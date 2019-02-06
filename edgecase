@@ -17,47 +17,12 @@ def create_subparser(subparsers, name, help, usage, rules):
         _subparser.add_argument(*rule_args, **rule_kwargs)
 
 
-parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
+parser = ArgumentParser(prog=__file__)
 parser.add_argument(
     "-j", "--jobs", help="number of jobs to run in parallel",
     default=1, type=int, metavar="J"
 )
-subparsers = parser.add_subparsers(help="subcommands", dest="subparser")
-
-create_subparser(
-    subparsers, "kmerscanner", help="perform kmer scan",
-    usage="{} [-j J] kmerscanner [options] fastqs > txt".format(__file__),
-    rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
-        },
-        ("--motif",): {
-            "help": "target motif sequence",
-            "default": "TTAGGG", "metavar": "M"
-        },
-        ("--head-test",): {
-            "help": "length of head to use for density filter (if specified)",
-            "default": None, "type": int, "metavar": "H"
-        },
-        ("--tail-test",): {
-            "help": "length of tail to use for density filter (if specified)",
-            "default": None, "type": int, "metavar": "T"
-        },
-        ("-c", "--cutoff"): {
-            "help": "use hard cutoff for density",
-            "default": None, "type": float, "metavar": "C"
-        },
-        ("-w", "--window-size"): {
-            "help": "size of the rolling window",
-            "default": 120, "type": int, "metavar": "W"
-        },
-        ("-n", "--num-reads"): {
-            "help": "expected number of reads in input (for progress display)",
-            "default": None, "type": int, "metavar": "N"
-        }
-    }
-)
+subparsers = parser.add_subparsers(dest="subparser")
 
 create_subparser(
     subparsers, "tailpuller", help="select overhanging reads",
@@ -89,6 +54,41 @@ create_subparser(
         ("-p", "--prime"): {
             "help": "which 'prime' end to output",
             "default": 5, "type": int, "choices": [5, 3]
+        }
+    }
+)
+
+create_subparser(
+    subparsers, "kmerscanner", help="perform kmer scan",
+    usage="{} [-j J] kmerscanner [options] bams > dat".format(__file__),
+    rules={
+        ("bams",): {
+            "help": "name(s) of input BAM/SAM file(s)",
+            "nargs": "+"
+        },
+        ("--motif",): {
+            "help": "target motif sequence",
+            "default": "TTAGGG", "metavar": "M"
+        },
+        ("--head-test",): {
+            "help": "length of head to use for density filter (if specified)",
+            "default": None, "type": int, "metavar": "H"
+        },
+        ("--tail-test",): {
+            "help": "length of tail to use for density filter (if specified)",
+            "default": None, "type": int, "metavar": "T"
+        },
+        ("-c", "--cutoff"): {
+            "help": "use hard cutoff for density",
+            "default": None, "type": float, "metavar": "C"
+        },
+        ("-w", "--window-size"): {
+            "help": "size of the rolling window",
+            "default": 120, "type": int, "metavar": "W"
+        },
+        ("-n", "--num-reads"): {
+            "help": "expected number of reads in input (for progress display)",
+            "default": None, "type": int, "metavar": "N"
         }
     }
 )

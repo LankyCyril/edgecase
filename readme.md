@@ -60,7 +60,7 @@ Optionally filters input by terminal density (outputs data only for reads exceed
 By default, outputs data for all input reads.
 
 ```
-usage: ./edgecase [-j J] kmerscanner [options] fastqs > txt
+usage: ./edgecase [-j J] kmerscanner [options] bams > dat
 
 positional arguments:
   bams                   name(s) of input BAM/SAM file(s)
