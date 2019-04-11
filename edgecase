@@ -5,7 +5,7 @@ from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
 
 def WideHelpFormatter(prog):
     """Supply formatter class to ArgumentParser with wider fields than default"""
-    return ArgumentDefaultsHelpFormatter(prog, max_help_position=50, width=150)
+    return ArgumentDefaultsHelpFormatter(prog, max_help_position=30, width=150)
 
 
 def create_subparser(subparsers, name, help, usage, rules):
@@ -17,7 +17,7 @@ def create_subparser(subparsers, name, help, usage, rules):
         _subparser.add_argument(*rule_args, **rule_kwargs)
 
 
-parser = ArgumentParser(prog=__file__)
+parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
 parser.add_argument(
     "-j", "--jobs", help="number of jobs to run in parallel",
     default=1, type=int, metavar="J"
@@ -29,8 +29,7 @@ create_subparser(
     usage="{} tailpuller [options] bams > sam".format(__file__),
     rules={
         ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
+            "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
         },
         ("-r", "--reference"): {
             "help": "reference FASTA",
@@ -48,8 +47,7 @@ create_subparser(
     usage="{} tailchopper [options] bams > fasta".format(__file__),
     rules={
         ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
+            "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
         },
         ("-p", "--prime"): {
             "help": "which 'prime' end to output",
@@ -63,12 +61,10 @@ create_subparser(
     usage="{} [-j J] kmerscanner [options] bams > dat".format(__file__),
     rules={
         ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
+            "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
         },
         ("--motif",): {
-            "help": "target motif sequence",
-            "default": "TTAGGG", "metavar": "M"
+            "help": "target motif sequence", "default": "TTAGGG", "metavar": "M"
         },
         ("--head-test",): {
             "help": "length of head to use for density filter (if specified)",
@@ -91,8 +87,7 @@ create_subparser(
             "default": None, "type": int, "metavar": "N"
         },
         ("--no-print-header",): {
-            "help": "suppress header",
-            "action": "store_true"
+            "help": "suppress header", "action": "store_true"
         }
     }
 )
@@ -109,24 +104,17 @@ create_subparser(
             "default": 100, "type": int, "metavar": "B"
         },
         ("--title",): {
-            "help": "figure title (defaults to input filename)",
-            "metavar": "T"
+            "help": "figure title (defaults to input filename)", "metavar": "T"
         },
         ("--no-align",): {
-            "help": "plot unaligned",
-            "action": "store_true"
+            "help": "plot unaligned", "action": "store_true"
         }
     }
 )
 
+
 kwargs = dict(parser.parse_args()._get_kwargs())
-if kwargs["subparser"] == "kmerscanner":
-    kmerscanner.main(**kwargs)
-elif kwargs["subparser"] == "tailpuller":
-    tailpuller.main(**kwargs)
-elif kwargs["subparser"] == "tailchopper":
-    tailchopper.main(**kwargs)
-elif kwargs["subparser"] == "densityplot":
-    densityplot.main(**kwargs)
+if kwargs["subparser"] in subparsers.choices:
+    globals()[kwargs["subparser"]].main(**kwargs)
 else:
-    raise ValueError("A valid subparser (subcommand) must be specified")
+    exit(parser.print_help() or 1)
