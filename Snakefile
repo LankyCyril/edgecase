@@ -1,7 +1,8 @@
 from os.path import join
-from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
+from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot, ar_ib
 from edgecaselib.util import motif_revcomp
 from gzip import open as gzopen
+from pysam import AlignmentFile
 
 configfile: "config.yaml"
 
@@ -29,6 +30,21 @@ rule tailchopper:
             tailchopper.main(
                 bams=[input.sam],
                 prime=int(wildcards.prime),
+                file=fasta
+            )
+
+rule ar_ib:
+    input:
+        ar=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.sorted.bam"),
+        p5ac=join(config["data_dir"], config["reads_dir"], "{dataset}/5AC.sam"),
+        p3ac=join(config["data_dir"], config["reads_dir"], "{dataset}/3AC.sam")
+    output:
+        fa=join(config["data_dir"], config["reads_dir"], "{dataset}/AR-IB.fa.gz")
+    run:
+        with gzopen(output.fa, mode="wt") as fasta:
+            ar_ib.main(
+                ar=input.ar,
+                acs=[input.p5ac, input.p3ac],
                 file=fasta
             )
 
@@ -81,6 +97,13 @@ rule all_dataset_tails:
             dataset=config["datasets"],
             prime=[5, 3],
             kind=["AC.sam", "OOB.fa"]
+        )
+
+rule all_dataset_backgrounds:
+    input:
+        targets=expand(
+            join(config["data_dir"], config["reads_dir"], "{dataset}/AR-IB.fa.gz"),
+            dataset=config["datasets"]
         )
 
 rule all_dataset_candidate_densities:
