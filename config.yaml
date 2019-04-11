@@ -3,6 +3,7 @@ reads_dir: "processedReads"
 analysis_dir: "analysis"
 
 reference: "data/references/hs37d5.fa"
+chromosome_names: "ucsc"
 
 datasets:
   - _1_pre_TW

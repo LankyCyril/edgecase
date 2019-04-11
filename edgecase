@@ -35,8 +35,12 @@ create_subparser(
             "help": "reference FASTA",
             "required": True, "metavar": "R", "default": "no default, required"
         },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
+        ("-n",): {
+            "help": "chromosome naming convention", "dest": "names",
+            "default": "ucsc", "choices": {"ucsc", "ensembl"}
+        },
+        ("-p",): {
+            "help": "which 'prime' end to output", "dest": "prime",
             "default": 5, "type": int, "choices": [5, 3]
         }
     }

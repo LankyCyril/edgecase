@@ -17,6 +17,7 @@ rule tailpuller:
                 bams=[input.ar],
                 reference=input.reference,
                 prime=int(wildcards.prime),
+                names=config["chromosome_names"],
                 file=sam
             )
 

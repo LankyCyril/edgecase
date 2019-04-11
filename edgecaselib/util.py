@@ -3,7 +3,8 @@ from itertools import chain
 from regex import compile
 
 
-MAINCHROMS = {str(i) for i in range(1, 23)} | {"X", "Y"}
+MAINCHROMS_ENSEMBL = {str(i) for i in range(1, 23)} | {"X", "Y"}
+MAINCHROMS_UCSC = {"chr" + s for s in MAINCHROMS_ENSEMBL}
 ALPHABET = list("ACGT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
 MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}

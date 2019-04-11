@@ -1,13 +1,23 @@
 from sys import stdout
 from re import compile, IGNORECASE
-from edgecaselib.util import ReadFileChain, MAINCHROMS
+from edgecaselib.util import ReadFileChain, MAINCHROMS_ENSEMBL, MAINCHROMS_UCSC
 from tqdm import tqdm
 from pysam import FastxFile, AlignmentFile
 from pandas import read_csv, DataFrame
 from itertools import takewhile, filterfalse
 
 
-def get_anchors(reference):
+def get_mainchroms(names):
+    """Choose mainchroms based on reference annotation format"""
+    if names == "ucsc":
+        return MAINCHROMS_UCSC
+    elif names == "ensembl":
+        return MAINCHROMS_ENSEMBL
+    else:
+        raise ValueError("`names` must be either 'ucsc' or 'ensembl'")
+
+
+def get_anchors(reference, mainchroms):
     """Get coordinates of hard-masked bounds at each end of each main chromosome"""
     if reference.endswith(".tsv"): # assume precomputed anchors
         return read_csv(reference, sep="\t", index_col=0)
@@ -15,11 +25,11 @@ def get_anchors(reference):
         pattern = compile(r'[^n]', flags=IGNORECASE)
         anchor_data = {}
         bar = tqdm(
-            desc="Finding anchors", total=len(MAINCHROMS), unit="chromosome"
+            desc="Finding anchors", total=len(mainchroms), unit="chromosome"
         )
         with FastxFile(reference) as genome:
             for entry in genome:
-                if entry.name in MAINCHROMS:
+                if entry.name in mainchroms:
                     bar.update()
                     bound_5prime = pattern.search(entry.sequence).span()[0]
                     bound_3prime = (
@@ -30,21 +40,21 @@ def get_anchors(reference):
         return DataFrame(data=anchor_data, index=["5prime", "3prime"]).T
 
 
-def is_good_entry(entry):
+def is_good_entry(entry, mainchroms):
     """Simple filter"""
     if entry.is_unmapped or entry.is_secondary or entry.is_supplementary:
         return False
-    elif entry.reference_name in MAINCHROMS:
+    elif entry.reference_name in mainchroms:
         return True
     else:
         return False
 
 
-def filter_entries(bam_data, anchors, prime):
+def filter_entries(bam_data, anchors, prime, mainchroms):
     """Only pass reads extending past anchors"""
     isnone = lambda p: p is None
     for entry in bam_data:
-        if is_good_entry(entry):
+        if is_good_entry(entry, mainchroms):
             positions = entry.get_reference_positions(full_length=True)
             left_clip = sum(
                 True for _ in takewhile(isnone, positions)
@@ -66,12 +76,15 @@ def filter_entries(bam_data, anchors, prime):
                     yield entry
 
 
-def main(bams, reference, prime, file=stdout, **kwargs):
+def main(bams, reference, prime, names, file=stdout, **kwargs):
     # use header of first input file (NB! fragile):
     with AlignmentFile(bams[0]) as bam:
         print(str(bam.header).rstrip("\n"), file=file)
     # dispatch data to subroutines:
-    anchors = get_anchors(reference)
+    mainchroms = get_mainchroms(names)
+    anchors = get_anchors(reference, mainchroms)
+    if anchors.shape[0] == 0:
+        raise ValueError("No anchors found (wrong -n parameter?)")
     with ReadFileChain(bams, AlignmentFile) as bam_data:
-        for entry in filter_entries(bam_data, anchors, prime):
+        for entry in filter_entries(bam_data, anchors, prime, mainchroms):
             print(entry.to_string(), file=file)
