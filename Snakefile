@@ -48,6 +48,15 @@ rule ar_ib:
                 file=fasta
             )
 
+rule ar_fasta:
+    input: join(config["data_dir"], config["reads_dir"], "{dataset}/AR.sorted.bam")
+    output: join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz")
+    shell: """
+        samtools view {input} \
+        | bioawk -c sam '{{if ($seq != "*") {{print ">"$qname; print $seq}}}}' \
+        | gzip -2 > {output}
+    """
+
 rule candidate_densities:
     input:
         sam=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam"),
@@ -102,8 +111,9 @@ rule all_dataset_tails:
 rule all_dataset_backgrounds:
     input:
         targets=expand(
-            join(config["data_dir"], config["reads_dir"], "{dataset}/AR-IB.fa.gz"),
-            dataset=config["datasets"]
+            join(config["data_dir"], config["reads_dir"], "{dataset}/{kind}.fa.gz"),
+            dataset=config["datasets"],
+            kind=["AR", "AR-IB"]
         )
 
 rule all_dataset_candidate_densities:
