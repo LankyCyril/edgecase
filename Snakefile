@@ -60,8 +60,8 @@ rule ar_ib_fasta:
         fa=join(config["data_dir"], config["reads_dir"], "{dataset}/AR-IB.fa.gz")
     shell: """
         zcat {input.ar} \
-        | tr '\\n' '\\t' | sed -E 's/\\t>/\\n>/g' \
-        | grep -iFf <(cat {input.p5ac} {input.p3ac} | grep -iF '>') \
+        | paste - - \
+        | grep -ivFf <(cat {input.p5ac} {input.p3ac} | grep -iF '>') \
         | tr '\\t' '\\n' \
         | gzip -2 > {output.fa}
     """
