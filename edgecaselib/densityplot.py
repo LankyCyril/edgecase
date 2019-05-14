@@ -111,7 +111,10 @@ def plot_motif_densities(read_data, trace_ax, legend=False):
     """Plot traces for motif densities of one read"""
     trace_data = read_data.iloc[:,8:].T
     trace_data.columns = read_data["motif"]
-    lineplot(data=trace_data, ax=trace_ax, legend=legend, dashes=False)
+    try:
+        lineplot(data=trace_data, ax=trace_ax, legend=legend, dashes=False)
+    except:
+        pass
     if legend:
         trace_ax.legend(loc="lower left", bbox_to_anchor=(0, 1.4))
     return trace_data
