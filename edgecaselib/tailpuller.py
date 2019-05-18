@@ -1,6 +1,7 @@
 from sys import stdout
 from re import compile, IGNORECASE
-from edgecaselib.util import ReadFileChain, MAINCHROMS_ENSEMBL, MAINCHROMS_UCSC
+from edgecaselib.util import ReadFileChain
+from edgecaselib.util import MAINCHROMS_ENSEMBL, MAINCHROMS_UCSC
 from tqdm import tqdm
 from pysam import FastxFile, AlignmentFile
 from pandas import read_csv, DataFrame
@@ -76,7 +77,7 @@ def filter_entries(bam_data, anchors, prime, mainchroms):
                     yield entry
 
 
-def main(bams, reference, prime, names, file=stdout, **kwargs):
+def main(bams, reference, prime, names, hmm=None, file=stdout, **kwargs):
     # use header of first input file (NB! fragile):
     with AlignmentFile(bams[0]) as bam:
         print(str(bam.header).rstrip("\n"), file=file)

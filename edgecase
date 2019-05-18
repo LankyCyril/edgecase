@@ -42,6 +42,10 @@ create_subparser(
         ("-p",): {
             "help": "which 'prime' end to output", "dest": "prime",
             "default": 5, "type": int, "choices": [5, 3]
+        },
+        ("--hmm",): {
+            "help": "use provided (nhmmer) binary to subset to telomeric hits",
+            "default": None, "type": str
         }
     }
 )
