@@ -5,6 +5,8 @@ analysis_dir: "analysis"
 reference: "data/references/hg38.fa"
 chromosome_names: "ucsc"
 
+nhmmer: "tools/hmmer/bin/nhmmer"
+
 datasets:
   - _1_pre_TW
   - _2_flight_TW
