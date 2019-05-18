@@ -3,6 +3,7 @@ reads_dir: "processedReads"
 analysis_dir: "analysis"
 
 reference: "data/references/hg38.fa"
+telomere_model: "data/references/M19947.hmm"
 chromosome_names: "ucsc"
 
 nhmmer: "tools/hmmer/bin/nhmmer"

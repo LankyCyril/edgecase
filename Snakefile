@@ -62,6 +62,22 @@ rule ar_ib_fasta:
         | gzip -2 > {output.fa}
     """
 
+rule hmmer:
+    input:
+        ar=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz"),
+        model=config["telomere_model"]
+    output:
+        tbl=join(config["data_dir"], config["analysis_dir"], "{dataset}/AR.hmm.tbl")
+    params:
+        nhmmer=config.get("nhmmer", "nhmmer")
+    threads: 32
+    shell: """
+        {params.nhmmer} --cpu {threads} \
+            --tblout {output.tbl} \
+            {input.model} {input.ar} \
+        > /dev/null
+    """
+
 rule candidate_densities:
     input:
         sam=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam"),
