@@ -71,7 +71,7 @@ rule candidate_densities:
         sam=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam"),
         motifs=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-motifs.txt")
     output:
-        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
+        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat.gz")
     params: window_size=120, revcomp=True
     threads: 16
     run:
@@ -95,7 +95,7 @@ rule candidate_densities:
 
 rule densityplot:
     input:
-        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat")
+        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat.gz")
     output:
         pdf=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.pdf")
     params: bin_size=100

@@ -59,7 +59,7 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
 
 def load_densities(dat, bin_size, no_align, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
-    raw_densities = read_csv(dat, compression="gzip", sep="\t", escapechar="#")
+    raw_densities = read_csv(dat, sep="\t", escapechar="#")
     if each_once:
         raw_densities["length"] = raw_densities["density"].apply(
             lambda d: d.count(",")+1
