@@ -39,12 +39,17 @@ rule ac_fasta:
     """
 
 rule ar_fasta:
-    input: join(config["data_dir"], config["reads_dir"], "{dataset}/AR.sorted.bam")
-    output: join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz")
+    input:
+        bam=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.sorted.bam")
+    output:
+        fa=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz"),
+        fai=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz.fai"),
+        gzi=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz.gzi")
     shell: """
-        samtools view {input} \
+        samtools view -F2304 {input} \
         | bioawk -c sam '{{if ($seq != "*") {{print ">"$qname; print $seq}}}}' \
-        | gzip -2 > {output}
+        | bgzip > {output};
+        samtools faidx {output}
     """
 
 rule ar_ib_fasta:
