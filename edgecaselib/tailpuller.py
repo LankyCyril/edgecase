@@ -1,7 +1,7 @@
 from sys import stdout
 from re import compile, IGNORECASE
 from edgecaselib.util import ReadFileChain
-from edgecaselib.util import MAINCHROMS_ENSEMBL, MAINCHROMS_UCSC
+from edgecaselib.util import MAINCHROMS_ENSEMBL, MAINCHROMS_UCSC, MAINCHROMS_T2T
 from tqdm import tqdm
 from pysam import FastxFile, AlignmentFile
 from pandas import read_csv, DataFrame
@@ -10,7 +10,9 @@ from itertools import takewhile, filterfalse
 
 def get_mainchroms(names):
     """Choose mainchroms based on reference annotation format"""
-    if names == "ucsc":
+    if names == "t2t":
+        return MAINCHROMS_T2T
+    elif names == "ucsc":
         return MAINCHROMS_UCSC
     elif names == "ensembl":
         return MAINCHROMS_ENSEMBL

@@ -5,6 +5,8 @@ from regex import compile
 
 MAINCHROMS_ENSEMBL = {str(i) for i in range(1, 23)} | {"X", "Y"}
 MAINCHROMS_UCSC = {"chr" + s for s in MAINCHROMS_ENSEMBL}
+MAINCHROMS_T2T = {"chrX_fixedBionanoSV_centromereV3"}
+
 ALPHABET = list("ACGT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
 MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}
