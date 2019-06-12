@@ -37,7 +37,8 @@ create_subparser(
         },
         ("-n",): {
             "help": "chromosome naming convention", "dest": "names",
-            "default": None, "choices": {"t2t", "ucsc", "ensembl"}
+            "default": "riethman",
+            "choices": {"riethman", "t2t", "ucsc", "ensembl"}
         },
         ("-p",): {
             "help": "which 'prime' end to output", "dest": "prime",

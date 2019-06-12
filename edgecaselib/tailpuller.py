@@ -8,6 +8,12 @@ from pandas import read_csv, DataFrame
 from itertools import takewhile, filterfalse
 
 
+class AutofillableSet(set):
+    def __contains__(self, item):
+        self.add(item)
+        return True
+
+
 def get_mainchroms(names):
     """Choose mainchroms based on reference annotation format"""
     if names == "t2t":
@@ -16,14 +22,16 @@ def get_mainchroms(names):
         return MAINCHROMS_UCSC
     elif names == "ensembl":
         return MAINCHROMS_ENSEMBL
+    elif names == "riethman":
+        return AutofillableSet()
     else:
-        raise ValueError("`names` must be either 'ucsc' or 'ensembl'")
+        raise ValueError("Unsupported value of `names`")
 
 
 def get_anchors(reference, mainchroms):
     """Get coordinates of hard-masked bounds at each end of each main chromosome"""
     if reference.endswith(".tsv"): # assume precomputed anchors
-        return read_csv(reference, sep="\t", index_col=0)
+        anchors = read_csv(reference, sep="\t", index_col=0)
     else:
         pattern = compile(r'[^n]', flags=IGNORECASE)
         anchor_data = {}
@@ -40,7 +48,8 @@ def get_anchors(reference, mainchroms):
                         pattern.search(entry.sequence[::-1]).span()[0]
                     )
                     anchor_data[entry.name] = bound_5prime, bound_3prime
-        return DataFrame(data=anchor_data, index=["5prime", "3prime"]).T
+        anchors = DataFrame(data=anchor_data, index=["5prime", "3prime"]).T
+    return anchors, set(mainchroms)
 
 
 def is_good_entry(entry, mainchroms):
@@ -85,7 +94,7 @@ def main(bams, reference, prime, names, hmm=None, file=stdout, **kwargs):
         print(str(bam.header).rstrip("\n"), file=file)
     # dispatch data to subroutines:
     mainchroms = get_mainchroms(names)
-    anchors = get_anchors(reference, mainchroms)
+    anchors, mainchroms = get_anchors(reference, mainchroms)
     if anchors.shape[0] == 0:
         raise ValueError("No anchors found (wrong -n parameter?)")
     with ReadFileChain(bams, AlignmentFile) as bam_data:
