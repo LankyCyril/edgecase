@@ -106,6 +106,6 @@ rule densityplot:
     run:
         with open(output.pdf, mode="wb") as pdf:
             densityplot.main(
-                dat=input.dat, bin_size=params.bin_size, file=pdf,
-                title="{} {}AC".format(wildcards.dataset, wildcards.prime)
+                dat=input.dat, bin_size=params.bin_size,
+                title=output.pdf, file=pdf
             )
