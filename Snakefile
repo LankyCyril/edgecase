@@ -1,17 +1,12 @@
-from os.path import join
 from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
 from edgecaselib.util import motif_revcomp
 from gzip import open as gzopen
-from pysam import AlignmentFile
 
 configfile: "config.yaml"
 
 rule tailpuller:
-    input:
-        ar=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.sorted.bam"),
-        reference=config["reference"]
-    output:
-        ac=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam")
+    input: ar="{path}/AR.sorted.bam", reference=config["reference"]
+    output: ac="{path}/{prime}AC.sam"
     run:
         with open(output.ac, mode="wt") as sam:
             tailpuller.main(
@@ -21,8 +16,8 @@ rule tailpuller:
             )
 
 rule tailchopper:
-    input: sam=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam")
-    output: fa=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}OOB.fa")
+    input: sam="{path}/{prime}AC.sam"
+    output: fa="{path}/{prime}OOB.fa"
     run:
         with open(output.fa, mode="wt") as fasta:
             tailchopper.main(
@@ -30,8 +25,8 @@ rule tailchopper:
             )
 
 rule ac_fasta:
-    input: join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam")
-    output: join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.fa")
+    input: "{path}/{prime}AC.sam"
+    output: "{path}/{prime}AC.fa"
     shell: """
         samtools view {input} \
         | bioawk -c sam '{{print ">"$qname; print $seq}}' \
@@ -39,12 +34,8 @@ rule ac_fasta:
     """
 
 rule ar_fasta:
-    input:
-        bam=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.sorted.bam")
-    output:
-        fa=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz"),
-        fai=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz.fai"),
-        gzi=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz.gzi")
+    input: bam="{path}/AR.sorted.bam"
+    output: fa="{path}/AR.fa.gz", fai="{path}/AR.fa.gz.fai", gzi="{path}/AR.fa.gz.gzi"
     shell: """
         samtools view -F2304 {input} \
         | bioawk -c sam '{{if ($seq != "*") {{print ">"$qname; print $seq}}}}' \
@@ -53,12 +44,8 @@ rule ar_fasta:
     """
 
 rule ar_ib_fasta:
-    input:
-        ar=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz"),
-        p5ac=join(config["data_dir"], config["reads_dir"], "{dataset}/5AC.fa"),
-        p3ac=join(config["data_dir"], config["reads_dir"], "{dataset}/3AC.fa")
-    output:
-        fa=join(config["data_dir"], config["reads_dir"], "{dataset}/AR-IB.fa.gz")
+    input: ar="{path}/AR.fa.gz", p5ac="{path}/5AC.fa", p3ac="{path}/3AC.fa"
+    output: fa="{path}/AR-IB.fa.gz"
     shell: """
         zcat {input.ar} \
         | paste - - \
@@ -68,27 +55,19 @@ rule ar_ib_fasta:
     """
 
 rule hmmer:
-    input:
-        ar=join(config["data_dir"], config["reads_dir"], "{dataset}/AR.fa.gz"),
-        model=config["telomere_model"]
-    output:
-        tbl=join(config["data_dir"], config["analysis_dir"], "{dataset}/AR.hmm.tbl")
-    params:
-        nhmmer=config.get("nhmmer", "nhmmer")
+    input: ar="{path}/AR.fa.gz", model=config["telomere_model"]
+    output: tbl="{path}/AR.hmm.tbl"
+    params: nhmmer=config.get("nhmmer", "nhmmer")
     threads: 32
     shell: """
         {params.nhmmer} --cpu {threads} \
-            --tblout {output.tbl} \
-            {input.model} {input.ar} \
+            --tblout {output.tbl} {input.model} {input.ar} \
         > /dev/null
     """
 
 rule candidate_densities:
-    input:
-        sam=join(config["data_dir"], config["reads_dir"], "{dataset}/{prime}AC.sam"),
-        motifs=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-motifs.txt")
-    output:
-        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat.gz")
+    input: sam="{path}/{prime}AC.sam", motifs="{path}/{prime}AC-motifs.txt"
+    output: dat="{path}/{prime}AC-densities.dat.gz"
     params: window_size=120, revcomp=True
     threads: 16
     run:
@@ -107,10 +86,8 @@ rule candidate_densities:
                 )
 
 rule densityplot:
-    input:
-        dat=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.dat.gz")
-    output:
-        pdf=join(config["data_dir"], config["analysis_dir"], "{dataset}/{prime}AC-densities.pdf")
+    input: dat="{path}/{prime}AC-densities.dat.gz"
+    output: pdf="{path}/{prime}AC-densities.pdf"
     params: bin_size=100
     run:
         with open(output.pdf, mode="wb") as pdf:

@@ -1,6 +1,5 @@
 data_dir: "data"
-reads_dir: "processedReads"
-analysis_dir: "analysis"
+reads_dir: "analysis"
 
 reference: "data/references/hg38.fa"
 telomere_model: "data/references/M19947.hmm"
