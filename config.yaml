@@ -15,3 +15,12 @@ datasets:
   - _1_pre_HR
   - _2_flight_HR
   - _3_post_HR
+
+nasa_timepoints:
+  - 1_pre
+  - 2_flight
+  - 3_post
+
+nasa_subjects:
+  - TW
+  - HR
