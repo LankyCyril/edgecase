@@ -1,7 +1,7 @@
 data_dir: "data/reference_extended/edgecase"
 
 reference: "data/references/hg38.fa"
-telomere_model: "data/references/M19947.hmm"
+telomere_model: "models/M19947.hmm"
 chromosome_names: "ucsc"
 
 nhmmer: "tools/hmmer/bin/nhmmer"
