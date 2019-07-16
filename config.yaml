@@ -6,6 +6,7 @@ chromosome_names: "ucsc"
 
 nhmmer: "tools/hmmer/bin/nhmmer"
 densityplot_bin_size: 100
+density_window_size: 120
 
 datasets:
   - _1_pre_TW
@@ -14,4 +15,3 @@ datasets:
   - _1_pre_HR
   - _2_flight_HR
   - _3_post_HR
-  - hg002

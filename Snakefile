@@ -82,7 +82,9 @@ rule hmmer:
 rule candidate_densities:
     input: sam="{path}/{prime}AC.sam", motifs="{path}/{prime}AC-motifs.txt"
     output: dat="{path}/{prime}AC-densities.dat.gz"
-    params: window_size=120, revcomp=True
+    params:
+        window_size=config.get("density_window_size", 120),
+        revcomp=config.get("density_motif_revcomp", False)
     threads: 16
     run:
         with open(input.motifs) as motif_data:
