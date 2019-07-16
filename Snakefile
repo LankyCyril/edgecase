@@ -1,8 +1,23 @@
+from os import path
+from itertools import product
 from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
 from edgecaselib.util import motif_revcomp
 from gzip import open as gzopen
 
 configfile: "config.yaml"
+
+def pipeline_targets(wildcards):
+    if "data_dir" in config:
+        return [
+            path.join(config["data_dir"], dataset, prime + "AC-densities" + ext)
+            for dataset, prime, ext
+            in product(config["datasets"], ["5", "3"], [".dat.gz", ".pdf"])
+        ]
+    else:
+        raise NameError("Config variable 'data_dir' is not defined")
+
+rule all:
+    input: pipeline_targets
 
 rule tailpuller:
     input: ar="{path}/AR.sorted.bam", reference=config["reference"]

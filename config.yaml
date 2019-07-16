@@ -1,5 +1,4 @@
-data_dir: "data"
-reads_dir: "analysis"
+data_dir: "data/reference_extended/edgecase"
 
 reference: "data/references/hg38.fa"
 telomere_model: "data/references/M19947.hmm"
