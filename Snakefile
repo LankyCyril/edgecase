@@ -9,8 +9,7 @@ configfile: "config.yaml"
 def pipeline_targets(wildcards):
     if "data_dir" in config:
         return [
-            path.join(config["data_dir"], dataset, prime + "AC-densities" + ext)
-            for dataset, prime, ext
+            path.join(config["data_dir"], d, p + "AC-densities" + e) for d, p, e
             in product(config["datasets"], ["5", "3"], [".dat.gz", ".pdf"])
         ]
     else:
@@ -92,18 +91,16 @@ rule candidate_densities:
             motifs |= {motif_revcomp(motif) for motif in set(motifs)}
         with gzopen(output.dat, mode="wt") as dat:
             for i, motif in enumerate(motifs):
-                no_print_header = (i != 0)
                 kmerscanner.main(
-                    bams=[input.sam], num_reads=None,
-                    motif=motif, window_size=params.window_size,
-                    head_test=None, tail_test=None, cutoff=None,
-                    jobs=threads, no_print_header=no_print_header, file=dat
+                    bams=[input.sam], jobs=threads, num_reads=None, motif=motif,
+                    cutoff=None, window_size=params.window_size, head_test=None,
+                    tail_test=None, no_print_header=(i!=0), file=dat
                 )
 
 rule densityplot:
     input: dat="{path}/{prime}AC-densities.dat.gz"
     output: pdf="{path}/{prime}AC-densities.pdf"
-    params: bin_size=100
+    params: bin_size=config.get("densityplot_bin_size", 100)
     run:
         with open(output.pdf, mode="wb") as pdf:
             densityplot.main(

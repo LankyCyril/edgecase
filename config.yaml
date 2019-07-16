@@ -5,6 +5,7 @@ telomere_model: "models/M19947.hmm"
 chromosome_names: "ucsc"
 
 nhmmer: "tools/hmmer/bin/nhmmer"
+densityplot_bin_size: 100
 
 datasets:
   - _1_pre_TW
