@@ -53,8 +53,8 @@ rule ar_fasta:
     shell: """
         samtools view -F2304 {input} \
         | bioawk -c sam '{{if ($seq != "*") {{print ">"$qname; print $seq}}}}' \
-        | bgzip > {output};
-        samtools faidx {output}
+        | bgzip > {output.fa};
+        samtools faidx {output.fa}
     """
 
 rule ar_ib_fasta:
