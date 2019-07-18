@@ -1,4 +1,4 @@
-data_dir: "data/data_reference_extended/edgecase"
+data_dir: "data/datasets/twins_reference_extended/edgecase"
 
 reference: "data/references/hg38.fa"
 telomere_model: "models/M19947.hmm"
