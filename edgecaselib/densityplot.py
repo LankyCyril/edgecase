@@ -1,4 +1,4 @@
-from sys import stdout
+from sys import stdout, stderr
 from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
 from pandas import read_csv, DataFrame, concat, merge
 from matplotlib.pyplot import subplots
@@ -8,6 +8,7 @@ from seaborn import lineplot
 from itertools import count
 from tqdm import tqdm
 from os import path
+from edgecaselib.tailpuller import get_mainchroms, get_anchors
 
 
 def binned(A, bins, func=mean):
@@ -152,7 +153,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
     meta_ax.set(xlim=(0, max_mapq))
 
 
-def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title, no_align):
+def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title, no_align, anchors):
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(len(names), chrom, max_mapq)
@@ -172,11 +173,16 @@ def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title, no_a
                 ylim=(-.2, 1.2), yticks=[]
             )
             plot_read_metadata(read_data, max_mapq, meta_ax)
+        if anchors is not None:
+            trace_ax.axvline(
+                anchors.loc[chrom, "anchor"], -.2, 1.2,
+                ls="--", lw=2, c="gray", alpha=.7
+            )
     axs[0, 0].set(title=title)
     return page
 
 
-def plot_densities(densities, bin_size, title, no_align, file=stdout.buffer):
+def plot_densities(densities, bin_size, title, no_align, anchors, file=stdout.buffer):
     """Plot binned densities as a heatmap"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
     chromosome_iterator = tqdm(
@@ -186,16 +192,34 @@ def plot_densities(densities, bin_size, title, no_align, file=stdout.buffer):
     with PdfPages(file) as pdf:
         for chrom, binned_density_dataframe in chromosome_iterator:
             page = chromosome_motif_plot(
-                binned_density_dataframe, chrom, max_mapq, title, no_align
+                binned_density_dataframe, chrom,
+                max_mapq, title, no_align, anchors
             )
             pdf.savefig(page, bbox_inches="tight")
 
 
-def main(dat, bin_size=100, title=None, no_align=False, file=stdout.buffer, **kwargs):
+def main(dat, bin_size=100, title=None, no_align=False, reference=None, names=None, prime=None, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     densities = load_densities(dat, bin_size=bin_size, no_align=no_align)
     if title is None:
         title = path.split(dat)[-1]
+    if reference:
+        if no_align:
+            print("`reference` has no effect if no_align is True", file=stderr)
+            anchors = None
+        elif (names is not None) and (prime is not None):
+            anchors, _ = get_anchors(reference, get_mainchroms(names))
+            if prime == 5:
+                anchors = anchors[["5prime"]]
+            elif prime == 3:
+                anchors = anchors[["3prime"]]
+            else:
+                raise ValueError("`prime` can only be 5 or 3")
+            anchors.columns = ["anchor"]
+        else:
+            raise ValueError("For `reference`, must specify `names` & `prime`")
+    else:
+        anchors = None
     plot_densities(
-        densities, bin_size, title, no_align, file
+        densities, bin_size, title, no_align, anchors, file
     )

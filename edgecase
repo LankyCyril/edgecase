@@ -117,6 +117,19 @@ create_subparser(
         },
         ("--no-align",): {
             "help": "plot unaligned", "action": "store_true"
+        },
+        ("-r", "--reference"): {
+            "help": "reference FASTA (if anchor shading is needed)",
+            "metavar": "R"
+        },
+        ("-n",): {
+            "help": "chromosome naming convention", "dest": "names",
+            "default": "riethman",
+            "choices": {"riethman", "t2t", "ucsc", "ensembl"}
+        },
+        ("-p",): {
+            "help": "which 'prime' end to output", "dest": "prime",
+            "default": 5, "type": int, "choices": [5, 3]
         }
     }
 )
