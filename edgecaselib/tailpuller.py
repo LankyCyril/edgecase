@@ -5,6 +5,7 @@ from pysam import AlignmentFile
 from pandas import read_fwf
 from functools import reduce
 from operator import __or__
+from copy import deepcopy
 
 
 def load_index(index_filename):
@@ -30,9 +31,10 @@ def make_ecx_filter_dict(ecx):
 
 
 def get_anchor_pos(reference_pos, cigartuples, cigarpos):
-    # measure the None (clipped) stretch on the left (0) or right (-1):
+    """Calculate the position of clipped start/end of read relative to the reference"""
     if not cigartuples: # no CIGAR available
         return None
+    # measure the None (clipped) stretch on the left (0) or right (-1):
     cigartype, clip = cigartuples[cigarpos]
     if (cigartype != 4) and (cigartype != 5): # not a soft/hard clip
         clip = 0
@@ -43,6 +45,15 @@ def get_anchor_pos(reference_pos, cigartuples, cigarpos):
         return reference_pos + clip
     else:
         raise ValueError("get_anchor_pos(): cigarpos can only be 0 or -1")
+
+
+def updated_entry(entry, flags, is_q=False):
+    """Add ECX flags to entry"""
+    new_entry = deepcopy(entry)
+    new_entry.flag |= reduce(__or__, flags)
+    if is_q:
+        new_entry.flag |= 0x8000
+    return new_entry
 
 
 def filter_entries(bam_data, ecxfd, flag_filter):
@@ -56,18 +67,16 @@ def filter_entries(bam_data, ecxfd, flag_filter):
             p_flags = set( # ECX flags where anchor is to right of read start
                 ecx_entry[ecx_entry["pos"]>=p_anchor_pos].loc[[5, "-"], "flag"]
             )
+            if p_flags:
+                yield updated_entry(entry, p_flags)
             q_anchor_pos = get_anchor_pos( # pos of end relative to reference
                 entry.reference_end, entry.cigartuples, cigarpos=-1
             )
             q_flags = set( # ECX flags where anchor is to left of read end
-                ecx_entry[ecx_entry["pos"]<=q_anchor_pos].loc[[3, "-"], "flag"]
+                ecx_entry[ecx_entry["pos"]<q_anchor_pos].loc[[3, "-"], "flag"]
             )
-            extra_flags = p_flags | q_flags
-            if extra_flags: # update entry flags with ECX flags and yield
-                entry.flag |= reduce(__or__, extra_flags)
-                if q_flags: # add the is_q flag
-                    entry.flag |= 0x8000
-                yield entry
+            if q_flags:
+                yield updated_entry(entry, q_flags, is_q=True)
 
 
 def main(bams, index, flag_filter, file=stdout, **kwargs):
