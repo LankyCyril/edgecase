@@ -9,6 +9,7 @@ from itertools import count
 from tqdm import tqdm
 from os import path
 from edgecaselib.tailpuller import get_mainchroms, get_anchors
+from re import split
 
 
 def binned(A, bins, func=mean):
@@ -182,10 +183,29 @@ def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title, no_a
     return page
 
 
+def chromosome_natsort(chrom):
+    """Natural order sorting that undestands chr1, chr10, chr14_K*, 7ptel etc"""
+    keyoder = []
+    for chunk in split(r'(\d+)', chrom): # stackoverflow.com/a/16090640
+        if chunk.isdigit():
+            keyoder.append(int(chunk))
+        elif chunk == "":
+            keyoder.append("chr")
+        else:
+            keyoder.append(chunk.lower())
+    return keyoder
+
+
 def plot_densities(densities, bin_size, title, no_align, anchors, file=stdout.buffer):
     """Plot binned densities as a heatmap"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
-    sorted_chromosomes = sorted(densities.keys())
+    try:
+        sorted_chromosomes = sorted(densities.keys(), key=chromosome_natsort)
+    except Exception as e:
+        msg = "natural sorting failed, pages will be sorted alphanumerically"
+        print("Warning: " + msg, file=stderr)
+        print("The error was: '{}'".format(e), file=stderr)
+        sorted_chromosomes = sorted(densities.keys())
     sorted_densities_iterator = (
         (chrom, densities[chrom]) for chrom in sorted_chromosomes
     )
