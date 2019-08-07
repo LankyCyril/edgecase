@@ -103,7 +103,7 @@ create_subparser(
 
 create_subparser(
     subparsers, "densityplot", help="visualize densities of candidate reads",
-    usage="{} densityplot [options] dat > png".format(__file__),
+    usage="{} densityplot [options] dat > pdf".format(__file__),
     rules={
         ("dat",): {
             "help": "input density file"
