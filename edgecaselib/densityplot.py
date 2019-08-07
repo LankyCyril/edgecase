@@ -1,7 +1,7 @@
 from sys import stdout, stderr
 from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
 from pandas import read_csv, DataFrame, concat, merge
-from matplotlib.pyplot import subplots
+from matplotlib.pyplot import subplots, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle
 from seaborn import lineplot
@@ -213,13 +213,14 @@ def plot_densities(densities, bin_size, title, no_align, anchors, file=stdout.bu
         sorted_densities_iterator, total=len(densities),
         desc="Plotting", unit="chromosome"
     )
-    with PdfPages(file) as pdf:
-        for chrom, binned_density_dataframe in decorated_densities_iterator:
-            page = chromosome_motif_plot(
-                binned_density_dataframe, chrom,
-                max_mapq, title, no_align, anchors
-            )
-            pdf.savefig(page, bbox_inches="tight")
+    with rc_context({"figure.max_open_warning": len(densities)+2}):
+        with PdfPages(file) as pdf:
+            for chrom, binned_density_dataframe in decorated_densities_iterator:
+                page = chromosome_motif_plot(
+                    binned_density_dataframe, chrom,
+                    max_mapq, title, no_align, anchors
+                )
+                pdf.savefig(page, bbox_inches="tight")
 
 
 def main(dat, bin_size=100, title=None, no_align=False, reference=None, names=None, prime=None, file=stdout.buffer, **kwargs):
