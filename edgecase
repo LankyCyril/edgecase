@@ -31,9 +31,9 @@ create_subparser(
         ("bams",): {
             "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
         },
-        ("-r", "--reference"): {
-            "help": "location of the reference (with .fai and .ecx indices)",
-            "required": True, "metavar": "R", "default": "no default, required"
+        ("-x", "--index"): {
+            "help": "location of the reference .ecx index",
+            "required": True, "metavar": "X", "default": "no default, required"
         },
         ("-F", "--flag-filter"): {
             "help": "SAM flags to filter input entries (see samtools view -F)",
