@@ -8,7 +8,6 @@ from seaborn import lineplot
 from itertools import count
 from tqdm import tqdm
 from os import path
-from edgecaselib.tailpuller import get_mainchroms, get_anchors
 from re import split
 
 
@@ -233,7 +232,8 @@ def main(dat, bin_size=100, title=None, no_align=False, reference=None, names=No
             print("`reference` has no effect if no_align is True", file=stderr)
             anchors = None
         elif (names is not None) and (prime is not None):
-            anchors, _ = get_anchors(reference, get_mainchroms(names))
+            raise NotImplementedError
+            #anchors, _ = get_anchors(reference, get_mainchroms(names))
             if prime == 5:
                 anchors = anchors[["5prime"]]
             elif prime == 3:

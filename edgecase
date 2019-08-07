@@ -32,21 +32,12 @@ create_subparser(
             "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
         },
         ("-r", "--reference"): {
-            "help": "reference FASTA",
+            "help": "location of the reference (with .fai and .ecx indices)",
             "required": True, "metavar": "R", "default": "no default, required"
         },
-        ("-n", "--names"): {
-            "help": "chromosome naming convention",
-            "default": "riethman",
-            "choices": {"riethman", "t2t", "ucsc", "ensembl"}
-        },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
-        },
-        ("--hmm",): {
-            "help": "use provided (nhmmer) binary to subset to telomeric hits",
-            "default": None, "type": str
+        ("-F", "--flag-filter"): {
+            "help": "SAM flags to filter input entries (see samtools view -F)",
+            "default": 3844, "type": int, "metavar": "F"
         }
     }
 )

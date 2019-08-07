@@ -1,102 +1,75 @@
 from sys import stdout
-from re import compile, IGNORECASE
+from os.path import isfile
 from edgecaselib.util import ReadFileChain
-from edgecaselib.util import MAINCHROMS_ENSEMBL, MAINCHROMS_UCSC, MAINCHROMS_T2T
-from tqdm import tqdm
-from pysam import FastxFile, AlignmentFile
-from pandas import read_csv, DataFrame
+from pysam import AlignmentFile
+from pandas import read_csv, read_fwf
 from itertools import takewhile, filterfalse
+from functools import reduce
+from operator import __or__
 
 
-class AutofillableSet(set):
-    def __contains__(self, item):
-        self.add(item)
-        return True
-
-
-def get_mainchroms(names):
-    """Choose mainchroms based on reference annotation format"""
-    if names == "t2t":
-        return MAINCHROMS_T2T
-    elif names == "ucsc":
-        return MAINCHROMS_UCSC
-    elif names == "ensembl":
-        return MAINCHROMS_ENSEMBL
-    elif names == "riethman":
-        return AutofillableSet()
+def load_index(basename):
+    """Load FAI and ECX indices"""
+    fai_filename, ecx_filename = basename + ".fai", basename + ".ecx"
+    if not isfile(fai_filename):
+        raise FileNotFoundError(fai_filename)
+    elif not isfile(ecx_filename):
+        raise FileNotFoundError(ecx_filename)
     else:
-        raise ValueError("Unsupported value of `names`")
-
-
-def get_anchors(reference, mainchroms):
-    """Get coordinates of hard-masked bounds at each end of each main chromosome"""
-    if reference.endswith(".tsv"): # assume precomputed anchors
-        anchors = read_csv(reference, sep="\t", index_col=0)
-    else:
-        pattern = compile(r'[^n]', flags=IGNORECASE)
-        anchor_data = {}
-        bar = tqdm(
-            desc="Finding anchors", total=len(mainchroms), unit="chromosome"
+        ecx = read_fwf(ecx_filename, skiprows=1)
+        ecx.columns = [c.lstrip("#") for c in ecx.columns]
+        fai = read_csv(
+            fai_filename, sep="\t",
+            usecols=(0,1), index_col=0, names=["rname", "length"]
         )
-        with FastxFile(reference) as genome:
-            for entry in genome:
-                if entry.name in mainchroms:
-                    bar.update()
-                    bound_5prime = pattern.search(entry.sequence).span()[0]
-                    bound_3prime = (
-                        len(entry.sequence) -
-                        pattern.search(entry.sequence[::-1]).span()[0]
-                    )
-                    anchor_data[entry.name] = bound_5prime, bound_3prime
-        anchors = DataFrame(data=anchor_data, index=["5prime", "3prime"]).T
-    return anchors, set(mainchroms)
+        return ecx, dict(fai["length"])
 
 
-def is_good_entry(entry, mainchroms):
-    """Simple filter"""
-    if entry.is_unmapped or entry.is_secondary or entry.is_supplementary:
-        return False
-    elif entry.reference_name in mainchroms:
-        return True
-    else:
-        return False
-
-
-def filter_entries(bam_data, anchors, prime, mainchroms):
-    """Only pass reads extending past anchors"""
+def filter_entries(bam_data, ecx, flag_filter):
+    """Only pass reads extending past regions specified in the ECX"""
     isnone = lambda p: p is None
+    ecx_rnames = set(ecx["rname"])
     for entry in bam_data:
-        if is_good_entry(entry, mainchroms):
+        passes_flags = (entry.flag & flag_filter == 0)
+        if passes_flags and (entry.reference_name in ecx_rnames):
+            # get mapping positions including clipped (represented as None):
             positions = entry.get_reference_positions(full_length=True)
-            left_clip = sum(
-                True for _ in takewhile(isnone, positions)
-            )
-            left_mappos = next(filterfalse(isnone, positions))
-            right_clip = sum(
-                True for _ in takewhile(isnone, reversed(positions))
-            )
-            right_mappos = next(filterfalse(isnone, reversed(positions)))
-            if prime not in {5, 3}:
-                raise ValueError("`prime` can only be 5 or 3")
-            elif prime == 5:
-                anchor = anchors.loc[entry.reference_name, "5prime"]
-                if left_mappos - left_clip < anchor:
-                    yield entry
-            elif prime == 3:
-                anchor = anchors.loc[entry.reference_name, "3prime"]
-                if right_mappos + right_clip > anchor:
-                    yield entry
+            # find leftmost non-None position:
+            p_mappos = next(filterfalse(isnone, positions))
+            # measure the None (clipped) stretch on the left:
+            p_clip = sum(1 for _ in takewhile(isnone, positions))
+            # determine location of the start of the read relative to reference:
+            p_anchor_pos = p_mappos - p_clip
+            # find flags in ECX where anchor is to the right of the read start:
+            p_flags = set(ecx.loc[
+                (ecx["rname"]==entry.reference_name) & (ecx["prime"]==5) &
+                (ecx["pos"]>=p_anchor_pos), "flag"
+            ])
+            # find rightmost non-None position:
+            q_mappos = next(filterfalse(isnone, reversed(positions)))
+            # measure the None (clipped) stretch on the right:
+            q_clip = sum(1 for _ in takewhile(isnone, reversed(positions)))
+            # determine location of the end of the read relative to reference:
+            q_anchor_pos = q_mappos + q_clip
+            # find flags in ECX where anchor is to the left of the read end:
+            q_flags = set(ecx.loc[
+                (ecx["rname"]==entry.reference_name) & (ecx["prime"]==3) &
+                (ecx["pos"]<=q_anchor_pos), "flag"
+            ])
+            extra_flags = p_flags | q_flags
+            if extra_flags: # update entry flags with edgeCase flags and yield
+                entry.flag |= reduce(__or__, extra_flags)
+                if q_flags: # add the is_q flag
+                    entry.flag |= 0x8000
+                yield entry
 
 
-def main(bams, reference, prime, names, hmm=None, file=stdout, **kwargs):
+def main(bams, reference, flag_filter, file=stdout, **kwargs):
     # use header of first input file (NB! fragile):
     with AlignmentFile(bams[0]) as bam:
         print(str(bam.header).rstrip("\n"), file=file)
     # dispatch data to subroutines:
-    mainchroms = get_mainchroms(names)
-    anchors, mainchroms = get_anchors(reference, mainchroms)
-    if anchors.shape[0] == 0:
-        raise ValueError("No anchors found (wrong -n parameter?)")
+    ecx, reflens = load_index(reference)
     with ReadFileChain(bams, AlignmentFile) as bam_data:
-        for entry in filter_entries(bam_data, anchors, prime, mainchroms):
+        for entry in filter_entries(bam_data, ecx, flag_filter):
             print(entry.to_string(), file=file)
