@@ -185,12 +185,16 @@ def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title, no_a
 def plot_densities(densities, bin_size, title, no_align, anchors, file=stdout.buffer):
     """Plot binned densities as a heatmap"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
-    chromosome_iterator = tqdm(
-        densities.items(), total=len(densities),
+    sorted_chromosomes = sorted(densities.keys())
+    sorted_densities_iterator = (
+        (chrom, densities[chrom]) for chrom in sorted_chromosomes
+    )
+    decorated_densities_iterator = tqdm(
+        sorted_densities_iterator, total=len(densities),
         desc="Plotting", unit="chromosome"
     )
     with PdfPages(file) as pdf:
-        for chrom, binned_density_dataframe in chromosome_iterator:
+        for chrom, binned_density_dataframe in decorated_densities_iterator:
             page = chromosome_motif_plot(
                 binned_density_dataframe, chrom,
                 max_mapq, title, no_align, anchors
