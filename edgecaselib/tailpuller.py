@@ -3,7 +3,6 @@ from os.path import isfile
 from edgecaselib.util import ReadFileChain
 from pysam import AlignmentFile
 from pandas import read_csv, read_fwf
-from itertools import takewhile, filterfalse
 from functools import reduce
 from operator import __or__
 
@@ -27,30 +26,27 @@ def load_index(basename):
 
 def filter_entries(bam_data, ecx, flag_filter):
     """Only pass reads extending past regions specified in the ECX"""
-    isnone = lambda p: p is None
     ecx_rnames = set(ecx["rname"])
     for entry in bam_data:
         passes_flags = (entry.flag & flag_filter == 0)
         if passes_flags and (entry.reference_name in ecx_rnames):
-            # get mapping positions including clipped (represented as None):
-            positions = entry.get_reference_positions(full_length=True)
-            # find leftmost non-None position:
-            p_mappos = next(filterfalse(isnone, positions))
             # measure the None (clipped) stretch on the left:
-            p_clip = sum(1 for _ in takewhile(isnone, positions))
+            p_cigartype, p_clip = entry.cigartuples[0]
+            if (p_cigartype != 4) and (p_cigartype != 5):
+                p_clip = 0
             # determine location of the start of the read relative to reference:
-            p_anchor_pos = p_mappos - p_clip
+            p_anchor_pos = entry.reference_start - p_clip
             # find flags in ECX where anchor is to the right of the read start:
             p_flags = set(ecx.loc[
                 (ecx["rname"]==entry.reference_name) & (ecx["prime"]==5) &
                 (ecx["pos"]>=p_anchor_pos), "flag"
             ])
-            # find rightmost non-None position:
-            q_mappos = next(filterfalse(isnone, reversed(positions)))
             # measure the None (clipped) stretch on the right:
-            q_clip = sum(1 for _ in takewhile(isnone, reversed(positions)))
+            q_cigartype, q_clip = entry.cigartuples[-1]
+            if (q_cigartype != 4) and (q_cigartype != 5):
+                q_clip = 0
             # determine location of the end of the read relative to reference:
-            q_anchor_pos = q_mappos + q_clip
+            q_anchor_pos = entry.reference_end + q_clip
             # find flags in ECX where anchor is to the left of the read end:
             q_flags = set(ecx.loc[
                 (ecx["rname"]==entry.reference_name) & (ecx["prime"]==3) &
