@@ -6,6 +6,8 @@ from functools import reduce
 from operator import __or__
 from copy import deepcopy
 from tqdm import tqdm
+from itertools import chain
+from numpy import isnan
 
 
 def load_index(index_filename, as_filter_dict=False):
@@ -77,12 +79,37 @@ def filter_entries(bam_data, ecxfd, flag_filter):
                 yield updated_entry(entry, q_flags, is_q=True)
 
 
-def main(bam, index, flag_filter, file=stdout, **kwargs):
+def get_bam_chunk(bam_data, chrom, ecxfd, max_read_length):
+    """Subset bam_data to a region where reads of interest can occur"""
+    if chrom not in ecxfd:
+        return None
+    elif max_read_length is None:
+        return bam_data.fetch(chrom, None, None)
+    else:
+        p_innermost_pos = ecxfd[chrom][5]["pos"].max() + max_read_length
+        q_innermost_pos = ecxfd[chrom][3]["pos"].min() - max_read_length
+        if isnan(p_innermost_pos) and isnan(q_innermost_pos):
+            return None
+        elif (not isnan(p_innermost_pos)) and isnan(q_innermost_pos):
+            return bam_data.fetch(chrom, 0, p_innermost_pos)
+        elif isnan(p_innermost_pos) and (not isnan(q_innermost_pos)):
+            return bam_data.fetch(chrom, q_innermost_pos, None)
+        elif p_innermost_pos >= q_innermost_pos:
+            return bam_data.fetch(chrom, None, None)
+        else:
+            return chain(
+                bam_data.fetch(chrom, 0, p_innermost_pos),
+                bam_data.fetch(chrom, q_innermost_pos, None)
+            )
+
+
+def main(bam, index, flag_filter, max_read_length, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
     with AlignmentFile(bam) as bam_data:
         print(str(bam_data.header).rstrip("\n"), file=file)
-        for reference in tqdm(bam_data.references, desc="reference"):
-            bam_chunk = bam_data.fetch(reference, None, None)
-            for entry in filter_entries(bam_chunk, ecxfd, flag_filter):
-                print(entry.to_string(), file=file)
+        for chrom in tqdm(bam_data.references, desc="reference"):
+            bam_chunk = get_bam_chunk(bam_data, chrom, ecxfd, max_read_length)
+            if bam_chunk:
+                for entry in filter_entries(bam_chunk, ecxfd, flag_filter):
+                    print(entry.to_string(), file=file)

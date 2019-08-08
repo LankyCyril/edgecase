@@ -38,6 +38,10 @@ create_subparser(
         ("-F", "--flag-filter"): {
             "help": "SAM flags to filter input entries (see samtools view -F)",
             "default": 3844, "type": int, "metavar": "F"
+        },
+        ("-m", "--max-read-length"): {
+            "help": "max read length to consider when selecting lookup regions",
+            "default": None, "type": int, "metavar": "M"
         }
     }
 )
