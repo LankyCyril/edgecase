@@ -36,7 +36,7 @@ create_subparser(
             "required": True, "metavar": "X", "default": "no default, required"
         },
         ("-F", "--flag-filter"): {
-            "help": "SAM flags to filter input entries (see samtools view -F)",
+            "help": "process only sam entries with none of these flags present",
             "default": 3844, "type": int, "metavar": "F"
         },
         ("-m", "--max-read-length"): {
