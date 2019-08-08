@@ -71,16 +71,8 @@ create_subparser(
             "help": "format of input file(s)", "default": "sam",
             "choices": {"sam", "fastx"}
         },
-        ("-f", "--flags"): {
-            "help": "process only sam entries with all these flags present",
-            "default": 0, "type": int, "metavar": "f"
-        },
-        ("-F", "--flag-filter"): {
-            "help": "process only sam entries with none of these flags present",
-            "default": 3844, "type": int, "metavar": "F"
-        },
-        ("--motif",): {
-            "help": "target motif sequence", "default": "TTAGGG", "metavar": "M"
+        ("--motifs",): {
+            "help": "target motif sequences", "default": "TTAGGG", "metavar": "M"
         },
         ("--head-test",): {
             "help": "length of head to use for density filter (if specified)",
@@ -101,9 +93,6 @@ create_subparser(
         ("-n", "--num-reads"): {
             "help": "expected number of reads in input (for progress display)",
             "default": None, "type": int, "metavar": "N"
-        },
-        ("--no-print-header",): {
-            "help": "suppress header", "action": "store_true"
         }
     }
 )
@@ -114,6 +103,22 @@ create_subparser(
     rules={
         ("dat",): {
             "help": "input density file"
+        },
+        ("-z", "--gzipped") : {
+            "help": "input is gzipped (must specify if any of -qfF present)",
+            "action": "store_true"
+        },
+        ("-f", "--flags"): {
+            "help": "process only entries with all these sam flags present",
+            "default": 0, "type": int, "metavar": "f"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only entries with none of these sam flags present",
+            "default": 0, "type": int, "metavar": "F"
+        },
+        ("-q", "--min-quality"): {
+            "help": "process only entries with MAPQ >= Q",
+            "default": 0, "type": int, "metavar": "Q"
         },
         ("-b", "--bin-size"): {
             "help": "size of each bin in bp for visualization speedup",

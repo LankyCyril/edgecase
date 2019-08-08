@@ -1,5 +1,7 @@
 from sys import stdout, stderr
 from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
+from gzip import open as gzopen
+from tempfile import TemporaryDirectory
 from pandas import read_csv, DataFrame, concat, merge
 from matplotlib.pyplot import subplots, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
@@ -58,9 +60,56 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
     )
 
 
-def load_densities(dat, bin_size, no_align, each_once=True):
+def passes_filter(entry_flag, entry_mapq, flags, flag_filter, min_quality):
+    """Check if entry flags pass filters"""
+    passes_quality = (entry_mapq is None) or (entry_mapq >= min_quality)
+    if not passes_quality:
+        return False
+    else:
+        return (entry_flag is None) or (
+            (entry_flag & flags == flags) and
+            (entry_flag & flag_filter == 0)
+        )
+
+
+def filter_and_read_csv(dat, gzipped, flags, flag_filter, min_quality):
+    """If filters supplied, subset CSV first, then read with pandas"""
+    number_retained = 0
+    if gzipped:
+        opener = gzopen
+    else:
+        opener = open
+    with opener(dat, mode="rt") as dat_handle:
+        with TemporaryDirectory() as tempdir:
+            datflt_name = path.join(tempdir, "dat.gz")
+            with gzopen(datflt_name, mode="wt") as datflt:
+                decorated_line_iterator = tqdm(
+                    dat_handle, desc="Filtering", unit=" records"
+                )
+                for line in decorated_line_iterator:
+                    if line[0] == "#":
+                        print(line, end="", file=datflt)
+                    else:
+                        fields = line.split("\t")
+                        line_passes_filter = passes_filter(
+                            int(fields[1]), int(fields[4]),
+                            flags, flag_filter, min_quality
+                        )
+                        if line_passes_filter:
+                            number_retained += 1
+                            print(line, end="", file=datflt)
+                print("Kept {} records".format(number_retained), file=stderr)
+            return read_csv(datflt_name, sep="\t", escapechar="#")
+
+
+def load_densities(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_align, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
-    raw_densities = read_csv(dat, sep="\t", escapechar="#")
+    if (flags == 0) and (flag_filter == 0) and (min_quality == 0):
+        raw_densities = read_csv(dat, sep="\t", escapechar="#")
+    else:
+        raw_densities = filter_and_read_csv(
+            dat, gzipped, flags, flag_filter, min_quality
+        )
     if each_once:
         raw_densities["length"] = raw_densities["density"].apply(
             lambda d: d.count(",")+1
@@ -222,9 +271,12 @@ def plot_densities(densities, bin_size, title, no_align, anchors, file=stdout.bu
                 pdf.savefig(page, bbox_inches="tight")
 
 
-def main(dat, bin_size=100, title=None, no_align=False, reference=None, names=None, prime=None, file=stdout.buffer, **kwargs):
+def main(dat, gzipped=None, flags=0, flag_filter=3844, min_quality=0, bin_size=100, title=None, no_align=False, reference=None, names=None, prime=None, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
-    densities = load_densities(dat, bin_size=bin_size, no_align=no_align)
+    densities = load_densities(
+        dat, gzipped, flags, flag_filter, min_quality,
+        bin_size=bin_size, no_align=no_align
+    )
     if title is None:
         title = path.split(dat)[-1]
     if reference:
@@ -245,6 +297,4 @@ def main(dat, bin_size=100, title=None, no_align=False, reference=None, names=No
             raise ValueError("For `reference`, must specify `names` & `prime`")
     else:
         anchors = None
-    plot_densities(
-        densities, bin_size, title, no_align, anchors, file
-    )
+    plot_densities(densities, bin_size, title, no_align, anchors, file)
