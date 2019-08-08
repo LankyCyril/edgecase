@@ -1,6 +1,5 @@
 from sys import stdout
 from os.path import isfile
-from edgecaselib.util import ReadFileChain
 from pysam import AlignmentFile
 from pandas import read_csv
 from functools import reduce
@@ -77,12 +76,10 @@ def filter_entries(bam_data, ecxfd, flag_filter):
                 yield updated_entry(entry, q_flags, is_q=True)
 
 
-def main(bams, index, flag_filter, file=stdout, **kwargs):
-    # use header of first input file (NB! fragile):
-    with AlignmentFile(bams[0]) as bam:
-        print(str(bam.header).rstrip("\n"), file=file)
+def main(bam, index, flag_filter, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
-    with ReadFileChain(bams, AlignmentFile) as bam_data:
+    with AlignmentFile(bam) as bam_data:
+        print(str(bam_data.header).rstrip("\n"), file=file)
         for entry in filter_entries(bam_data, ecxfd, flag_filter):
             print(entry.to_string(), file=file)

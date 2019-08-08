@@ -26,10 +26,10 @@ subparsers = parser.add_subparsers(dest="subparser")
 
 create_subparser(
     subparsers, "tailpuller", help="select overhanging reads",
-    usage="{} tailpuller [options] bams > sam".format(__file__),
+    usage="{} tailpuller [options] bam > sam".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
+        ("bam",): {
+            "help": "name of input BAM/SAM file"
         },
         ("-x", "--index"): {
             "help": "location of the reference .ecx index",
