@@ -67,9 +67,17 @@ create_subparser(
         ("readfiles",): {
             "help": "name(s) of input sam/fasta/fastq file(s)", "nargs": "+"
         },
-        ("-f", "--fmt"): {
+        ("--fmt",): {
             "help": "format of input file(s)", "default": "sam",
             "choices": {"sam", "fastx"}
+        },
+        ("-f", "--flags"): {
+            "help": "process only sam entries with all these flags present",
+            "default": 0, "type": int, "metavar": "f"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only sam entries with none of these flags present",
+            "default": 3844, "type": int, "metavar": "F"
         },
         ("--motif",): {
             "help": "target motif sequence", "default": "TTAGGG", "metavar": "M"
