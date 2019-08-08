@@ -5,6 +5,7 @@ from pandas import read_csv
 from functools import reduce
 from operator import __or__
 from copy import deepcopy
+from tqdm import tqdm
 
 
 def load_index(index_filename, as_filter_dict=False):
@@ -81,5 +82,7 @@ def main(bam, index, flag_filter, file=stdout, **kwargs):
     ecxfd = load_index(index, as_filter_dict=True)
     with AlignmentFile(bam) as bam_data:
         print(str(bam_data.header).rstrip("\n"), file=file)
-        for entry in filter_entries(bam_data, ecxfd, flag_filter):
-            print(entry.to_string(), file=file)
+        for reference in tqdm(bam_data.references, desc="reference"):
+            bam_chunk = bam_data.fetch(reference, None, None)
+            for entry in filter_entries(bam_chunk, ecxfd, flag_filter):
+                print(entry.to_string(), file=file)
