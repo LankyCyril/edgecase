@@ -64,8 +64,12 @@ create_subparser(
     subparsers, "kmerscanner", help="perform kmer scan",
     usage="{} [-j J] kmerscanner [options] bams > dat".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
+        ("readfiles",): {
+            "help": "name(s) of input sam/fasta/fastq file(s)", "nargs": "+"
+        },
+        ("-f", "--fmt"): {
+            "help": "format of input file(s)", "default": "sam",
+            "choices": {"sam", "fastx"}
         },
         ("--motif",): {
             "help": "target motif sequence", "default": "TTAGGG", "metavar": "M"

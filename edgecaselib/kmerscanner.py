@@ -63,17 +63,22 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
     else: # effectively skip
         return None, zeros(1)
 
+
 def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tail_test, num_reads, jobs):
     """Calculate density of pattern hits in a rolling window along each read"""
     simple_entry_iterator = (
         SimpleNamespace(
-            query_name=entry.query_name,
-            flag=entry.flag,
-            reference_name=entry.reference_name,
-            reference_start=entry.reference_start,
-            mapping_quality=entry.mapping_quality,
-            query_sequence=entry.query_sequence,
-            cigarstring=entry.cigarstring
+            query_name=getattr(
+                entry, "query_name", getattr(entry, "name", None)
+            ),
+            flag=getattr(entry, "flag", None),
+            reference_name=getattr(entry, "reference_name", None),
+            reference_start=getattr(entry, "reference_start", None),
+            mapping_quality=getattr(entry, "mapping_quality", None),
+            query_sequence=getattr(
+                entry, "query_sequence", getattr(entry, "sequence", None)
+            ),
+            cigarstring=getattr(entry, "cigarstring", "")
         )
         for entry in entry_iterator
     )
@@ -95,7 +100,7 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
         )
 
 
-def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, no_print_header=False, file=stdout, **kwargs):
+def main(readfiles, fmt="sam", motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, no_print_header=False, file=stdout, **kwargs):
     # parse and check arguments:
     if (head_test is not None) and (tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
@@ -103,6 +108,12 @@ def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, wind
         raise ValueError("--cutoff has no effect without a head/tail test")
     elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
+    if fmt == "sam":
+        manager = AlignmentFile
+    elif fmt == "fastx":
+        raise NotImplementedError("--fmt fastx")
+    else:
+        raise ValueError("Unknown --fmt: '{}'".format(fmt))
     pattern = get_circular_pattern(motif)
     if not no_print_header:
         header = [
@@ -111,7 +122,7 @@ def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, wind
         ]
         print(*header, sep="\t", file=file)
     # scan fastq for target motif query, parallelizing on reads:
-    with ReadFileChain(bams, AlignmentFile) as entry_iterator:
+    with ReadFileChain(readfiles, manager) as entry_iterator:
         scanner = pattern_scanner(
             entry_iterator, pattern, window_size=window_size,
             head_test=head_test, tail_test=tail_test,
