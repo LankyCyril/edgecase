@@ -79,15 +79,19 @@ def filter_entries(bam_data, ecxfd, flag_filter):
                 yield updated_entry(entry, q_flags, is_q=True)
 
 
-def get_bam_chunk(bam_data, chrom, ecxfd, max_read_length):
+def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
     """Subset bam_data to a region where reads of interest can occur"""
-    if chrom not in ecxfd:
-        return None
+    if chrom not in reflens:
+        return []
     elif max_read_length is None:
         return bam_data.fetch(chrom, None, None)
     else:
         p_innermost_pos = ecxfd[chrom][5]["pos"].max() + max_read_length
+        if p_innermost_pos < 0:
+            p_innermost_pos = 0
         q_innermost_pos = ecxfd[chrom][3]["pos"].min() - max_read_length
+        if q_innermost_pos > reflens[chrom]:
+            q_innermost_pos = reflens[chrom]
         if isnan(p_innermost_pos) and isnan(q_innermost_pos):
             return None
         elif (not isnan(p_innermost_pos)) and isnan(q_innermost_pos):
@@ -107,9 +111,11 @@ def main(bam, index, flag_filter, max_read_length, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
     with AlignmentFile(bam) as bam_data:
+        reflens = dict(zip(bam_data.references, bam_data.lengths))
         print(str(bam_data.header).rstrip("\n"), file=file)
-        for chrom in tqdm(bam_data.references, desc="reference"):
-            bam_chunk = get_bam_chunk(bam_data, chrom, ecxfd, max_read_length)
-            if bam_chunk:
-                for entry in filter_entries(bam_chunk, ecxfd, flag_filter):
-                    print(entry.to_string(), file=file)
+        for chrom in tqdm(ecxfd, total=len(ecxfd), desc="reference"):
+            bam_chunk = get_bam_chunk(
+                bam_data, chrom, ecxfd, reflens, max_read_length
+            )
+            for entry in filter_entries(bam_chunk, ecxfd, flag_filter):
+                print(entry.to_string(), file=file)
