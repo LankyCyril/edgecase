@@ -2,7 +2,7 @@ from sys import stdout
 from os.path import isfile
 from edgecaselib.util import ReadFileChain
 from pysam import AlignmentFile
-from pandas import read_fwf
+from pandas import read_csv
 from functools import reduce
 from operator import __or__
 from copy import deepcopy
@@ -13,9 +13,7 @@ def load_index(index_filename):
     if not isfile(index_filename):
         raise FileNotFoundError(index_filename)
     else:
-        ecx = read_fwf(index_filename, skiprows=1)
-        ecx.columns = [c.lstrip("#") for c in ecx.columns]
-        return ecx
+        return read_csv(index_filename, sep="\t", skiprows=1, escapechar="#")
 
 
 def make_ecx_filter_dict(ecx):
