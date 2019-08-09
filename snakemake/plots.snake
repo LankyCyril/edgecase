@@ -10,8 +10,6 @@ if "datasets" not in config:
             if key not in config:
                 config[key] = value
 
-print(config)
-
 rule lengths_plot:
     input:
         sam=expand(
