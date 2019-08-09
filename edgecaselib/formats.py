@@ -22,6 +22,17 @@ FLAG_COLORS = {
     0x4000: "green"
 }
 
+ALL_SAM_FLAGS = [
+    "paired", "mapped_pair", "unm", "mate_unm", "rev", "mate_rev",
+    "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
+    "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
+]
+
+
+def explain_sam_flags(flag):
+    """Convert an integer flag into string"""
+    return ",".join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
+
 
 def passes_filter(entry_flag, entry_mapq, flags, flag_filter, min_quality):
     """Check if entry flags pass filters"""

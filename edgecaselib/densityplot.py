@@ -1,6 +1,6 @@
 from sys import stdout, stderr
 from edgecaselib.formats import load_index, load_kmerscan
-from edgecaselib.formats import interpret_flags, FLAG_COLORS
+from edgecaselib.formats import interpret_flags, FLAG_COLORS, explain_sam_flags
 from matplotlib.pyplot import subplots, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle
@@ -66,7 +66,7 @@ def highlight_mapped_region(read_data, trace_data, name, trace_ax):
     )
     trace_ax.text(
         leftmost_map+map_length/2, 1,
-        "{}\nflag={}".format(name, read_flag),
+        name + "\n" + explain_sam_flags(read_flag),
         verticalalignment="top", horizontalalignment="center"
     )
 
