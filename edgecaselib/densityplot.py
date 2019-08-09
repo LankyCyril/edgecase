@@ -162,4 +162,4 @@ def main(dat, gzipped=None, index=None, flags=0, flag_filter=3844, min_quality=0
     )
     if title is None:
         title = path.split(dat)[-1]
-    plot_densities(densities, ecx, bin_size, no_align, title, flags, flag_filter, file)
+    plot_densities(densities, ecx, bin_size, no_align, title, flags, flag_filter, min_quality, file)
