@@ -5,7 +5,7 @@ from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
 
 def WideHelpFormatter(prog):
     """Supply formatter class to ArgumentParser with wider fields than default"""
-    return ArgumentDefaultsHelpFormatter(prog, max_help_position=50, width=150)
+    return ArgumentDefaultsHelpFormatter(prog, max_help_position=30, width=150)
 
 
 def create_subparser(subparsers, name, help, usage, rules):
@@ -22,19 +22,57 @@ parser.add_argument(
     "-j", "--jobs", help="number of jobs to run in parallel",
     default=1, type=int, metavar="J"
 )
-subparsers = parser.add_subparsers(help="subcommands", dest="subparser")
+subparsers = parser.add_subparsers(dest="subparser")
+
+create_subparser(
+    subparsers, "tailpuller", help="select overhanging reads",
+    usage="{} tailpuller [options] bam > sam".format(__file__),
+    rules={
+        ("bam",): {
+            "help": "name of input BAM/SAM file"
+        },
+        ("-x", "--index"): {
+            "help": "location of the reference .ecx index",
+            "required": True, "metavar": "X", "default": "no default, required"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only sam entries with none of these flags present",
+            "default": "3844", "type": str, "metavar": "F"
+        },
+        ("-m", "--max-read-length"): {
+            "help": "max read length to consider when selecting lookup regions",
+            "default": None, "type": int, "metavar": "M"
+        }
+    }
+)
+
+create_subparser(
+    subparsers, "tailchopper", help="get clipped heads/tails of reads",
+    usage="{} tailchopper [options] bams > fasta".format(__file__),
+    rules={
+        ("bams",): {
+            "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
+        },
+        ("-p", "--prime"): {
+            "help": "which 'prime' end to output",
+            "default": 5, "type": int, "choices": [5, 3]
+        }
+    }
+)
 
 create_subparser(
     subparsers, "kmerscanner", help="perform kmer scan",
-    usage="{} [-j J] kmerscanner [options] fastqs > txt".format(__file__),
+    usage="{} [-j J] kmerscanner [options] bams > dat".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
+        ("readfiles",): {
+            "help": "name(s) of input sam/fasta/fastq file(s)", "nargs": "+"
         },
-        ("--motif",): {
-            "help": "target motif sequence",
-            "default": "TTAGGG", "metavar": "M"
+        ("--fmt",): {
+            "help": "format of input file(s)", "default": "sam",
+            "choices": {"sam", "fastx"}
+        },
+        ("--motifs",): {
+            "help": "target motif sequences", "default": "TTAGGG", "metavar": "M"
         },
         ("--head-test",): {
             "help": "length of head to use for density filter (if specified)",
@@ -60,64 +98,48 @@ create_subparser(
 )
 
 create_subparser(
-    subparsers, "tailpuller", help="select overhanging reads",
-    usage="{} tailpuller [options] bams > sam".format(__file__),
-    rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
-        },
-        ("-r", "--reference"): {
-            "help": "reference FASTA",
-            "required": True, "metavar": "R", "default": "no default, required"
-        },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
-        }
-    }
-)
-
-create_subparser(
-    subparsers, "tailchopper", help="get clipped heads/tails of reads",
-    usage="{} tailchopper [options] bams > fasta".format(__file__),
-    rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
-        },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
-        }
-    }
-)
-
-create_subparser(
     subparsers, "densityplot", help="visualize densities of candidate reads",
-    usage="{} densityplot [options] dat > png".format(__file__),
+    usage="{} densityplot [options] dat > pdf".format(__file__),
     rules={
         ("dat",): {
             "help": "input density file"
+        },
+        ("-z", "--gzipped") : {
+            "help": "input is gzipped (must specify if any of -qfF present)",
+            "action": "store_true"
+        },
+        ("-x", "--index"): {
+            "help": "location of the reference .ecx index",
+            "required": True, "metavar": "X", "default": "no default, required"
+        },
+        ("-f", "--flags"): {
+            "help": "process only entries with all these sam flags present",
+            "default": "0", "type": str, "metavar": "f"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only entries with none of these sam flags present",
+            "default": "0", "type": str, "metavar": "F"
+        },
+        ("-q", "--min-quality"): {
+            "help": "process only entries with MAPQ >= Q",
+            "default": 0, "type": int, "metavar": "Q"
         },
         ("-b", "--bin-size"): {
             "help": "size of each bin in bp for visualization speedup",
             "default": 100, "type": int, "metavar": "B"
         },
         ("--title",): {
-            "help": "figure title (defaults to input filename)"
+            "help": "figure title (defaults to input filename)", "metavar": "T"
+        },
+        ("--no-align",): {
+            "help": "plot unaligned", "action": "store_true"
         }
     }
 )
 
+
 kwargs = dict(parser.parse_args()._get_kwargs())
-if kwargs["subparser"] == "kmerscanner":
-    kmerscanner.main(**kwargs)
-elif kwargs["subparser"] == "tailpuller":
-    tailpuller.main(**kwargs)
-elif kwargs["subparser"] == "tailchopper":
-    tailchopper.main(**kwargs)
-elif kwargs["subparser"] == "densityplot":
-    densityplot.main(**kwargs)
+if kwargs["subparser"] in subparsers.choices:
+    globals()[kwargs["subparser"]].main(**kwargs)
 else:
-    raise ValueError("A valid subparser (subcommand) must be specified")
+    exit(parser.print_help() or 1)

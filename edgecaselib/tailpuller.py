@@ -1,77 +1,97 @@
 from sys import stdout
-from re import compile, IGNORECASE
-from edgecaselib.util import ReadFileChain, MAINCHROMS
+from edgecaselib.formats import load_index, interpret_flags
+from pysam import AlignmentFile
+from functools import reduce
+from operator import __or__
+from copy import deepcopy
 from tqdm import tqdm
-from pysam import FastxFile, AlignmentFile
-from pandas import read_csv, DataFrame
-from itertools import takewhile, filterfalse
+from itertools import chain
+from numpy import isnan
 
 
-def get_anchors(reference):
-    """Get coordinates of hard-masked bounds at each end of each main chromosome"""
-    if reference.endswith(".tsv"): # assume precomputed anchors
-        return read_csv(reference, sep="\t", index_col=0)
+def get_terminal_pos(entry, cigarpos):
+    """Calculate the position of clipped start/end of read relative to the reference"""
+    if not entry.cigartuples: # no CIGAR available
+        return None
+    # measure the clipped stretch on the left (0) or right (-1):
+    cigartype, clip = entry.cigartuples[cigarpos]
+    if (cigartype != 4) and (cigartype != 5): # not a soft/hard clip
+        clip = 0
+    # determine location of start/end of the read relative to reference:
+    if cigarpos == 0: # start
+        return entry.reference_start - clip
+    elif cigarpos == -1: # end
+        return entry.reference_end + clip
     else:
-        pattern = compile(r'[^n]', flags=IGNORECASE)
-        anchor_data = {}
-        bar = tqdm(
-            desc="Finding anchors", total=len(MAINCHROMS), unit="chromosome"
-        )
-        with FastxFile(reference) as genome:
-            for entry in genome:
-                if entry.name in MAINCHROMS:
-                    bar.update()
-                    bound_5prime = pattern.search(entry.sequence).span()[0]
-                    bound_3prime = (
-                        len(entry.sequence) -
-                        pattern.search(entry.sequence[::-1]).span()[0]
-                    )
-                    anchor_data[entry.name] = bound_5prime, bound_3prime
-        return DataFrame(data=anchor_data, index=["5prime", "3prime"]).T
+        raise ValueError("get_terminal_pos(): cigarpos can only be 0 or -1")
 
 
-def is_good_entry(entry):
-    """Simple filter"""
-    if entry.is_unmapped or entry.is_secondary or entry.is_supplementary:
-        return False
-    elif entry.reference_name in MAINCHROMS:
-        return True
-    else:
-        return False
+def updated_entry(entry, flags, is_q=False):
+    """Add ECX flags to entry"""
+    new_entry = deepcopy(entry)
+    new_entry.flag |= reduce(__or__, flags)
+    if is_q:
+        new_entry.flag |= 0x8000
+    return new_entry
 
 
-def filter_aligned_segments(bam_data, anchors, prime):
-    """Only pass reads extending past anchors"""
-    isnone = lambda p: p is None
+def filter_entries(bam_data, ecxfd, flag_filter):
+    """Only pass reads extending past regions specified in the ECX"""
     for entry in bam_data:
-        if is_good_entry(entry):
-            positions = entry.get_reference_positions(full_length=True)
-            left_clip = sum(
-                True for _ in takewhile(isnone, positions)
-            )
-            left_mappos = next(filterfalse(isnone, positions))
-            right_clip = sum(
-                True for _ in takewhile(isnone, reversed(positions))
-            )
-            right_mappos = next(filterfalse(isnone, reversed(positions)))
-            if prime not in {5, 3}:
-                raise ValueError("`prime` can only be 5 or 3")
-            elif prime == 5:
-                anchor = anchors.loc[entry.reference_name, "5prime"]
-                if left_mappos - left_clip < anchor:
-                    yield entry
-            elif prime == 3:
-                anchor = anchors.loc[entry.reference_name, "3prime"]
-                if right_mappos + right_clip > anchor:
-                    yield entry
+        if (entry.flag & flag_filter == 0) and (entry.reference_name in ecxfd):
+            # find positions of start and end of read relative to reference:
+            p_pos = get_terminal_pos(entry, cigarpos=0)
+            q_pos = get_terminal_pos(entry, cigarpos=-1)
+            # collect ECX flags where anchor is to right of read start:
+            ecx_t_p5 = ecxfd[entry.reference_name][5]
+            p_flags = set(ecx_t_p5.loc[ecx_t_p5["pos"]>=p_pos, "flag"])
+            if p_flags:
+                yield updated_entry(entry, p_flags)
+            # collect ECX flags where anchor is to left of read end
+            ecx_t_p3 = ecxfd[entry.reference_name][3]
+            q_flags = set(ecx_t_p3.loc[ecx_t_p3["pos"]<q_pos, "flag"])
+            if q_flags:
+                yield updated_entry(entry, q_flags, is_q=True)
 
 
-def main(bams, reference, prime, file=stdout, **kwargs):
-    # use header of first input file (NB! fragile):
-    with AlignmentFile(bams[0]) as bam:
-        print(str(bam.header).rstrip("\n"))
+def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
+    """Subset bam_data to a region where reads of interest can occur"""
+    if chrom not in reflens:
+        return []
+    elif max_read_length is None:
+        return bam_data.fetch(chrom, None, None)
+    else:
+        p_innermost_pos = ecxfd[chrom][5]["pos"].max() + max_read_length
+        if p_innermost_pos < 0:
+            p_innermost_pos = 0
+        q_innermost_pos = ecxfd[chrom][3]["pos"].min() - max_read_length
+        if q_innermost_pos > reflens[chrom]:
+            q_innermost_pos = reflens[chrom]
+        if isnan(p_innermost_pos) and isnan(q_innermost_pos):
+            return None
+        elif (not isnan(p_innermost_pos)) and isnan(q_innermost_pos):
+            return bam_data.fetch(chrom, 0, p_innermost_pos)
+        elif isnan(p_innermost_pos) and (not isnan(q_innermost_pos)):
+            return bam_data.fetch(chrom, q_innermost_pos, None)
+        elif p_innermost_pos >= q_innermost_pos:
+            return bam_data.fetch(chrom, None, None)
+        else:
+            return chain(
+                bam_data.fetch(chrom, 0, p_innermost_pos),
+                bam_data.fetch(chrom, q_innermost_pos, None)
+            )
+
+
+def main(bam, index, flag_filter, max_read_length, file=stdout, **kwargs):
     # dispatch data to subroutines:
-    anchors = get_anchors(reference)
-    with ReadFileChain(bams, AlignmentFile) as bam_data:
-        for entry in filter_aligned_segments(bam_data, anchors, prime):
-            print(entry.to_string(), file=file)
+    ecxfd = load_index(index, as_filter_dict=True)
+    int_flag_filter = interpret_flags(flag_filter)
+    with AlignmentFile(bam) as bam_data:
+        reflens = dict(zip(bam_data.references, bam_data.lengths))
+        print(str(bam_data.header).rstrip("\n"), file=file)
+        for chrom in tqdm(ecxfd, total=len(ecxfd), desc="reference"):
+            bam_chunk = get_bam_chunk(
+                bam_data, chrom, ecxfd, reflens, max_read_length
+            )
+            for entry in filter_entries(bam_chunk, ecxfd, int_flag_filter):
+                print(entry.to_string(), file=file)

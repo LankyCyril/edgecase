@@ -1,8 +1,12 @@
-data_dir: "data"
-reads_dir: "processedReads"
-analysis_dir: "analysis"
+data_dir: "data/datasets/twins_reference_extended/edgecase"
 
-reference: "data/references/hs37d5.fa"
+reference: "data/references/hg38.fa"
+telomere_model: "models/M19947.hmm"
+chromosome_names: "ucsc"
+
+nhmmer: "tools/hmmer/bin/nhmmer"
+densityplot_bin_size: 100
+density_window_size: 120
 
 datasets:
   - _1_pre_TW
@@ -11,3 +15,12 @@ datasets:
   - _1_pre_HR
   - _2_flight_HR
   - _3_post_HR
+
+nasa_timepoints:
+  - 1_pre
+  - 2_flight
+  - 3_post
+
+nasa_subjects:
+  - TW
+  - HR
