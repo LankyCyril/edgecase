@@ -1,6 +1,7 @@
 edgeCase
 ========
 
+
 From a set of aligned reads (BAM/SAM file) and a reference, edgeCase currently can create:
 * 5AC and 3AC SAM files: subsets of reads mapped to ends of main chromosomes and extending into terminal hard-masked regions
 * 5OOB and 3OOB FASTQ files: parts of 5AC and 3AC reads completely in the masked region
@@ -39,7 +40,8 @@ optional arguments:
 
 ### tailchopper
 
-Truncates reads in a 5AC or 3AC file to a FASTQ of sequences completely overhanging reference hard mask.  
+Truncates reads in a 5AC or 3AC file to a FASTQ of sequences of soft/hard-clipped ends.  
+(usually, this corresponds to regions completely overhanging onto the reference hard mask).  
 NB! Needs `--prime` to be set, as it has no knowledge of how the SAM was generated.
 
 ```
@@ -89,4 +91,18 @@ optional arguments:
   -h, --help          show this help message and exit
   -b B, --bin-size B  size of each bin in bp for visualization speedup (default: 100)
   --title TITLE       figure title (defaults to input filename) (default: None)
+```
+
+### Visual guide to read terminology
+```
+  ~~~~~~~~~~~                            5AC "5 prime anchored":       reads that map to (and beyond)  5' ends
+  ~~~~~~                                 5OOB "5 prime out of bounds": the soft or hard clipped edges of reads     
+               ~~~~~~~~                  AR-IB "Anchored in bounds":   reads mapped &  fully within chromosome
+                         ~~~~~~~~~~      3AC "3 prime anchored":       reads that map to (and beyond) 3'  ends
+                              ~~~~~      3OOB "3 prime out of bounds": the soft or hard clipped edges of reads
+******===========================******
+
+~~~  a NanoPore read
+***  hard-masked region of reference chromosome
+===  normal, unmasked region of reference chromosome
 ```
