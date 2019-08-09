@@ -16,6 +16,12 @@ ECX_FLAGS = {
     "is_q": 0x8000
 }
 
+FLAG_COLORS = {
+    0x1000: "gray",
+    0x2000: "red",
+    0x4000: "green"
+}
+
 
 def passes_filter(entry_flag, entry_mapq, flags, flag_filter, min_quality):
     """Check if entry flags pass filters"""

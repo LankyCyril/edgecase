@@ -109,7 +109,8 @@ create_subparser(
             "action": "store_true"
         },
         ("-x", "--index"): {
-            "help": "location of the reference .ecx index", "metavar": "X"
+            "help": "location of the reference .ecx index",
+            "required": True, "metavar": "X", "default": "no default, required"
         },
         ("-f", "--flags"): {
             "help": "process only entries with all these sam flags present",

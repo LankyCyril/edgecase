@@ -1,5 +1,6 @@
 from sys import stdout, stderr
-from edgecaselib.formats import load_kmerscan, interpret_flags
+from edgecaselib.formats import load_index, load_kmerscan
+from edgecaselib.formats import interpret_flags, FLAG_COLORS
 from matplotlib.pyplot import subplots, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle
@@ -80,7 +81,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
     meta_ax.set(xlim=(0, max_mapq))
 
 
-def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title, no_align, anchors):
+def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_align, title, flags, flag_filter, min_quality):
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(len(names), chrom, max_mapq)
@@ -100,12 +101,15 @@ def chromosome_motif_plot(binned_density_dataframe, chrom, max_mapq, title, no_a
                 ylim=(-.2, 1.2), yticks=[]
             )
             plot_read_metadata(read_data, max_mapq, meta_ax)
-        if anchors is not None:
+        plottable_flags = ecx.loc[ecx["rname"]==chrom, ["pos", "flag"]]
+        for _, pos, flag in plottable_flags.itertuples():
             trace_ax.axvline(
-                anchors.loc[chrom, "anchor"], -.2, 1.2,
-                ls="--", lw=2, c="gray", alpha=.7
+                pos, -.2, 1.2, ls="--", lw=4,
+                c=FLAG_COLORS[flag], alpha=.4
             )
-    axs[0, 0].set(title=title)
+    axs[0, 0].set(title="{}\n-f={} -F={} -q={}".format(
+        title, flags, flag_filter, min_quality
+    ))
     return page
 
 
@@ -122,7 +126,7 @@ def chromosome_natsort(chrom):
     return keyoder
 
 
-def plot_densities(densities, bin_size, title, no_align, anchors, file=stdout.buffer):
+def plot_densities(densities, ecx, bin_size, no_align, title, flags=None, flag_filter=None, min_quality=0, file=stdout.buffer):
     """Plot binned densities as a heatmap"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
     try:
@@ -143,36 +147,19 @@ def plot_densities(densities, bin_size, title, no_align, anchors, file=stdout.bu
         with PdfPages(file) as pdf:
             for chrom, binned_density_dataframe in decorated_densities_iterator:
                 page = chromosome_motif_plot(
-                    binned_density_dataframe, chrom,
-                    max_mapq, title, no_align, anchors
+                    binned_density_dataframe, ecx, chrom, max_mapq, no_align,
+                    title, flags, flag_filter, min_quality
                 )
                 pdf.savefig(page, bbox_inches="tight")
 
 
-def main(dat, gzipped=None, flags=0, flag_filter=3844, min_quality=0, bin_size=100, title=None, no_align=False, reference=None, names=None, prime=None, file=stdout.buffer, **kwargs):
+def main(dat, gzipped=None, index=None, flags=0, flag_filter=3844, min_quality=0, bin_size=100, no_align=False, title=None, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
+    ecx = load_index(index)
     densities = load_kmerscan(
         dat, gzipped, interpret_flags(flags), interpret_flags(flag_filter),
         min_quality, bin_size, no_align
     )
     if title is None:
         title = path.split(dat)[-1]
-    if reference:
-        if no_align:
-            print("`reference` has no effect if no_align is True", file=stderr)
-            anchors = None
-        elif (names is not None) and (prime is not None):
-            raise NotImplementedError
-            #anchors, _ = get_anchors(reference, get_mainchroms(names))
-            if prime == 5:
-                anchors = anchors[["5prime"]]
-            elif prime == 3:
-                anchors = anchors[["3prime"]]
-            else:
-                raise ValueError("`prime` can only be 5 or 3")
-            anchors.columns = ["anchor"]
-        else:
-            raise ValueError("For `reference`, must specify `names` & `prime`")
-    else:
-        anchors = None
-    plot_densities(densities, bin_size, title, no_align, anchors, file)
+    plot_densities(densities, ecx, bin_size, no_align, title, flags, flag_filter, file)
