@@ -52,6 +52,7 @@ def plot_motif_densities(read_data, trace_ax, legend=False):
 def highlight_mapped_region(read_data, trace_data, name, trace_ax):
     """Plot a rectangle around mapped region of read"""
     leftmost_map = read_data["pos"].iloc[0]
+    read_flag = read_data["flag"].iloc[0]
     map_length = (
         trace_data.dropna().index.max() -
         read_data["clip_3prime"].iloc[0] -
@@ -64,7 +65,8 @@ def highlight_mapped_region(read_data, trace_data, name, trace_ax):
         )
     )
     trace_ax.text(
-        leftmost_map+map_length/2, 1, name,
+        leftmost_map+map_length/2, 1,
+        "{}\nflag={}".format(name, read_flag),
         verticalalignment="top", horizontalalignment="center"
     )
 
@@ -162,4 +164,8 @@ def main(dat, gzipped=None, index=None, flags=0, flag_filter=3844, min_quality=0
     )
     if title is None:
         title = path.split(dat)[-1]
-    plot_densities(densities, ecx, bin_size, no_align, title, flags, flag_filter, min_quality, file)
+    plot_densities(
+        densities, ecx, bin_size, no_align,
+        title, flags, flag_filter, min_quality,
+        file
+    )
