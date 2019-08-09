@@ -36,7 +36,7 @@ def passes_filter(entry_flag, entry_mapq, flags, flag_filter, min_quality):
 
 
 def filter_and_read_csv(dat, gzipped, flags, flag_filter, min_quality):
-    """If filters supplied, subset CSV first, then read with pandas"""
+    """If filters supplied, subset DAT first, then read with pandas"""
     number_retained = 0
     if gzipped:
         opener = gzopen
@@ -62,7 +62,7 @@ def filter_and_read_csv(dat, gzipped, flags, flag_filter, min_quality):
                             number_retained += 1
                             print(line, end="", file=datflt)
                 print("Kept {} records".format(number_retained), file=stderr)
-            print("Loading CSV...", file=stderr, flush=True)
+            print("Loading DAT...", file=stderr, flush=True)
             return read_csv(datflt_name, sep="\t", escapechar="#")
 
 
@@ -116,7 +116,7 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
 def load_kmerscan(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_align, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
     if (flags == 0) and (flag_filter == 0) and (min_quality == 0):
-        print("Loading CSV...", file=stderr, flush=True)
+        print("Loading DAT...", file=stderr, flush=True)
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
         raw_densities = filter_and_read_csv(
@@ -133,7 +133,7 @@ def load_kmerscan(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_al
     if no_align:
         raw_densities["chrom"] = "None"
     chromosome_iterator = tqdm(
-        raw_densities["chrom"].drop_duplicates(), desc="Reading data",
+        raw_densities["chrom"].drop_duplicates(), desc="Interpreting data",
         unit="chromosome"
     )
     return {
