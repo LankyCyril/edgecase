@@ -34,6 +34,7 @@ def chop(entry, prime):
 
 
 def main(bams, prime, file=stdout, **kwargs):
+    raise NotImplementedError("Chopping SAMs with custom flags")
     with ReadFileChain(bams, AlignmentFile) as bam_data:
         for entry in bam_data:
             chopped_entry = chop(entry, prime)

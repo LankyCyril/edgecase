@@ -8,6 +8,13 @@ from pysam import AlignmentFile
 from types import SimpleNamespace
 from functools import partial
 from tqdm import tqdm
+from collections import OrderedDict
+
+
+DAT_HEADER = [
+    "#name", "flag", "chrom", "pos", "mapq", "motif",
+    "clip_5prime", "clip_3prime", "density"
+]
 
 
 def get_circular_pattern(motif):
@@ -63,17 +70,22 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
     else: # effectively skip
         return None, zeros(1)
 
+
 def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tail_test, num_reads, jobs):
     """Calculate density of pattern hits in a rolling window along each read"""
     simple_entry_iterator = (
         SimpleNamespace(
-            query_name=entry.query_name,
-            flag=entry.flag,
-            reference_name=entry.reference_name,
-            reference_start=entry.reference_start,
-            mapping_quality=entry.mapping_quality,
-            query_sequence=entry.query_sequence,
-            cigarstring=entry.cigarstring
+            query_name=getattr(
+                entry, "query_name", getattr(entry, "name", None)
+            ),
+            flag=getattr(entry, "flag", None),
+            reference_name=getattr(entry, "reference_name", None),
+            reference_start=getattr(entry, "reference_start", None),
+            mapping_quality=getattr(entry, "mapping_quality", None),
+            query_sequence=getattr(
+                entry, "query_sequence", getattr(entry, "sequence", None)
+            ),
+            cigarstring=getattr(entry, "cigarstring", "")
         )
         for entry in entry_iterator
     )
@@ -95,35 +107,49 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
         )
 
 
-def main(bams, motif="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, no_print_header=False, file=stdout, **kwargs):
-    # parse and check arguments:
+def interpret_arguments(head_test, tail_test, cutoff, fmt, motifs):
+    """Parse and check arguments"""
     if (head_test is not None) and (tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
     elif (cutoff is not None) and (head_test is None) and (tail_test is None):
         raise ValueError("--cutoff has no effect without a head/tail test")
     elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
-    pattern = get_circular_pattern(motif)
-    if not no_print_header:
-        header = [
-            "#name", "flag", "chrom", "pos", "mapq", "motif",
-            "clip_5prime", "clip_3prime", "density"
-        ]
-        print(*header, sep="\t", file=file)
-    # scan fastq for target motif query, parallelizing on reads:
-    with ReadFileChain(bams, AlignmentFile) as entry_iterator:
-        scanner = pattern_scanner(
-            entry_iterator, pattern, window_size=window_size,
-            head_test=head_test, tail_test=tail_test,
-            cutoff=cutoff, num_reads=num_reads, jobs=jobs
-        )
-        # output densities of reads that pass filter:
-        for entry, density_array in scanner:
-            if entry: # non-null result, entry passed filters
-                meta_fields = [
-                    entry.query_name, entry.flag, entry.reference_name,
-                    entry.reference_start, entry.mapping_quality, motif,
-                    len(chop(entry, 5).sequence), len(chop(entry, 3).sequence)
-                ]
-                print(*meta_fields, sep="\t", end="\t", file=file)
-                print(*density_array, sep=",", file=file)
+    if fmt == "sam":
+        manager = AlignmentFile
+    elif fmt == "fastx":
+        raise NotImplementedError("--fmt fastx")
+    else:
+        raise ValueError("Unknown --fmt: '{}'".format(fmt))
+    motif_patterns = OrderedDict([
+        [motif, get_circular_pattern(motif)]
+        for motif in motifs.split("|")
+    ])
+    return manager, motif_patterns
+
+
+def main(readfiles, fmt="sam", motifs="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, file=stdout, **kwargs):
+    # parse and check arguments:
+    manager, motif_patterns = interpret_arguments(
+        head_test, tail_test, cutoff, fmt, motifs
+    )
+    print(*DAT_HEADER, sep="\t", file=file)
+    # scan fastq for target motif queries, parallelizing on reads:
+    # TODO: motif and pattern per read
+    for motif, pattern in motif_patterns.items():
+        with ReadFileChain(readfiles, manager) as entry_iterator:
+            scanner = pattern_scanner(
+                entry_iterator, pattern, window_size=window_size,
+                head_test=head_test, tail_test=tail_test,
+                cutoff=cutoff, num_reads=num_reads, jobs=jobs
+            )
+            # output densities of reads that pass filter:
+            for entry, density_array in scanner:
+                if entry: # non-null result, entry passed filters
+                    meta_fields = [
+                        entry.query_name, entry.flag, entry.reference_name,
+                        entry.reference_start, entry.mapping_quality, motif,
+                        len(chop(entry, 5).sequence), len(chop(entry, 3).sequence)
+                    ]
+                    print(*meta_fields, sep="\t", end="\t", file=file)
+                    print(*density_array, sep=",", file=file)
