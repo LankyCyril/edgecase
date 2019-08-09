@@ -62,11 +62,15 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
         return bam_data.fetch(chrom, None, None)
     else:
         p_innermost_pos = ecxfd[chrom][5]["pos"].max() + max_read_length
-        if p_innermost_pos < 0:
+        if p_innermost_pos > reflens[chrom] - 1:
+            p_innermost_pos = reflens[chrom] - 1
+        elif p_innermost_pos < 0:
             p_innermost_pos = 0
         q_innermost_pos = ecxfd[chrom][3]["pos"].min() - max_read_length
-        if q_innermost_pos > reflens[chrom]:
-            q_innermost_pos = reflens[chrom]
+        if q_innermost_pos > reflens[chrom] - 1:
+            q_innermost_pos = reflens[chrom] - 1
+        elif q_innermost_pos < 0:
+            q_innermost_pos = 0
         if isnan(p_innermost_pos) and isnan(q_innermost_pos):
             return None
         elif (not isnan(p_innermost_pos)) and isnan(q_innermost_pos):

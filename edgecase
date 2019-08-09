@@ -37,7 +37,7 @@ create_subparser(
         },
         ("-F", "--flag-filter"): {
             "help": "process only sam entries with none of these flags present",
-            "default": "3844", "type": str, "metavar": "F"
+            "default": "0", "type": str, "metavar": "F"
         },
         ("-m", "--max-read-length"): {
             "help": "max read length to consider when selecting lookup regions",
