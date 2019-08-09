@@ -37,7 +37,7 @@ create_subparser(
         },
         ("-F", "--flag-filter"): {
             "help": "process only sam entries with none of these flags present",
-            "default": 3844, "type": int, "metavar": "F"
+            "default": "3844", "type": str, "metavar": "F"
         },
         ("-m", "--max-read-length"): {
             "help": "max read length to consider when selecting lookup regions",
@@ -108,6 +108,9 @@ create_subparser(
             "help": "input is gzipped (must specify if any of -qfF present)",
             "action": "store_true"
         },
+        ("-x", "--index"): {
+            "help": "location of the reference .ecx index", "metavar": "X"
+        },
         ("-f", "--flags"): {
             "help": "process only entries with all these sam flags present",
             "default": "0", "type": str, "metavar": "f"
@@ -129,19 +132,6 @@ create_subparser(
         },
         ("--no-align",): {
             "help": "plot unaligned", "action": "store_true"
-        },
-        ("-r", "--reference"): {
-            "help": "reference FASTA (if anchor shading is needed)",
-            "metavar": "R"
-        },
-        ("-n", "--names"): {
-            "help": "chromosome naming convention", "dest": "names",
-            "default": "riethman",
-            "choices": {"riethman", "t2t", "ucsc", "ensembl"}
-        },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output", "dest": "prime",
-            "default": 5, "type": int, "choices": [5, 3]
         }
     }
 )

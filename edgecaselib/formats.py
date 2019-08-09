@@ -153,3 +153,27 @@ def interpret_flags(flags):
         return ECX_FLAGS[flags]
     else:
         raise ValueError("Unknown flags: {}".format(repr(flags)))
+
+
+def load_index(index_filename, as_filter_dict=False):
+    """Load ECX index; convert to simpler dictionary for filtering if requested"""
+    if not path.isfile(index_filename):
+        raise FileNotFoundError(index_filename)
+    else:
+        ecx = read_csv(index_filename, sep="\t", skiprows=1, escapechar="#")
+        if as_filter_dict:
+            slim_ecx = ecx[["rname", "pos", "flag", "prime"]]
+            rnames = set(slim_ecx["rname"])
+            return {
+                rname: {
+                    5: slim_ecx[
+                        (slim_ecx["rname"]==rname) & (slim_ecx["prime"]==5)
+                    ].drop(columns=["rname", "prime"]),
+                    3: slim_ecx[
+                        (slim_ecx["rname"]==rname) & (slim_ecx["prime"]==3)
+                    ].drop(columns=["rname", "prime"])
+                }
+                for rname in rnames
+            }
+        else:
+            return ecx

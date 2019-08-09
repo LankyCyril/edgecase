@@ -1,37 +1,12 @@
 from sys import stdout
-from os.path import isfile
+from edgecaselib.formats import load_index, interpret_flags
 from pysam import AlignmentFile
-from pandas import read_csv
 from functools import reduce
 from operator import __or__
 from copy import deepcopy
 from tqdm import tqdm
 from itertools import chain
 from numpy import isnan
-
-
-def load_index(index_filename, as_filter_dict=False):
-    """Load ECX index; convert to simpler dictionary for filtering if requested"""
-    if not isfile(index_filename):
-        raise FileNotFoundError(index_filename)
-    else:
-        ecx = read_csv(index_filename, sep="\t", skiprows=1, escapechar="#")
-        if as_filter_dict:
-            slim_ecx = ecx[["rname", "pos", "flag", "prime"]]
-            rnames = set(slim_ecx["rname"])
-            return {
-                rname: {
-                    5: slim_ecx[
-                        (slim_ecx["rname"]==rname) & (slim_ecx["prime"]==5)
-                    ].drop(columns=["rname", "prime"]),
-                    3: slim_ecx[
-                        (slim_ecx["rname"]==rname) & (slim_ecx["prime"]==3)
-                    ].drop(columns=["rname", "prime"])
-                }
-                for rname in rnames
-            }
-        else:
-            return ecx
 
 
 def get_terminal_pos(entry, cigarpos):
@@ -110,6 +85,7 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
 def main(bam, index, flag_filter, max_read_length, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
+    int_flag_filter = interpret_flags(flag_filter)
     with AlignmentFile(bam) as bam_data:
         reflens = dict(zip(bam_data.references, bam_data.lengths))
         print(str(bam_data.header).rstrip("\n"), file=file)
@@ -117,5 +93,5 @@ def main(bam, index, flag_filter, max_read_length, file=stdout, **kwargs):
             bam_chunk = get_bam_chunk(
                 bam_data, chrom, ecxfd, reflens, max_read_length
             )
-            for entry in filter_entries(bam_chunk, ecxfd, flag_filter):
+            for entry in filter_entries(bam_chunk, ecxfd, int_flag_filter):
                 print(entry.to_string(), file=file)
