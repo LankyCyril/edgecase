@@ -1,5 +1,5 @@
 from sys import stdout, stderr
-from edgecaselib.formats import load_kmerscan
+from edgecaselib.formats import load_kmerscan, interpret_flags
 from matplotlib.pyplot import subplots, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle
@@ -152,7 +152,8 @@ def plot_densities(densities, bin_size, title, no_align, anchors, file=stdout.bu
 def main(dat, gzipped=None, flags=0, flag_filter=3844, min_quality=0, bin_size=100, title=None, no_align=False, reference=None, names=None, prime=None, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     densities = load_kmerscan(
-        dat, gzipped, flags, flag_filter, min_quality, bin_size, no_align
+        dat, gzipped, interpret_flags(flags), interpret_flags(flag_filter),
+        min_quality, bin_size, no_align
     )
     if title is None:
         title = path.split(dat)[-1]

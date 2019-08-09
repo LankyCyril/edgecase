@@ -5,6 +5,16 @@ from gzip import open as gzopen
 from tempfile import TemporaryDirectory
 from os import path
 from tqdm import tqdm
+from functools import reduce
+from operator import __or__
+
+
+ECX_FLAGS = {
+    "ucsc_mask_anchor": 0x1000,
+    "fork": 0x2000,
+    "tract_anchor": 0x4000,
+    "is_q": 0x8000
+}
 
 
 def passes_filter(entry_flag, entry_mapq, flags, flag_filter, min_quality):
@@ -124,3 +134,22 @@ def load_kmerscan(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_al
         )
         for chrom in chromosome_iterator
     }
+
+
+def interpret_flags(flags):
+    """If flags are not a decimal number, assume strings and convert to number"""
+    if isinstance(flags, int) or flags.isdigit():
+        return int(flags)
+    elif not isinstance(flags, str):
+        raise ValueError("Unknown flags: {}".format(repr(flags)))
+    elif flags[:2] == "0x":
+        return int(flags, 16)
+    elif flags[:2] == "0b":
+        return int(flags, 2)
+    elif "|" in flags:
+        flag_set = set(map(interpret_flags, flags.split("|")))
+        return reduce(__or__, flag_set | {0})
+    elif flags in ECX_FLAGS:
+        return ECX_FLAGS[flags]
+    else:
+        raise ValueError("Unknown flags: {}".format(repr(flags)))
