@@ -59,3 +59,15 @@ def natsorted_chromosomes(chromosomes):
         print("Warning: " + msg, file=stderr)
         print("The error was: '{}'".format(e), file=stderr)
         return sorted(chromosomes)
+
+
+def entry_filters_ok(entry_flag, entry_mapq, flags, flag_filter, min_mapq):
+    """Check if entry flags and mapq pass filters"""
+    passes_quality = (entry_mapq is None) or (entry_mapq >= min_mapq)
+    if not passes_quality:
+        return False
+    else:
+        return (entry_flag is None) or (
+            (entry_flag & flags == flags) and
+            (entry_flag & flag_filter == 0)
+        )

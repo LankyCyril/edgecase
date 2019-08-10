@@ -1,4 +1,4 @@
-from sys import stdout, stderr
+from sys import stdout
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import interpret_flags, FLAG_COLORS, explain_sam_flags
 from edgecaselib.util import natsorted_chromosomes
