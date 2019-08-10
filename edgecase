@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
-from edgecaselib import assembler
+import edgecaselib
 
 
 def WideHelpFormatter(prog):
@@ -178,6 +177,6 @@ create_subparser(
 
 kwargs = dict(parser.parse_args()._get_kwargs())
 if kwargs["subparser"] in subparsers.choices:
-    globals()[kwargs["subparser"]].main(**kwargs)
+    getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
 else:
     exit(parser.print_help() or 1)
