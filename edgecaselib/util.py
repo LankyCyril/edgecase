@@ -1,6 +1,7 @@
 from contextlib import contextmanager, ExitStack
 from itertools import chain
 from regex import compile
+from re import split
 
 
 MAINCHROMS_ENSEMBL = {str(i) for i in range(1, 23)} | {"X", "Y"}
@@ -33,3 +34,16 @@ def motif_revcomp(motif, ignorecase=True):
         return MOTIF_COMPLEMENT_PATTERN.sub(matcher, motif[::-1])
     except KeyError:
         raise ValueError("Unsupported character(s) in motif: {}".format(motif))
+
+
+def chromosome_natsort(chrom):
+    """Natural order sorting that undestands chr1, chr10, chr14_K*, 7ptel etc"""
+    keyoder = []
+    for chunk in split(r'(\d+)', chrom): # stackoverflow.com/a/16090640
+        if chunk.isdigit():
+            keyoder.append(int(chunk))
+        elif chunk == "":
+            keyoder.append("chr")
+        else:
+            keyoder.append(chunk.lower())
+    return keyoder

@@ -1,5 +1,5 @@
 from sys import stdout
-from edgecaselib.densityplot import chromosome_natsort
+from edgecaselib.util import chromosome_natsort
 from pysam import FastaFile
 from collections import defaultdict
 from tqdm import tqdm
