@@ -1,7 +1,7 @@
 from sys import stdout, stderr
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import interpret_flags, FLAG_COLORS, explain_sam_flags
-from edgecaselib.util import chromosome_natsort
+from edgecaselib.util import natsorted_chromosomes
 from matplotlib.pyplot import subplots, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle
@@ -118,13 +118,7 @@ def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_ali
 def plot_densities(densities, ecx, bin_size, no_align, title, flags=None, flag_filter=None, min_quality=0, file=stdout.buffer):
     """Plot binned densities as a heatmap"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
-    try:
-        sorted_chromosomes = sorted(densities.keys(), key=chromosome_natsort)
-    except Exception as e:
-        msg = "natural sorting failed, pages will be sorted alphanumerically"
-        print("Warning: " + msg, file=stderr)
-        print("The error was: '{}'".format(e), file=stderr)
-        sorted_chromosomes = sorted(densities.keys())
+    sorted_chromosomes = natsorted_chromosomes(densities.keys())
     sorted_densities_iterator = (
         (chrom, densities[chrom]) for chrom in sorted_chromosomes
     )

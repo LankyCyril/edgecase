@@ -1,5 +1,5 @@
 from sys import stdout
-from edgecaselib.util import chromosome_natsort
+from edgecaselib.util import natsorted_chromosomes
 from pysam import FastaFile
 from collections import defaultdict
 from tqdm import tqdm
@@ -39,14 +39,10 @@ def count_kmers(sequence, k, with_ordered=False, desc=None):
 def main(bam, reference, kmer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
     if chromosomes:
-        target_chromosomes = sorted(
-            set(chromosomes.split("|")), key=chromosome_natsort
-        )
+        target_chromosomes = natsorted_chromosomes(chromosomes.split("|"))
     else:
-        with FastaFile(reference) as reference_fasta:
-            target_chromosomes = sorted(
-                reference_fasta.references, key=chromosome_natsort
-            )
+        with FastaFile(reference) as fa:
+            target_chromosomes = natsorted_chromosomes(fa.references)
     for chromosome in target_chromosomes:
         reference_seq = get_reference_seq(reference, chromosome)
         reference_kmers, ordered_reference_kmers = count_kmers(

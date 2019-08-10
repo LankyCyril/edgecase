@@ -1,3 +1,4 @@
+from sys import stderr
 from contextlib import contextmanager, ExitStack
 from itertools import chain
 from regex import compile
@@ -37,7 +38,7 @@ def motif_revcomp(motif, ignorecase=True):
 
 
 def chromosome_natsort(chrom):
-    """Natural order sorting that undestands chr1, chr10, chr14_K*, 7ptel etc"""
+    """Natural order sorting that undestands chr1, 4, chr10, chr14_K*, 7ptel etc"""
     keyoder = []
     for chunk in split(r'(\d+)', chrom): # stackoverflow.com/a/16090640
         if chunk.isdigit():
@@ -47,3 +48,14 @@ def chromosome_natsort(chrom):
         else:
             keyoder.append(chunk.lower())
     return keyoder
+
+
+def natsorted_chromosomes(chromosomes):
+    """Sort chromosome names in natural order"""
+    try:
+        return sorted(chromosomes, key=chromosome_natsort)
+    except Exception as e:
+        msg = "natural sorting failed, pages will be sorted alphanumerically"
+        print("Warning: " + msg, file=stderr)
+        print("The error was: '{}'".format(e), file=stderr)
+        return sorted(chromosomes)
