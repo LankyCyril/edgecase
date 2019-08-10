@@ -145,6 +145,18 @@ create_subparser(
         ("bam",): {
             "help": "input tailpuller file"
         },
+        ("-f", "--flags"): {
+            "help": "process only entries with all these sam flags present",
+            "default": "0", "type": str, "metavar": "f"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only entries with none of these sam flags present",
+            "default": "0", "type": str, "metavar": "F"
+        },
+        ("-q", "--min-quality"): {
+            "help": "process only entries with MAPQ >= Q",
+            "default": 0, "type": int, "metavar": "Q"
+        },
         ("-r", "--reference"): {
             "help": "reference FASTA (with .fai and .ecx indices)",
             "required": True, "metavar": "R", "default": "no default, required"

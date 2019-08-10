@@ -61,9 +61,9 @@ def natsorted_chromosomes(chromosomes):
         return sorted(chromosomes)
 
 
-def entry_filters_ok(entry_flag, entry_mapq, flags, flag_filter, min_mapq):
+def entry_filters_ok(entry_flag, entry_mapq, flags, flag_filter, min_quality):
     """Check if entry flags and mapq pass filters"""
-    passes_quality = (entry_mapq is None) or (entry_mapq >= min_mapq)
+    passes_quality = (entry_mapq is None) or (entry_mapq >= min_quality)
     if not passes_quality:
         return False
     else:
