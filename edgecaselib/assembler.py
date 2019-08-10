@@ -54,7 +54,7 @@ def find_minmax_pos(bam, chromosome, flags, flag_filter, min_quality, desc="find
         return None, None
 
 
-def assemble_around_chromosome(bam, chromosome, reference, kmer_size, flags, flag_filter, min_quality):
+def assemble_around_chromosome(bam, chromosome, reference, kmer_size, flags, flag_filter, min_quality, output_prefix):
     """Perform local reference-guided assembly on one chromosome"""
     minpos, maxpos = find_minmax_pos(
         bam, chromosome, flags, flag_filter, min_quality,
@@ -79,5 +79,6 @@ def main(bam, reference, flags, flag_filter, min_quality, kmer_size, chromosomes
     for chromosome in target_chromosomes:
         assemble_around_chromosome(
             bam, chromosome, reference, kmer_size,
-            interpret_flags(flags), interpret_flags(flag_filter), min_quality
+            interpret_flags(flags), interpret_flags(flag_filter), min_quality,
+            output_prefix
         )
