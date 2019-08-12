@@ -11,13 +11,6 @@ from functools import reduce
 from operator import __or__
 
 
-ECX_FLAGS = {
-    "ucsc_mask_anchor": 0x1000,
-    "fork": 0x2000,
-    "tract_anchor": 0x4000,
-    "is_q": 0x8000
-}
-
 FLAG_COLORS = {
     0x1000: "gray",
     0x2000: "red",
@@ -25,15 +18,16 @@ FLAG_COLORS = {
 }
 
 ALL_SAM_FLAGS = [
-    "paired", "mapped_pair", "unm", "mate_unm", "rev", "mate_rev",
-    "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
+    "paired", "mapped_proper_pair", "unmapped", "mate_unmapped",
+    "rev", "mate_rev", "1stmate", "2ndmate", "secondary",
+    "qcfail", "pcrdup", "supp",
     "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
 
-def explain_sam_flags(flag):
+def explain_sam_flags(flag, sep="|"):
     """Convert an integer flag into string"""
-    return ",".join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
+    return sep.join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
 
 
 def interpret_flags(flags):
@@ -49,8 +43,8 @@ def interpret_flags(flags):
     elif "|" in flags:
         flag_set = set(map(interpret_flags, flags.split("|")))
         return reduce(__or__, flag_set | {0})
-    elif flags in ECX_FLAGS:
-        return ECX_FLAGS[flags]
+    elif flags in ALL_SAM_FLAGS:
+        return 2**ALL_SAM_FLAGS.index(flags)
     else:
         raise ValueError("Unknown flags: {}".format(repr(flags)))
 
