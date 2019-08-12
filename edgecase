@@ -168,6 +168,10 @@ create_subparser(
             "help": "reference FASTA (with .fai and .ecx indices)",
             "required": True, "metavar": "R", "default": "no default, required"
         },
+        ("--reference-guided",): {
+            "help": "whether assembly should be reference guided",
+            "action": "store_true"
+        },
         ("-c", "--chromosomes"): {
             "help": "target chromosome(s) (if not specified, target all)",
             "default": None, "metavar": "C"
