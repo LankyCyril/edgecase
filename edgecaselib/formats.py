@@ -49,25 +49,27 @@ def interpret_flags(flags):
         raise ValueError("Unknown flags: {}".format(repr(flags)))
 
 
-def entry_filters_ok(entry_flag, entry_mapq, flags, flag_filter, min_quality):
+def entry_filters_ok(entry_flag, entry_mapq, integer_samfilters):
     """Check if entry flags and mapq pass filters"""
-    passes_quality = (entry_mapq is None) or (entry_mapq >= min_quality)
-    if not passes_quality:
+    if (entry_mapq is None) or (entry_flag is None):
+        return True
+    if entry_mapq < integer_samfilters[-1]:
         return False
     else:
-        return (entry_flag is None) or (
-            (entry_flag & flags == flags) and
-            (entry_flag & flag_filter == 0)
+        return (
+            (entry_flag & integer_samfilters[0] == integer_samfilters[0]) and
+            (entry_flag & integer_samfilters[1] == 0)
         )
 
 
-def filter_and_read_tsv(dat, gzipped, flags, flag_filter, min_quality):
+def filter_and_read_tsv(dat, gzipped, samfilters):
     """If filters supplied, subset DAT first, then read with pandas"""
     number_retained = 0
     if gzipped:
         opener = gzopen
     else:
         opener = open
+    integer_samfilters = list(map(interpret_flags, samfilters))
     with opener(dat, mode="rt") as dat_handle:
         with TemporaryDirectory() as tempdir:
             datflt_name = path.join(tempdir, "dat.gz")
@@ -81,8 +83,7 @@ def filter_and_read_tsv(dat, gzipped, flags, flag_filter, min_quality):
                     else:
                         fields = line.split("\t")
                         line_passes_filter = entry_filters_ok(
-                            int(fields[1]), int(fields[4]),
-                            flags, flag_filter, min_quality
+                            int(fields[1]), int(fields[4]), integer_samfilters
                         )
                         if line_passes_filter:
                             number_retained += 1
@@ -139,15 +140,13 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
     )
 
 
-def load_kmerscan(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_align, each_once=True):
+def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
-    if (flags == 0) and (flag_filter == 0) and (min_quality == 0):
+    if not any(samfilters): # all zero / None
         print("Loading DAT...", file=stderr, flush=True)
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
-        raw_densities = filter_and_read_tsv(
-            dat, gzipped, flags, flag_filter, min_quality
-        )
+        raw_densities = filter_and_read_tsv(dat, gzipped, samfilters)
     if each_once:
         raw_densities["length"] = raw_densities["density"].apply(
             lambda d: d.count(",")+1
@@ -204,13 +203,12 @@ def ReadFileChain(filenames, manager):
         ))
 
 
-def filter_bam(alignment, flags, flag_filter, min_quality, desc=None):
+def filter_bam(alignment, samfilters, desc=None):
     """Wrap alignment iterator with a flag and quality filter"""
+    integer_samfilters = list(map(interpret_flags, samfilters))
     filtered_iterator = (
         entry for entry in alignment
-        if entry_filters_ok(
-            entry.flag, entry.mapq, flags, flag_filter, min_quality
-        )
+        if entry_filters_ok(entry.flag, entry.mapq, integer_samfilters)
     )
     if desc is None:
         return filtered_iterator

@@ -37,12 +37,12 @@ def count_kmers(sequence, k, with_ordered=False, desc=None):
         return dict(counts)
 
 
-def find_minmax_pos(bam, chromosome, flags, flag_filter, min_quality, desc="find_minmax_pos"):
+def find_minmax_pos(bam, chromosome, samfilters, desc="find_minmax_pos"):
     """Determine leftmost and rightmost mapping positions in given chunk of the tailpuller file"""
     minpos, maxpos = float("inf"), 0
     with AlignmentFile(bam) as alignment:
         entry_iterator = filter_bam(
-            alignment.fetch(chromosome), flags, flag_filter, min_quality,
+            alignment.fetch(chromosome), samfilters,
             desc=desc
         )
         for entry in entry_iterator:
@@ -54,10 +54,10 @@ def find_minmax_pos(bam, chromosome, flags, flag_filter, min_quality, desc="find
         return None, None
 
 
-def assemble_around_chromosome(bam, chromosome, reference, kmer_size, flags, flag_filter, min_quality, output_prefix):
+def assemble_around_chromosome(bam, chromosome, reference, kmer_size, samfilters, output_prefix):
     """Perform local reference-guided assembly on one chromosome"""
     minpos, maxpos = find_minmax_pos(
-        bam, chromosome, flags, flag_filter, min_quality,
+        bam, chromosome, samfilters,
         desc="determining min/max positions on {}".format(chromosome)
     )
     if minpos and maxpos:
@@ -79,6 +79,6 @@ def main(bam, reference, flags, flag_filter, min_quality, kmer_size, chromosomes
     for chromosome in target_chromosomes:
         assemble_around_chromosome(
             bam, chromosome, reference, kmer_size,
-            interpret_flags(flags), interpret_flags(flag_filter), min_quality,
+            [flags, flag_filter, min_quality],
             output_prefix
         )

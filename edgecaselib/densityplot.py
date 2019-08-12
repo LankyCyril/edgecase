@@ -136,12 +136,11 @@ def plot_densities(densities, ecx, bin_size, no_align, title, flags=None, flag_f
                 pdf.savefig(page, bbox_inches="tight")
 
 
-def main(dat, gzipped=None, index=None, flags=0, flag_filter=3844, min_quality=0, bin_size=100, no_align=False, title=None, file=stdout.buffer, **kwargs):
+def main(dat, gzipped=None, index=None, flags=0, flag_filter=0, min_quality=0, bin_size=100, no_align=False, title=None, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     ecx = load_index(index)
     densities = load_kmerscan(
-        dat, gzipped, interpret_flags(flags), interpret_flags(flag_filter),
-        min_quality, bin_size, no_align
+        dat, gzipped, [flags, flag_filter, min_quality], bin_size, no_align
     )
     if title is None:
         title = path.split(dat)[-1]
