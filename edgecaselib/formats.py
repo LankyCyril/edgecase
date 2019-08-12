@@ -7,6 +7,7 @@ from os import path
 from tqdm import tqdm
 from functools import reduce
 from operator import __or__
+from edgecaselib.util import entry_filters_ok
 
 
 ECX_FLAGS = {
@@ -34,18 +35,6 @@ def explain_sam_flags(flag):
     return ",".join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
 
 
-def passes_filter(entry_flag, entry_mapq, flags, flag_filter, min_quality):
-    """Check if entry flags pass filters"""
-    passes_quality = (entry_mapq is None) or (entry_mapq >= min_quality)
-    if not passes_quality:
-        return False
-    else:
-        return (entry_flag is None) or (
-            (entry_flag & flags == flags) and
-            (entry_flag & flag_filter == 0)
-        )
-
-
 def filter_and_read_csv(dat, gzipped, flags, flag_filter, min_quality):
     """If filters supplied, subset DAT first, then read with pandas"""
     number_retained = 0
@@ -65,7 +54,7 @@ def filter_and_read_csv(dat, gzipped, flags, flag_filter, min_quality):
                         print(line, end="", file=datflt)
                     else:
                         fields = line.split("\t")
-                        line_passes_filter = passes_filter(
+                        line_passes_filter = entry_filters_ok(
                             int(fields[1]), int(fields[4]),
                             flags, flag_filter, min_quality
                         )

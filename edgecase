@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
+import edgecaselib
 
 
 def WideHelpFormatter(prog):
@@ -137,9 +137,46 @@ create_subparser(
     }
 )
 
+create_subparser(
+    subparsers, "assembler", help="assemble haplotypes at ends of chromosomes",
+    usage="{} assembler [options] bam".format(__file__),
+    rules={
+        ("bam",): {
+            "help": "input tailpuller file"
+        },
+        ("-f", "--flags"): {
+            "help": "process only entries with all these sam flags present",
+            "default": "0", "type": str, "metavar": "f"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only entries with none of these sam flags present",
+            "default": "0", "type": str, "metavar": "F"
+        },
+        ("-q", "--min-quality"): {
+            "help": "process only entries with MAPQ >= Q",
+            "default": 0, "type": int, "metavar": "Q"
+        },
+        ("-r", "--reference"): {
+            "help": "reference FASTA (with .fai and .ecx indices)",
+            "required": True, "metavar": "R", "default": "no default, required"
+        },
+        ("-c", "--chromosomes"): {
+            "help": "target chromosome(s) (if not specified, target all)",
+            "default": None, "metavar": "C"
+        },
+        ("-k", "--kmer-size"): {
+            "help": "kmer size used for assembly",
+            "default": 6, "type": int, "metavar": "K"
+        },
+        ("-o", "--output-prefix"): {
+            "help": "output prefix",
+            "required": True, "metavar": "O", "default": "no default, required"
+        }
+    }
+)
 
 kwargs = dict(parser.parse_args()._get_kwargs())
 if kwargs["subparser"] in subparsers.choices:
-    globals()[kwargs["subparser"]].main(**kwargs)
+    getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
 else:
     exit(parser.print_help() or 1)
