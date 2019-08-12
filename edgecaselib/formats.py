@@ -208,3 +208,17 @@ def ReadFileChain(filenames, manager):
             stack.enter_context(manager(filename))
             for filename in filenames
         ))
+
+
+def filter_bam(alignment, flags, flag_filter, min_quality, desc=None):
+    """Wrap alignment iterator with a flag and quality filter"""
+    filtered_iterator = (
+        entry for entry in alignment
+        if entry_filters_ok(
+            entry.flag, entry.mapq, flags, flag_filter, min_quality
+        )
+    )
+    if desc is None:
+        return filtered_iterator
+    else:
+        return tqdm(filtered_iterator, desc=desc, unit="read")

@@ -1,6 +1,6 @@
 from sys import stdout
 from edgecaselib.util import natsorted_chromosomes
-from edgecaselib.formats import interpret_flags, entry_filters_ok
+from edgecaselib.formats import interpret_flags, filter_bam
 from pysam import FastaFile, AlignmentFile
 from collections import defaultdict
 from tqdm import tqdm
@@ -41,13 +41,13 @@ def find_minmax_pos(bam, chromosome, flags, flag_filter, min_quality, desc="find
     """Determine leftmost and rightmost mapping positions in given chunk of the tailpuller file"""
     minpos, maxpos = float("inf"), 0
     with AlignmentFile(bam) as alignment:
-        for entry in tqdm(alignment.fetch(chromosome), desc=desc):
-            passes_filters = entry_filters_ok(
-                entry.flag, entry.mapq, flags, flag_filter, min_quality
-            )
-            if passes_filters:
-                minpos = min(minpos, entry.reference_start)
-                maxpos = max(maxpos, entry.reference_end)
+        entry_iterator = filter_bam(
+            alignment.fetch(chromosome), flags, flag_filter, min_quality,
+            desc=desc
+        )
+        for entry in entry_iterator:
+            minpos = min(minpos, entry.reference_start)
+            maxpos = max(maxpos, entry.reference_end)
     if minpos < maxpos:
         return minpos, maxpos
     else:
