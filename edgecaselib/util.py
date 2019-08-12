@@ -1,6 +1,4 @@
 from sys import stderr
-from contextlib import contextmanager, ExitStack
-from itertools import chain
 from regex import compile
 from re import split
 
@@ -13,16 +11,6 @@ ALPHABET = list("ACGT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
 MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}
 MOTIF_COMPLEMENT_PATTERN = compile(r'|'.join(MOTIF_COMPLEMENTS.keys()))
-
-
-@contextmanager
-def ReadFileChain(filenames, manager):
-    """Chain records from all filenames in list bams, replicating behavior of pysam context managers"""
-    with ExitStack() as stack:
-        yield chain(*(
-            stack.enter_context(manager(filename))
-            for filename in filenames
-        ))
 
 
 def motif_revcomp(motif, ignorecase=True):
@@ -59,15 +47,3 @@ def natsorted_chromosomes(chromosomes):
         print("Warning: " + msg, file=stderr)
         print("The error was: '{}'".format(e), file=stderr)
         return sorted(chromosomes)
-
-
-def entry_filters_ok(entry_flag, entry_mapq, flags, flag_filter, min_quality):
-    """Check if entry flags and mapq pass filters"""
-    passes_quality = (entry_mapq is None) or (entry_mapq >= min_quality)
-    if not passes_quality:
-        return False
-    else:
-        return (entry_flag is None) or (
-            (entry_flag & flags == flags) and
-            (entry_flag & flag_filter == 0)
-        )

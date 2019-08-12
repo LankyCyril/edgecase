@@ -1,6 +1,6 @@
 from sys import stdout
-from edgecaselib.util import natsorted_chromosomes, entry_filters_ok
-from edgecaselib.formats import interpret_flags
+from edgecaselib.util import natsorted_chromosomes
+from edgecaselib.formats import interpret_flags, entry_filters_ok
 from pysam import FastaFile, AlignmentFile
 from collections import defaultdict
 from tqdm import tqdm

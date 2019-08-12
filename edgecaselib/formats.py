@@ -1,4 +1,6 @@
 from sys import stderr
+from contextlib import contextmanager, ExitStack
+from itertools import chain
 from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
 from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
@@ -7,7 +9,6 @@ from os import path
 from tqdm import tqdm
 from functools import reduce
 from operator import __or__
-from edgecaselib.util import entry_filters_ok
 
 
 ECX_FLAGS = {
@@ -35,7 +36,38 @@ def explain_sam_flags(flag):
     return ",".join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
 
 
-def filter_and_read_csv(dat, gzipped, flags, flag_filter, min_quality):
+def interpret_flags(flags):
+    """If flags are not a decimal number, assume strings and convert to number"""
+    if isinstance(flags, int) or flags.isdigit():
+        return int(flags)
+    elif not isinstance(flags, str):
+        raise ValueError("Unknown flags: {}".format(repr(flags)))
+    elif flags[:2] == "0x":
+        return int(flags, 16)
+    elif flags[:2] == "0b":
+        return int(flags, 2)
+    elif "|" in flags:
+        flag_set = set(map(interpret_flags, flags.split("|")))
+        return reduce(__or__, flag_set | {0})
+    elif flags in ECX_FLAGS:
+        return ECX_FLAGS[flags]
+    else:
+        raise ValueError("Unknown flags: {}".format(repr(flags)))
+
+
+def entry_filters_ok(entry_flag, entry_mapq, flags, flag_filter, min_quality):
+    """Check if entry flags and mapq pass filters"""
+    passes_quality = (entry_mapq is None) or (entry_mapq >= min_quality)
+    if not passes_quality:
+        return False
+    else:
+        return (entry_flag is None) or (
+            (entry_flag & flags == flags) and
+            (entry_flag & flag_filter == 0)
+        )
+
+
+def filter_and_read_tsv(dat, gzipped, flags, flag_filter, min_quality):
     """If filters supplied, subset DAT first, then read with pandas"""
     number_retained = 0
     if gzipped:
@@ -119,7 +151,7 @@ def load_kmerscan(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_al
         print("Loading DAT...", file=stderr, flush=True)
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
-        raw_densities = filter_and_read_csv(
+        raw_densities = filter_and_read_tsv(
             dat, gzipped, flags, flag_filter, min_quality
         )
     if each_once:
@@ -144,25 +176,6 @@ def load_kmerscan(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_al
     }
 
 
-def interpret_flags(flags):
-    """If flags are not a decimal number, assume strings and convert to number"""
-    if isinstance(flags, int) or flags.isdigit():
-        return int(flags)
-    elif not isinstance(flags, str):
-        raise ValueError("Unknown flags: {}".format(repr(flags)))
-    elif flags[:2] == "0x":
-        return int(flags, 16)
-    elif flags[:2] == "0b":
-        return int(flags, 2)
-    elif "|" in flags:
-        flag_set = set(map(interpret_flags, flags.split("|")))
-        return reduce(__or__, flag_set | {0})
-    elif flags in ECX_FLAGS:
-        return ECX_FLAGS[flags]
-    else:
-        raise ValueError("Unknown flags: {}".format(repr(flags)))
-
-
 def load_index(index_filename, as_filter_dict=False):
     """Load ECX index; convert to simpler dictionary for filtering if requested"""
     if not path.isfile(index_filename):
@@ -185,3 +198,13 @@ def load_index(index_filename, as_filter_dict=False):
             }
         else:
             return ecx
+
+
+@contextmanager
+def ReadFileChain(filenames, manager):
+    """Chain records from all filenames in list bams, replicating behavior of pysam context managers"""
+    with ExitStack() as stack:
+        yield chain(*(
+            stack.enter_context(manager(filename))
+            for filename in filenames
+        ))
