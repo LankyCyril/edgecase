@@ -83,7 +83,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
     meta_ax.set(xlim=(0, max_mapq))
 
 
-def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_align, title, flags, flag_filter, min_quality):
+def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_align, title, flags, flags_any, flag_filter, min_quality):
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(len(names), chrom, max_mapq)
@@ -109,13 +109,13 @@ def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_ali
                 pos, -.2, 1.2, ls="--", lw=4,
                 c=FLAG_COLORS[flag], alpha=.4
             )
-    axs[0, 0].set(title="{}\n-f={} -F={} -q={}".format(
-        title, flags, flag_filter, min_quality
+    axs[0, 0].set(title="{}\n-f={} -g={} -F={} -q={}".format(
+        title, flags, flags_any, flag_filter, min_quality
     ))
     return page
 
 
-def plot_densities(densities, ecx, bin_size, no_align, title, flags=None, flag_filter=None, min_quality=0, file=stdout.buffer):
+def plot_densities(densities, ecx, bin_size, no_align, title, flags=None, flags_any=None, flag_filter=None, min_quality=0, file=stdout.buffer):
     """Plot binned densities as a heatmap"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
     sorted_chromosomes = natsorted_chromosomes(densities.keys())
@@ -131,21 +131,21 @@ def plot_densities(densities, ecx, bin_size, no_align, title, flags=None, flag_f
             for chrom, binned_density_dataframe in decorated_densities_iterator:
                 page = chromosome_motif_plot(
                     binned_density_dataframe, ecx, chrom, max_mapq, no_align,
-                    title, flags, flag_filter, min_quality
+                    title, flags, flags_any, flag_filter, min_quality
                 )
                 pdf.savefig(page, bbox_inches="tight")
 
 
-def main(dat, gzipped=None, index=None, flags=0, flag_filter=0, min_quality=0, bin_size=100, no_align=False, title=None, file=stdout.buffer, **kwargs):
+def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, no_align, title, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     ecx = load_index(index)
     densities = load_kmerscan(
-        dat, gzipped, [flags, flag_filter, min_quality], bin_size, no_align
+        dat, gzipped, [flags, flags_any, flag_filter, min_quality], bin_size, no_align
     )
     if title is None:
         title = path.split(dat)[-1]
     plot_densities(
         densities, ecx, bin_size, no_align,
-        title, flags, flag_filter, min_quality,
+        title, flags, flags_any, flag_filter, min_quality,
         file
     )

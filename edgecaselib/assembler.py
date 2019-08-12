@@ -69,7 +69,7 @@ def assemble_around_chromosome(bam, chromosome, reference, kmer_size, samfilters
             )
 
 
-def main(bam, reference, flags, flag_filter, min_quality, kmer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
+def main(bam, reference, flags, flags_any, flag_filter, min_quality, kmer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
     if chromosomes:
         target_chromosomes = natsorted_chromosomes(chromosomes.split("|"))
@@ -79,6 +79,6 @@ def main(bam, reference, flags, flag_filter, min_quality, kmer_size, chromosomes
     for chromosome in target_chromosomes:
         assemble_around_chromosome(
             bam, chromosome, reference, kmer_size,
-            [flags, flag_filter, min_quality],
+            [flags, flags_any, flag_filter, min_quality],
             output_prefix
         )

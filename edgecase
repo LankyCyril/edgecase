@@ -116,6 +116,10 @@ create_subparser(
             "help": "process only entries with all these sam flags present",
             "default": "0", "type": str, "metavar": "f"
         },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
+        },
         ("-F", "--flag-filter"): {
             "help": "process only entries with none of these sam flags present",
             "default": "0", "type": str, "metavar": "F"
@@ -147,6 +151,10 @@ create_subparser(
         ("-f", "--flags"): {
             "help": "process only entries with all these sam flags present",
             "default": "0", "type": str, "metavar": "f"
+        },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
         },
         ("-F", "--flag-filter"): {
             "help": "process only entries with none of these sam flags present",
