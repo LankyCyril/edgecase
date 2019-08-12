@@ -1,6 +1,6 @@
 from sys import stdout
 from edgecaselib.formats import load_index, load_kmerscan
-from edgecaselib.formats import interpret_flags, FLAG_COLORS, explain_sam_flags
+from edgecaselib.formats import FLAG_COLORS, explain_sam_flags
 from edgecaselib.util import natsorted_chromosomes
 from matplotlib.pyplot import subplots, rc_context
 from matplotlib.backends.backend_pdf import PdfPages
