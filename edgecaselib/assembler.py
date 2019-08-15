@@ -15,8 +15,8 @@ def get_reference_seq(reference, chromosome, minpos=None, maxpos=None):
             return None
 
 
-def collect_unique_kmers(sequence, k, desc=None):
-    """Count kmers in sequence; optionally return them in order (useful for reference sequences)"""
+def collect_unique_kmers(sequence, k, desc=None, dinvert=False):
+    """Collect identities and positions of unique k-mers in a sequence"""
     kmer_table, repeated_kmers = {}, set()
     if desc:
         sequence_iterator = tqdm(sequence[k:], desc=desc)
@@ -32,7 +32,10 @@ def collect_unique_kmers(sequence, k, desc=None):
                 del kmer_table[kmer]
             else:
                 kmer_table[kmer] = pos
-    return kmer_table
+    if dinvert:
+        return {p: m for m, p in kmer_table.items()}
+    else:
+        return kmer_table
 
 
 def find_minmax_pos(bam, chromosome, samfilters, desc="find_minmax_pos"):
