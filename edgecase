@@ -178,7 +178,7 @@ create_subparser(
         },
         ("-k", "--kmer-size"): {
             "help": "kmer size used for assembly",
-            "default": 6, "type": int, "metavar": "K"
+            "default": 15, "type": int, "metavar": "K"
         },
         ("-o", "--output-prefix"): {
             "help": "output prefix",
