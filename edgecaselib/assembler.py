@@ -8,6 +8,7 @@ from pandas import Series
 from numpy import percentile
 from networkx import DiGraph, compose
 from functools import reduce
+from itertools import count
 
 
 def collect_sequence_unimers(sequence, k, desc=None):
@@ -69,12 +70,8 @@ def filter_unimer_database(unimer_database, cutoff_percentile=95):
     }
 
 
-def assemble_related_reads(bam, chromosome, unimer_size, samfilters, output_prefix):
-    """Perform local assembly on one chromosome arm"""
-    raw_unimer_database = build_unimer_database(
-        bam, samfilters, chromosome, unimer_size
-    )
-    unimer_database = filter_unimer_database(raw_unimer_database)
+def compose_raw_assembly_graph(unimer_database):
+    """String reads through retained unimers and glue paths together"""
     decorated_readgraph_iterator = tqdm(
         unimer_database.items(), desc="Building read paths", unit="read"
     )
@@ -86,8 +83,48 @@ def assemble_related_reads(bam, chromosome, unimer_size, samfilters, output_pref
     raw_assembly_graph = reduce(
         compose, tqdm(paths, desc="Gluing read paths", unit="read")
     )
-    print("Nodes in raw assembly graph:", len(raw_assembly_graph.nodes()))
-    print("Edges in raw assembly graph:", len(raw_assembly_graph.edges()))
+    msg = "Raw assembly graph: N={}, E={}".format(
+        len(raw_assembly_graph.nodes()), len(raw_assembly_graph.edges())
+    )
+    print(msg, file=stderr)
+    return raw_assembly_graph
+
+
+def reduce_transitive_edges(G):
+    """Reduce transitive edges"""
+    for _ in tqdm(count(), desc="Reducing transitive edges", unit="pass"):
+        node_pool = list(G.nodes())
+        for node in node_pool:
+            if (G.in_degree(node) == 1) and (G.out_degree(node) == 1):
+                parent = next(G.predecessors(node))
+                child = next(G.successors(node))
+                G.remove_edge(parent, node)
+                G.remove_edge(node, child)
+                assert G.degree(node) == 0
+                G.remove_node(node)
+                G.add_edge(parent, child)
+        if len(G.nodes()) == len(node_pool):
+            return G
+
+
+def simplify_assembly_graph(assembly_graph):
+    """Reduce transitive edges and maybe something more"""
+    reduced_assembly_graph = reduce_transitive_edges(assembly_graph)
+    msg = "Simplified assembly graph: N={}, E={}".format(
+        len(reduced_assembly_graph.nodes()), len(reduced_assembly_graph.edges())
+    )
+    print(msg, file=stderr)
+    return reduced_assembly_graph
+
+
+def assemble_related_reads(bam, chromosome, unimer_size, samfilters, output_prefix):
+    """Perform local assembly on one chromosome arm"""
+    raw_unimer_database = build_unimer_database(
+        bam, samfilters, chromosome, unimer_size
+    )
+    unimer_database = filter_unimer_database(raw_unimer_database)
+    raw_assembly_graph = compose_raw_assembly_graph(unimer_database)
+    assembly_graph = simplify_assembly_graph(raw_assembly_graph)
 
 
 def main(bam, index, flags, flags_any, flag_filter, min_quality, unimer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
