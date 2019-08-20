@@ -6,6 +6,8 @@ from collections import OrderedDict, defaultdict
 from tqdm import tqdm
 from pandas import Series
 from numpy import percentile
+from networkx import DiGraph, compose
+from functools import reduce
 
 
 def collect_sequence_unimers(sequence, k, desc=None):
@@ -73,6 +75,19 @@ def assemble_related_reads(bam, chromosome, unimer_size, samfilters, output_pref
         bam, samfilters, chromosome, unimer_size
     )
     unimer_database = filter_unimer_database(raw_unimer_database)
+    decorated_readgraph_iterator = tqdm(
+        unimer_database.items(), desc="Building read paths", unit="read"
+    )
+    paths = []
+    for name, p2u in decorated_readgraph_iterator:
+        path, nodes = DiGraph(), list(p2u.values())
+        path.add_edges_from(zip(nodes, nodes[1:]))
+        paths.append(path)
+    raw_assembly_graph = reduce(
+        compose, tqdm(paths, desc="Gluing read paths", unit="read")
+    )
+    print("Nodes in raw assembly graph:", len(raw_assembly_graph.nodes()))
+    print("Edges in raw assembly graph:", len(raw_assembly_graph.edges()))
 
 
 def main(bam, index, flags, flags_any, flag_filter, min_quality, unimer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
