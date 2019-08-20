@@ -1,6 +1,6 @@
 from sys import stdout, stderr
 from types import SimpleNamespace
-from edgecaselib.util import ReadFileChain
+from edgecaselib.formats import ReadFileChain
 from pysam import AlignmentFile
 from re import search, split
 

@@ -116,6 +116,10 @@ create_subparser(
             "help": "process only entries with all these sam flags present",
             "default": "0", "type": str, "metavar": "f"
         },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
+        },
         ("-F", "--flag-filter"): {
             "help": "process only entries with none of these sam flags present",
             "default": "0", "type": str, "metavar": "F"
@@ -148,6 +152,10 @@ create_subparser(
             "help": "process only entries with all these sam flags present",
             "default": "0", "type": str, "metavar": "f"
         },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
+        },
         ("-F", "--flag-filter"): {
             "help": "process only entries with none of these sam flags present",
             "default": "0", "type": str, "metavar": "F"
@@ -160,13 +168,17 @@ create_subparser(
             "help": "reference FASTA (with .fai and .ecx indices)",
             "required": True, "metavar": "R", "default": "no default, required"
         },
+        ("--reference-guided",): {
+            "help": "whether assembly should be reference guided",
+            "action": "store_true"
+        },
         ("-c", "--chromosomes"): {
             "help": "target chromosome(s) (if not specified, target all)",
             "default": None, "metavar": "C"
         },
         ("-k", "--kmer-size"): {
             "help": "kmer size used for assembly",
-            "default": 6, "type": int, "metavar": "K"
+            "default": 15, "type": int, "metavar": "K"
         },
         ("-o", "--output-prefix"): {
             "help": "output prefix",

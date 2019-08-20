@@ -1,9 +1,9 @@
 from sys import stdout
-from edgecaselib.util import natsorted_chromosomes, entry_filters_ok
-from edgecaselib.formats import interpret_flags
+from edgecaselib.util import natsorted_chromosomes
+from edgecaselib.formats import filter_bam
 from pysam import FastaFile, AlignmentFile
-from collections import defaultdict
 from tqdm import tqdm
+from pickle import dump
 
 
 def get_reference_seq(reference, chromosome, minpos=None, maxpos=None):
@@ -15,61 +15,76 @@ def get_reference_seq(reference, chromosome, minpos=None, maxpos=None):
             return None
 
 
-def count_kmers(sequence, k, with_ordered=False, desc=None):
-    """Count kmers in sequence; optionally return them in order (useful for reference sequences)"""
-    counts, ordered_kmers = defaultdict(int), []
+def collect_unique_kmers(sequence, k, desc=None, dinvert=False):
+    """Collect identities and positions of unique k-mers in a sequence"""
+    kmer_table, repeated_kmers = {}, set()
     if desc:
         sequence_iterator = tqdm(sequence[k:], desc=desc)
     else:
         sequence_iterator = iter(sequence[k:])
     kmer = sequence[:k].upper()
-    counts[kmer] = 1
-    if with_ordered:
-        ordered_kmers.append(kmer)
-    for base in sequence_iterator:
+    kmer_table[kmer] = 0
+    for pos, base in enumerate(sequence_iterator, start=1):
         kmer = kmer[1:] + base.upper()
-        counts[kmer] += 1
-        if with_ordered:
-            ordered_kmers.append(kmer)
-    if with_ordered:
-        return dict(counts), ordered_kmers
+        if kmer not in repeated_kmers:
+            if kmer in kmer_table:
+                repeated_kmers.add(kmer)
+                del kmer_table[kmer]
+            else:
+                kmer_table[kmer] = pos
+    if dinvert:
+        return {p: m for m, p in kmer_table.items()}
     else:
-        return dict(counts)
+        return kmer_table
 
 
-def find_minmax_pos(bam, chromosome, flags, flag_filter, min_quality, desc="find_minmax_pos"):
+def find_minmax_pos(bam, chromosome, samfilters, desc="find_minmax_pos"):
     """Determine leftmost and rightmost mapping positions in given chunk of the tailpuller file"""
     minpos, maxpos = float("inf"), 0
     with AlignmentFile(bam) as alignment:
-        for entry in tqdm(alignment.fetch(chromosome), desc=desc):
-            passes_filters = entry_filters_ok(
-                entry.flag, entry.mapq, flags, flag_filter, min_quality
-            )
-            if passes_filters:
-                minpos = min(minpos, entry.reference_start)
-                maxpos = max(maxpos, entry.reference_end)
+        entry_iterator = filter_bam(
+            alignment.fetch(chromosome), samfilters, desc=desc
+        )
+        for entry in entry_iterator:
+            minpos = min(minpos, entry.reference_start)
+            maxpos = max(maxpos, entry.reference_end)
     if minpos < maxpos:
         return minpos, maxpos
     else:
         return None, None
 
 
-def assemble_around_chromosome(bam, chromosome, reference, kmer_size, flags, flag_filter, min_quality, output_prefix):
+def assemble_around_chromosome(bam, chromosome, reference, reference_guided, kmer_size, samfilters, output_prefix):
     """Perform local reference-guided assembly on one chromosome"""
+    pickle_prefix = "{}-{}-{:02d}k".format(output_prefix, chromosome, kmer_size)
     minpos, maxpos = find_minmax_pos(
-        bam, chromosome, flags, flag_filter, min_quality,
+        bam, chromosome, samfilters,
         desc="determining min/max positions on {}".format(chromosome)
     )
     if minpos and maxpos:
         reference_seq = get_reference_seq(reference, chromosome, minpos, maxpos)
-        if reference_seq:
-            reference_kmers, ordered_reference_kmers = count_kmers(
-                reference_seq, kmer_size, with_ordered=True,
+        if reference_guided and reference_seq:
+            reference_kmers = collect_unique_kmers(
+                reference_seq, kmer_size,
                 desc="Counting kmers in {}".format(chromosome)
             )
+            with open(pickle_prefix + "-ref_kmers.pkl", mode="wb") as pkl:
+                dump(reference_kmers, pkl)
+        read_kmers = {}
+        with AlignmentFile(bam) as alignment:
+            decorated_entry_iterator = filter_bam(
+                alignment.fetch(chromosome), samfilters,
+                desc="Counting kmers in reads mapped to {}".format(chromosome)
+            )
+            for entry in decorated_entry_iterator:
+                read_kmers[entry.qname] = collect_unique_kmers(
+                    entry.seq, kmer_size
+                )
+        with open(pickle_prefix + "-read_kmers.pkl", mode="wb") as pkl:
+            dump(read_kmers, pkl)
 
 
-def main(bam, reference, flags, flag_filter, min_quality, kmer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
+def main(bam, reference, reference_guided, flags, flags_any, flag_filter, min_quality, kmer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
     if chromosomes:
         target_chromosomes = natsorted_chromosomes(chromosomes.split("|"))
@@ -78,7 +93,7 @@ def main(bam, reference, flags, flag_filter, min_quality, kmer_size, chromosomes
             target_chromosomes = natsorted_chromosomes(fa.references)
     for chromosome in target_chromosomes:
         assemble_around_chromosome(
-            bam, chromosome, reference, kmer_size,
-            interpret_flags(flags), interpret_flags(flag_filter), min_quality,
+            bam, chromosome, reference, reference_guided, kmer_size,
+            [flags, flags_any, flag_filter, min_quality],
             output_prefix
         )

@@ -1,4 +1,6 @@
 from sys import stderr
+from contextlib import contextmanager, ExitStack
+from itertools import chain
 from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
 from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
@@ -7,15 +9,7 @@ from os import path
 from tqdm import tqdm
 from functools import reduce
 from operator import __or__
-from edgecaselib.util import entry_filters_ok
 
-
-ECX_FLAGS = {
-    "ucsc_mask_anchor": 0x1000,
-    "fork": 0x2000,
-    "tract_anchor": 0x4000,
-    "is_q": 0x8000
-}
 
 FLAG_COLORS = {
     0x1000: "gray",
@@ -24,24 +18,62 @@ FLAG_COLORS = {
 }
 
 ALL_SAM_FLAGS = [
-    "paired", "mapped_pair", "unm", "mate_unm", "rev", "mate_rev",
-    "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
+    "paired", "mapped_proper_pair", "unmapped", "mate_unmapped",
+    "rev", "mate_rev", "1stmate", "2ndmate", "secondary",
+    "qcfail", "pcrdup", "supp",
     "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
 
-def explain_sam_flags(flag):
+def explain_sam_flags(flag, sep="|"):
     """Convert an integer flag into string"""
-    return ",".join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
+    return sep.join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
 
 
-def filter_and_read_csv(dat, gzipped, flags, flag_filter, min_quality):
+def interpret_flags(flags):
+    """If flags are not a decimal number, assume strings and convert to number"""
+    if isinstance(flags, int) or flags.isdigit():
+        return int(flags)
+    elif not isinstance(flags, str):
+        raise ValueError("Unknown flags: {}".format(repr(flags)))
+    elif flags[:2] == "0x":
+        return int(flags, 16)
+    elif flags[:2] == "0b":
+        return int(flags, 2)
+    elif "|" in flags:
+        flag_set = set(map(interpret_flags, flags.split("|")))
+        return reduce(__or__, flag_set | {0})
+    elif flags in ALL_SAM_FLAGS:
+        return 2**ALL_SAM_FLAGS.index(flags)
+    else:
+        raise ValueError("Unknown flags: {}".format(repr(flags)))
+
+
+def entry_filters_ok(entry_flag, entry_mapq, integer_samfilters):
+    """Check if entry flags and mapq pass filters"""
+    if (entry_mapq is None) or (entry_flag is None):
+        return True
+    if entry_mapq < integer_samfilters[-1]:
+        return False
+    else:
+        return (
+            # -f, flags (all must be present):
+            (entry_flag & integer_samfilters[0] == integer_samfilters[0]) and
+            # -g, flags_any (at least one must be present):
+            (entry_flag & integer_samfilters[1] != 0) and
+            # -F, flag_filter (all must be absent):
+            (entry_flag & integer_samfilters[2] == 0)
+        )
+
+
+def filter_and_read_tsv(dat, gzipped, samfilters):
     """If filters supplied, subset DAT first, then read with pandas"""
     number_retained = 0
     if gzipped:
         opener = gzopen
     else:
         opener = open
+    integer_samfilters = list(map(interpret_flags, samfilters))
     with opener(dat, mode="rt") as dat_handle:
         with TemporaryDirectory() as tempdir:
             datflt_name = path.join(tempdir, "dat.gz")
@@ -55,8 +87,7 @@ def filter_and_read_csv(dat, gzipped, flags, flag_filter, min_quality):
                     else:
                         fields = line.split("\t")
                         line_passes_filter = entry_filters_ok(
-                            int(fields[1]), int(fields[4]),
-                            flags, flag_filter, min_quality
+                            int(fields[1]), int(fields[4]), integer_samfilters
                         )
                         if line_passes_filter:
                             number_retained += 1
@@ -113,15 +144,13 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
     )
 
 
-def load_kmerscan(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_align, each_once=True):
+def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
-    if (flags == 0) and (flag_filter == 0) and (min_quality == 0):
+    if not any(samfilters): # all zero / None
         print("Loading DAT...", file=stderr, flush=True)
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
-        raw_densities = filter_and_read_csv(
-            dat, gzipped, flags, flag_filter, min_quality
-        )
+        raw_densities = filter_and_read_tsv(dat, gzipped, samfilters)
     if each_once:
         raw_densities["length"] = raw_densities["density"].apply(
             lambda d: d.count(",")+1
@@ -142,25 +171,6 @@ def load_kmerscan(dat, gzipped, flags, flag_filter, min_quality, bin_size, no_al
         )
         for chrom in chromosome_iterator
     }
-
-
-def interpret_flags(flags):
-    """If flags are not a decimal number, assume strings and convert to number"""
-    if isinstance(flags, int) or flags.isdigit():
-        return int(flags)
-    elif not isinstance(flags, str):
-        raise ValueError("Unknown flags: {}".format(repr(flags)))
-    elif flags[:2] == "0x":
-        return int(flags, 16)
-    elif flags[:2] == "0b":
-        return int(flags, 2)
-    elif "|" in flags:
-        flag_set = set(map(interpret_flags, flags.split("|")))
-        return reduce(__or__, flag_set | {0})
-    elif flags in ECX_FLAGS:
-        return ECX_FLAGS[flags]
-    else:
-        raise ValueError("Unknown flags: {}".format(repr(flags)))
 
 
 def load_index(index_filename, as_filter_dict=False):
@@ -185,3 +195,26 @@ def load_index(index_filename, as_filter_dict=False):
             }
         else:
             return ecx
+
+
+@contextmanager
+def ReadFileChain(filenames, manager):
+    """Chain records from all filenames in list bams, replicating behavior of pysam context managers"""
+    with ExitStack() as stack:
+        yield chain(*(
+            stack.enter_context(manager(filename))
+            for filename in filenames
+        ))
+
+
+def filter_bam(alignment, samfilters, desc=None):
+    """Wrap alignment iterator with a flag and quality filter"""
+    integer_samfilters = list(map(interpret_flags, samfilters))
+    filtered_iterator = (
+        entry for entry in alignment
+        if entry_filters_ok(entry.flag, entry.mapq, integer_samfilters)
+    )
+    if desc is None:
+        return filtered_iterator
+    else:
+        return tqdm(filtered_iterator, desc=desc, unit="read")
