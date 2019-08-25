@@ -1,84 +1,151 @@
-from sys import stdout
+from sys import stdout, stderr
 from edgecaselib.util import natsorted_chromosomes
-from edgecaselib.formats import filter_bam
-from pysam import FastaFile, AlignmentFile
-from collections import defaultdict
+from edgecaselib.formats import filter_bam, load_index
+from pysam import AlignmentFile
+from collections import OrderedDict, defaultdict
 from tqdm import tqdm
+from pandas import Series
+from numpy import percentile
+from networkx import DiGraph, compose
+from functools import reduce
+from itertools import count
 
 
-def get_reference_seq(reference, chromosome, minpos=None, maxpos=None):
-    """Pick out only the sequence of targeted chromosome"""
-    with FastaFile(reference) as reference_fasta:
-        if chromosome in reference_fasta:
-            return reference_fasta[chromosome][minpos:maxpos]
-        else:
-            return None
-
-
-def count_kmers(sequence, k, with_ordered=False, desc=None):
-    """Count kmers in sequence; optionally return them in order (useful for reference sequences)"""
-    counts, ordered_kmers = defaultdict(int), []
+def collect_sequence_unimers(sequence, k, desc=None):
+    """Collect identities and positions of unique k-mers in a sequence"""
+    pos2unimer, unimer2pos = OrderedDict(), {}
+    repeated_unimers = set()
     if desc:
-        sequence_iterator = tqdm(sequence[k:], desc=desc)
+        pos_iterator = tqdm(range(len(sequence)-k), desc=desc)
     else:
-        sequence_iterator = iter(sequence[k:])
-    kmer = sequence[:k].upper()
-    counts[kmer] = 1
-    if with_ordered:
-        ordered_kmers.append(kmer)
-    for base in sequence_iterator:
-        kmer = kmer[1:] + base.upper()
-        counts[kmer] += 1
-        if with_ordered:
-            ordered_kmers.append(kmer)
-    if with_ordered:
-        return dict(counts), ordered_kmers
-    else:
-        return dict(counts)
+        pos_iterator = range(len(sequence)-k)
+    for pos in pos_iterator:
+        unimer = sequence[pos:pos+k].upper()
+        if unimer not in repeated_unimers:
+            if unimer in unimer2pos:
+                repeated_unimers.add(unimer)
+                del pos2unimer[unimer2pos[unimer]]
+                del unimer2pos[unimer]
+            else:
+                unimer2pos[unimer] = pos
+                pos2unimer[pos] = unimer
+    return pos2unimer
 
 
-def find_minmax_pos(bam, chromosome, samfilters, desc="find_minmax_pos"):
-    """Determine leftmost and rightmost mapping positions in given chunk of the tailpuller file"""
-    minpos, maxpos = float("inf"), 0
+def build_unimer_database(bam, samfilters, chromosome, unimer_size):
+    """Collect identities and positions of unique k-mers in all reads"""
     with AlignmentFile(bam) as alignment:
-        entry_iterator = filter_bam(
+        decorated_entry_iterator = filter_bam(
             alignment.fetch(chromosome), samfilters,
-            desc=desc
+            desc="Collecting unimers for reads mapped to {}".format(chromosome)
         )
-        for entry in entry_iterator:
-            minpos = min(minpos, entry.reference_start)
-            maxpos = max(maxpos, entry.reference_end)
-    if minpos < maxpos:
-        return minpos, maxpos
-    else:
-        return None, None
+        return {
+            entry.qname: collect_sequence_unimers(entry.seq, unimer_size)
+            for entry in decorated_entry_iterator
+        }
 
 
-def assemble_around_chromosome(bam, chromosome, reference, kmer_size, samfilters, output_prefix):
-    """Perform local reference-guided assembly on one chromosome"""
-    minpos, maxpos = find_minmax_pos(
-        bam, chromosome, samfilters,
-        desc="determining min/max positions on {}".format(chromosome)
+def filter_unimer_database(unimer_database, cutoff_percentile=95):
+    """Remove infrequent unimers from database"""
+    decorated_count_iterator = tqdm(
+        unimer_database.items(), desc="Counting unimers", unit="read"
     )
-    if minpos and maxpos:
-        reference_seq = get_reference_seq(reference, chromosome, minpos, maxpos)
-        if reference_seq:
-            reference_kmers, ordered_reference_kmers = count_kmers(
-                reference_seq, kmer_size, with_ordered=True,
-                desc="Counting kmers in {}".format(chromosome)
-            )
+    unimer_counts = defaultdict(int)
+    for name, p2u in decorated_count_iterator:
+        for unimer in p2u.values():
+            unimer_counts[unimer] += 1
+    unimer_count_table = Series(unimer_counts)
+    print("Total unimers:", len(unimer_count_table), file=stderr)
+    count_filter = (
+        unimer_count_table >= percentile(unimer_count_table, cutoff_percentile)
+    )
+    frequent_unimers = set(unimer_count_table[count_filter].index)
+    print("Retained frequent unimers:", len(frequent_unimers), file=stderr)
+    decorated_filter_iterator = tqdm(
+        unimer_database.items(), desc="Filtering unimers", unit="read"
+    )
+    return {
+        name: {p: u for p, u in p2u.items() if u in frequent_unimers}
+        for name, p2u in decorated_filter_iterator
+    }
 
 
-def main(bam, reference, flags, flags_any, flag_filter, min_quality, kmer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
+def compose_raw_assembly_graph(unimer_database):
+    """String reads through retained unimers and glue paths together"""
+    decorated_readgraph_iterator = tqdm(
+        unimer_database.items(), desc="Building read paths", unit="read"
+    )
+    paths = []
+    for name, p2u in decorated_readgraph_iterator:
+        path, nodes = DiGraph(), list(p2u.values())
+        path.add_edges_from(zip(nodes, nodes[1:]))
+        paths.append(path)
+    raw_assembly_graph = reduce(
+        compose, tqdm(paths, desc="Gluing read paths", unit="read")
+    )
+    msg = "Raw assembly graph: N={}, E={}".format(
+        len(raw_assembly_graph.nodes()), len(raw_assembly_graph.edges())
+    )
+    print(msg, file=stderr)
+    return raw_assembly_graph
+
+
+def reduce_transitive_edges(G):
+    """Reduce transitive edges"""
+    for _ in tqdm(count(), desc="Reducing transitive edges", unit="pass"):
+        node_pool = list(G.nodes())
+        for node in node_pool:
+            if (G.in_degree(node) == 1) and (G.out_degree(node) == 1):
+                parent = next(G.predecessors(node))
+                child = next(G.successors(node))
+                G.remove_edge(parent, node)
+                G.remove_edge(node, child)
+                assert G.degree(node) == 0
+                G.remove_node(node)
+                G.add_edge(parent, child)
+        if len(G.nodes()) == len(node_pool):
+            return G
+
+
+def simplify_assembly_graph(assembly_graph):
+    """Reduce transitive edges and maybe something more"""
+    reduced_assembly_graph = reduce_transitive_edges(assembly_graph)
+    msg = "Simplified assembly graph: N={}, E={}".format(
+        len(reduced_assembly_graph.nodes()), len(reduced_assembly_graph.edges())
+    )
+    print(msg, file=stderr)
+    return reduced_assembly_graph
+
+
+def assemble_related_reads(bam, chromosome, unimer_size, samfilters, output_prefix):
+    """Perform local assembly on one chromosome arm"""
+    raw_unimer_database = build_unimer_database(
+        bam, samfilters, chromosome, unimer_size
+    )
+    unimer_database = filter_unimer_database(raw_unimer_database)
+    raw_assembly_graph = compose_raw_assembly_graph(unimer_database)
+    assembly_graph = simplify_assembly_graph(raw_assembly_graph)
+
+
+def main(bam, index, flags, flags_any, flag_filter, min_quality, unimer_size, chromosomes, output_prefix, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
     if chromosomes:
-        target_chromosomes = natsorted_chromosomes(chromosomes.split("|"))
+        chromosome_subset = set(chromosomes.split("|"))
     else:
-        with FastaFile(reference) as fa:
-            target_chromosomes = natsorted_chromosomes(fa.references)
-    for chromosome in target_chromosomes:
-        assemble_around_chromosome(
-            bam, chromosome, reference, kmer_size,
-            [flags, flags_any, flag_filter, min_quality],
-            output_prefix
-        )
+        chromosome_subset = set()
+    if index:
+        indexed_chromosomes = set(load_index(index)["rname"])
+    else:
+        indexed_chromosomes = set()
+    target_chromosomes = natsorted_chromosomes(
+        chromosome_subset & indexed_chromosomes
+    )
+    if not target_chromosomes:
+        raise ValueError("No usable chromosomes found")
+    else:
+        for chromosome in target_chromosomes:
+            assemble_related_reads(
+                bam, chromosome, unimer_size,
+                [flags, flags_any, flag_filter, min_quality],
+                output_prefix
+            )

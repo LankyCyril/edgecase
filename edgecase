@@ -164,17 +164,17 @@ create_subparser(
             "help": "process only entries with MAPQ >= Q",
             "default": 0, "type": int, "metavar": "Q"
         },
-        ("-r", "--reference"): {
-            "help": "reference FASTA (with .fai and .ecx indices)",
-            "required": True, "metavar": "R", "default": "no default, required"
+        ("-x", "--index"): {
+            "help": "location of the reference .ecx index",
+            "metavar": "X", "default": None
         },
         ("-c", "--chromosomes"): {
             "help": "target chromosome(s) (if not specified, target all)",
             "default": None, "metavar": "C"
         },
-        ("-k", "--kmer-size"): {
-            "help": "kmer size used for assembly",
-            "default": 6, "type": int, "metavar": "K"
+        ("-k", "--unimer-size"): {
+            "help": "unimer size used for assembly",
+            "default": 15, "type": int, "metavar": "K"
         },
         ("-o", "--output-prefix"): {
             "help": "output prefix",
