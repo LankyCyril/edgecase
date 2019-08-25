@@ -47,15 +47,36 @@ create_subparser(
 )
 
 create_subparser(
-    subparsers, "tailchopper", help="get clipped heads/tails of reads",
-    usage="{} tailchopper [options] bams > fasta".format(__file__),
+    subparsers, "tailchopper", help="get overhanging heads/tails of reads",
+    usage="{} tailchopper [options] bam > fasta".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
+        ("bam",): {
+            "help": "name of input BAM/SAM file"
         },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
+        ("-x", "--index"): {
+            "help": "location of the reference .ecx index",
+            "required": True, "metavar": "X", "default": "no default, required"
+        },
+        ("-f", "--flags"): {
+            "help": "process only entries with all these sam flags present",
+            "default": "0", "type": str, "metavar": "f"
+        },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only entries with none of these sam flags present",
+            "default": "0", "type": str, "metavar": "F"
+        },
+        ("-q", "--min-quality"): {
+            "help": "process only entries with MAPQ >= Q",
+            "default": 0, "type": int, "metavar": "Q"
+        },
+        ("-t", "--target"): {
+            "help": "either an ECX flag (cut relative to reference) or 'cigar'",
+            "default": "tract_anchor",
+            "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}
         }
     }
 )

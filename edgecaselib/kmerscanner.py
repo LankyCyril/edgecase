@@ -3,7 +3,7 @@ from regex import compile, IGNORECASE
 from numpy import zeros, array, cumsum
 from multiprocessing import Pool
 from edgecaselib.formats import ReadFileChain
-from edgecaselib.tailchopper import chop
+from edgecaselib.tailchopper import get_cigar_clip_length
 from pysam import AlignmentFile
 from types import SimpleNamespace
 from functools import partial
@@ -149,7 +149,8 @@ def main(readfiles, fmt="sam", motifs="TTAGGG", head_test=None, tail_test=None, 
                     meta_fields = [
                         entry.query_name, entry.flag, entry.reference_name,
                         entry.reference_start, entry.mapping_quality, motif,
-                        len(chop(entry, 5).sequence), len(chop(entry, 3).sequence)
+                        get_cigar_clip_length(entry, 5),
+                        get_cigar_clip_length(entry, 3)
                     ]
                     print(*meta_fields, sep="\t", end="\t", file=file)
                     print(*density_array, sep=",", file=file)
