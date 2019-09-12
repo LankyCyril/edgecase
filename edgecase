@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
+import edgecaselib
 
 
 def WideHelpFormatter(prog):
@@ -37,7 +37,7 @@ create_subparser(
         },
         ("-F", "--flag-filter"): {
             "help": "process only sam entries with none of these flags present",
-            "default": "3844", "type": str, "metavar": "F"
+            "default": "0", "type": str, "metavar": "F"
         },
         ("-m", "--max-read-length"): {
             "help": "max read length to consider when selecting lookup regions",
@@ -47,15 +47,36 @@ create_subparser(
 )
 
 create_subparser(
-    subparsers, "tailchopper", help="get clipped heads/tails of reads",
-    usage="{} tailchopper [options] bams > fasta".format(__file__),
+    subparsers, "tailchopper", help="get overhanging heads/tails of reads",
+    usage="{} tailchopper [options] bam > fasta".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)", "nargs": "+"
+        ("bam",): {
+            "help": "name of input BAM/SAM file"
         },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
+        ("-x", "--index"): {
+            "help": "location of the reference .ecx index",
+            "required": True, "metavar": "X", "default": "no default, required"
+        },
+        ("-f", "--flags"): {
+            "help": "process only entries with all these sam flags present",
+            "default": "0", "type": str, "metavar": "f"
+        },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only entries with none of these sam flags present",
+            "default": "0", "type": str, "metavar": "F"
+        },
+        ("-q", "--min-quality"): {
+            "help": "process only entries with MAPQ >= Q",
+            "default": 0, "type": int, "metavar": "Q"
+        },
+        ("-t", "--target"): {
+            "help": "either an ECX flag (cut relative to reference) or 'cigar'",
+            "default": "tract_anchor",
+            "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}
         }
     }
 )
@@ -116,6 +137,10 @@ create_subparser(
             "help": "process only entries with all these sam flags present",
             "default": "0", "type": str, "metavar": "f"
         },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
+        },
         ("-F", "--flag-filter"): {
             "help": "process only entries with none of these sam flags present",
             "default": "0", "type": str, "metavar": "F"
@@ -137,9 +162,50 @@ create_subparser(
     }
 )
 
+create_subparser(
+    subparsers, "assembler", help="assemble haplotypes at ends of chromosomes",
+    usage="{} assembler [options] bam".format(__file__),
+    rules={
+        ("bam",): {
+            "help": "input tailpuller file"
+        },
+        ("-f", "--flags"): {
+            "help": "process only entries with all these sam flags present",
+            "default": "0", "type": str, "metavar": "f"
+        },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only entries with none of these sam flags present",
+            "default": "0", "type": str, "metavar": "F"
+        },
+        ("-q", "--min-quality"): {
+            "help": "process only entries with MAPQ >= Q",
+            "default": 0, "type": int, "metavar": "Q"
+        },
+        ("-x", "--index"): {
+            "help": "location of the reference .ecx index",
+            "metavar": "X", "default": None
+        },
+        ("-c", "--chromosomes"): {
+            "help": "target chromosome(s) (if not specified, target all)",
+            "default": None, "metavar": "C"
+        },
+        ("-k", "--unimer-size"): {
+            "help": "unimer size used for assembly",
+            "default": 15, "type": int, "metavar": "K"
+        },
+        ("-o", "--output-prefix"): {
+            "help": "output prefix",
+            "required": True, "metavar": "O", "default": "no default, required"
+        }
+    }
+)
 
 kwargs = dict(parser.parse_args()._get_kwargs())
 if kwargs["subparser"] in subparsers.choices:
-    globals()[kwargs["subparser"]].main(**kwargs)
+    getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
 else:
     exit(parser.print_help() or 1)
