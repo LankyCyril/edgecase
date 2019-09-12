@@ -206,6 +206,8 @@ create_subparser(
 
 kwargs = dict(parser.parse_args()._get_kwargs())
 if kwargs["subparser"] in subparsers.choices:
+    if kwargs["subparser"] == "assembler":
+        raise NotImplementedError("assembler module in development")
     getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
 else:
     exit(parser.print_help() or 1)
