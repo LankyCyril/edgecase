@@ -88,8 +88,30 @@ significantly shorter than chromosomes.
 Bells and whistles:
 * **All** edgeCase routines that allow flag filtering (tailpuller, tailchopper,
 densityplot) recognize both the numeric flag format (such as 3844) and the
-"human-readable" format such as "is_q" or "is_q|tract_anchor". Combinations are
-also understood, for example, "3844|is_q".
+"human-readable" format such as "rev" or "is_q|paired". Combinations are also
+understood, for example, "3844|rev".
+
+The full table of flag names (also see
+https://broadinstitute.github.io/picard/explain-flags.html):
+
+name               | value | comment
+-------------------|-------|---------------------------
+paired             | 1     |
+mapped_proper_pair | 2     |
+unmapped           | 4     |
+mate_unmapped      | 8     |
+rev                | 16    |
+mate_rev           | 32    |
+1stmate            | 64    |
+2ndmate            | 128   |
+secondary          | 256   |
+qcfail             | 512   |
+pcrdup             | 1024  |
+supp               | 2048  |
+ucsc_mask_anchor   | 4096  | available after tailpuller
+fork               | 8192  | available after tailpuller
+tract_anchor       | 16384 | available after tailpuller
+is_q               | 32768 | available after tailpuller
 
 ### ./edgecase tailchopper [options] bam > fasta
 
