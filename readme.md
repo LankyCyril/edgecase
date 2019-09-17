@@ -132,6 +132,10 @@ Optionally filters input by terminal density (outputs data only for reads
 exceeding density cutoff).  
 By default, outputs data for all input reads.
 
+The value of `--motif` is technically a very simple regex that allows symbols
+'A', 'C', 'G', 'T', '.', and '|'. Examples of valid values are: 'TTAGGG',
+'TT.GGG|CCC.AA'.
+
 ### ./edgecase densityplot [options] dat > pdf
 
 ```
