@@ -1,6 +1,11 @@
 edgeCase
 ========
 
+edgeCase is a small toolchain that takes a set of aligned reads as the initial
+input and describes its telomeric content.
+
+![densityplot_sample](assets/densityplot-example.png?raw=true "densityplot sample")
+
 ## Installation
 
 This tool is in active development, so it is not pip-installable yet.
@@ -44,6 +49,10 @@ optional arguments:
   -j J, --jobs J     number of jobs to run in parallel (default: 1)
 ```
 
+Notes:
+* The `--jobs` option currently only has effect for `kmerscanner`.
+* The `assembler` routine is not available yet (in development).
+
 ### ./edgecase tailpuller [options] bam > sam
 
 ```{sh}
@@ -73,7 +82,14 @@ anything. `samtools view` can correctly subset using these flags.
 Suggestions:
 * use `-F 3844` to skip secondary, supplementary and QC-fail alignments;
 * pipe the output through `samtools view -bh -` to compress on the fly;
-* supplying `--max-read-length` drastically improves wall time.
+* supplying `--max-read-length` drastically improves wall time if reads are
+significantly shorter than chromosomes.
+
+Bells and whistles:
+* **All** edgeCase routines that allow flag filtering (tailpuller, tailchopper,
+densityplot) recognize both the numeric flag format (such as 3844) and the
+"human-readable" format such as "is_q" or "is_q|tract_anchor". Combinations are
+also understood, for example, "3844|is_q".
 
 ### ./edgecase tailchopper [options] bam > fasta
 
@@ -136,4 +152,7 @@ optional arguments:
 
 Visualizes the density of motifs in each read, placing them at their mapping
 positions on the reference.  
-Annotates the anchors from the ECX with dashed lines.
+Annotates the anchors from the ECX with dashed lines:
+* hard mask anchor == gray
+* fork == red
+* telomeric tract == green
