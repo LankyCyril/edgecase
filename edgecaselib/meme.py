@@ -1,10 +1,10 @@
-from sys import stdout
-from pysam import AlignmentFile
+from sys import stdout, stderr
+from pysam import AlignmentFile, FastxFile
 from shutil import which
 from os import path, access, X_OK
 from re import search
 from subprocess import Popen, PIPE, check_output
-from tqdm import tqdm
+from edgecaselib.formats import filter_bam
 
 
 from contextlib import contextmanager
@@ -46,9 +46,9 @@ def interpret_args(fmt, fasta_get_markov, bioawk, samtools, meme, background):
     if fmt == "sam":
         manager = AlignmentFile
     elif fmt == "fastx":
-        raise NotImplementedError("--fmt fastx")
+        manager = FastxFile
     else:
-        raise ValueError("Unknown --fmt: '{}'".format(fmt))
+        raise ValueError("Unsupported --fmt: '{}'".format(fmt))
     bg_fmt = guess_bg_fmt(background)
     if bg_fmt == "sam":
         if get_executable("fasta-get-markov", fasta_get_markov, False) is None:
@@ -69,6 +69,7 @@ def interpret_args(fmt, fasta_get_markov, bioawk, samtools, meme, background):
 
 def convert_background(sam, tempdir, fasta_get_markov, bioawk, samtools, max_order=6):
     """Convert a SAM/BAM file into Markov background for MEME"""
+    print("SAM/BAM -> HMM", file=stderr, flush=True)
     samtools_view = Popen(
         [samtools, "view", "-F3844", sam], stdout=PIPE
     )
@@ -83,10 +84,33 @@ def convert_background(sam, tempdir, fasta_get_markov, bioawk, samtools, max_ord
     bfile = path.join(tempdir, "bfile")
     with open(bfile, mode="wt") as bfile_handle:
         print(hmm.decode(), file=bfile_handle)
+    print("...done", file=stderr, flush=True)
     return bfile
 
 
-def main(readfiles, fmt, fasta_get_markov, bioawk, samtools, meme, minw, background, maxw, jobs=1, file=stdout.buffer, **kwargs):
+def convert_input(bam, manager, tempdir, samfilters):
+    """Convert BAM to fasta for MEME"""
+    fasta = path.join(tempdir, "input.fa")
+    with manager(bam) as alignment, open(fasta, mode="wt") as fasta_handle:
+        for entry in filter_bam(alignment, samfilters, "SAM/BAM -> FASTA"):
+            print(
+                ">{}\n{}".format(entry.qname, entry.query_sequence),
+                file=fasta_handle
+            )
+    return fasta
+
+
+def run_meme(meme, jobs, readfile, background, minw, maxw, evt, tempdir):
+    """Run the MEME binary with preset parameters"""
+    check_output([
+        meme, "-p", str(jobs), "-dna", "-mod", "anr",
+        "-minw", str(minw), "-maxw", str(maxw),
+        "-minsites", "2", "-evt", str(evt),
+        "-bfile", background, "-oc", tempdir, readfile
+    ])
+
+
+def main(readfile, fmt, flags, flags_any, flag_filter, min_quality, fasta_get_markov, bioawk, samtools, background, meme, minw, maxw, evt, jobs=1, file=stdout.buffer, **kwargs):
     # parse arguments
     manager, fasta_get_markov, bioawk, samtools, meme, bg_fmt = interpret_args(
         fmt, fasta_get_markov, bioawk, samtools, meme, background
@@ -96,3 +120,7 @@ def main(readfiles, fmt, fasta_get_markov, bioawk, samtools, meme, minw, backgro
             background = convert_background(
                 background, tempdir, fasta_get_markov, bioawk, samtools
             )
+        if manager != FastxFile: # will need to convert SAM to fastx
+            samfilters = [flags, flags_any, flag_filter, min_quality]
+            readfile = convert_input(readfile, manager, tempdir, samfilters)
+        run_meme(meme, jobs, readfile, background, minw, maxw, evt, tempdir)
