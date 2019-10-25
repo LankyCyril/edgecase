@@ -82,7 +82,36 @@ create_subparser(
 )
 
 create_subparser(
-    subparsers, "kmerscanner", help="perform kmer scan",
+    subparsers, "meme", help="discover motifs in candidate reads",
+    usage="{} [-j J] meme [options] bams > dat".format(__file__),
+    rules={
+        ("readfiles",): {
+            "help": "name(s) of input sam/fasta/fastq file(s)", "nargs": "+"
+        },
+        ("--fmt",): {
+            "help": "format of input file(s)", "default": "sam",
+            "choices": {"sam", "fastx"}
+        },
+        ("--fasta-get-markov",): {
+            "help": "fasta-get-markov binary (unless in $PATH)", "metavar": "?"
+        },
+        ("--bioawk",): {
+            "help": "bioawk binary (unless in $PATH)", "metavar": "?"
+        },
+        ("--samtools",): {
+            "help": "samtools binary (unless in $PATH)", "metavar": "?"
+        },
+        ("--meme",): {"help": "meme binary (unless in $PATH)", "metavar": "?"},
+        ("--minw",): {"help": "minw for meme", "default": 3, "type": int},
+        ("--maxw",): {"help": "maxw for meme", "default": 100, "type": int},
+        ("--background", "--bg"): {
+            "help": "background file (SAM/BAM or HMM)", "required": True
+        }
+    }
+)
+
+create_subparser(
+    subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
     usage="{} [-j J] kmerscanner [options] bams > dat".format(__file__),
     rules={
         ("readfiles",): {
