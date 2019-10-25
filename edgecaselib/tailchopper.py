@@ -72,12 +72,13 @@ def relative_chopper(entry, ecx, target, integer_target):
         positions = entry.get_reference_positions(full_length=True)
         try:
             read_pos = positions.index(anchor_pos)
+        except ValueError:
+            update_aligned_segment(entry, 0, 0)
+        else:
             if is_q:
                 update_aligned_segment(entry, read_pos, None)
             else:
                 update_aligned_segment(entry, None, -read_pos)
-        except ValueError:
-            update_aligned_segment(entry, 0, 0)
     return entry
 
 
