@@ -30,7 +30,7 @@ def update_aligned_segment(entry, start=None, end=None):
     entry.query_qualities = qualities_substring
 
 
-def cigar_chopper(entry, ecx, integer_target, strict=None):
+def cigar_chopper(entry, ecx, integer_target, relax_radius=0):
     """Return only clipped part of sequence"""
     is_q = (entry.flag & 0x8000 != 0)
     if is_q:
@@ -54,7 +54,12 @@ def cigar_chopper(entry, ecx, integer_target, strict=None):
     return entry
 
 
-def relative_chopper(entry, ecx, integer_target, strict):
+def find_closest_position(positions, anchor_pos, relax_radius):
+    """Find closest mapping position within `relax_radius` of anchor"""
+    read_pos = positions.index(anchor_pos)
+
+
+def relative_chopper(entry, ecx, integer_target, relax_radius):
     """Return only part of sequence past the anchor"""
     is_q = (entry.flag & 0x8000 != 0)
     prime = 3 if is_q else 5
@@ -71,7 +76,9 @@ def relative_chopper(entry, ecx, integer_target, strict):
         anchor_pos = anchor_positions.iloc[0]
         positions = entry.get_reference_positions(full_length=True)
         try:
-            read_pos = positions.index(anchor_pos)
+            read_pos = find_closest_position(
+                positions, anchor_pos, relax_radius=relax_radius
+            )
         except ValueError:
             update_aligned_segment(entry, 0, 0)
         else:
@@ -82,9 +89,11 @@ def relative_chopper(entry, ecx, integer_target, strict):
     return entry
 
 
-def main(bam, index, flags, flags_any, flag_filter, min_quality, target, strict, jobs=1, file=stdout, **kwargs):
+def main(bam, index, flags, flags_any, flag_filter, min_quality, target, relax_radius, jobs=1, file=stdout, **kwargs):
     """Interpret arguments and dispatch data to subroutines"""
     if target == "cigar":
+        if relax_radius != 0:
+            raise ValueError("Cannot relax radius with --target=cigar")
         chopper, integer_target = cigar_chopper, None
     else:
         chopper, integer_target = relative_chopper, interpret_flags(target)
@@ -94,7 +103,9 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, strict,
         samfilters = [flags, flags_any, flag_filter, min_quality]
         for entry in filter_bam(alignment, samfilters):
             if entry.query_sequence:
-                chopped_entry = chopper(entry, ecx, integer_target, strict)
+                chopped_entry = chopper(
+                    entry, ecx, integer_target, relax_radius
+                )
                 if chopped_entry.query_sequence:
                     print(chopped_entry.to_string(), file=file)
                 else:

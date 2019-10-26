@@ -78,9 +78,9 @@ create_subparser(
             "default": "tract_anchor",
             "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}
         },
-        ("-s", "--strict"): {
-            "help": "only chop reads with bases exactly aligned to the anchor",
-            "action": "store_true"
+        ("-r", "--relax-radius"): {
+            "help": "radius around anchor to look for mapped position in read",
+            "default": 0, "type": int
         }
     }
 )
