@@ -48,7 +48,7 @@ create_subparser(
 
 create_subparser(
     subparsers, "tailchopper", help="get overhanging heads/tails of reads",
-    usage="{} tailchopper [options] bam > fasta".format(__file__),
+    usage="{} [-j njobs] tailchopper [options] bam > fasta".format(__file__),
     rules={
         ("bam",): {
             "help": "name of input BAM/SAM file"
@@ -77,13 +77,24 @@ create_subparser(
             "help": "either an ECX flag (cut relative to reference) or 'cigar'",
             "default": "tract_anchor",
             "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}
-        }
+        },
+        ("-m", "--min-length"): {
+            "help": "minimum length of a chopped fragment to consider",
+            "default": 6, "type": int
+        },
+        ("--mafft",): {
+            "help": "MAFFT binary (unless in $PATH)", "metavar": "?"
+        },
+        ("--mafft-options", "--mo"): {
+            "help": "MAFFT options", "metavar": "?",
+            "default": "--retree 1 --maxiterate 0 --nofft --parttree"
+        },
     }
 )
 
 create_subparser(
     subparsers, "meme", help="discover motifs in candidate reads",
-    usage="{} [-j J] meme [options] bams > dat".format(__file__),
+    usage="{} [-j njobs] meme [options] bams > dat".format(__file__),
     rules={
         ("readfile",): {
             "help": "name of input sam/bam/fasta/fastq file"
@@ -129,7 +140,7 @@ create_subparser(
 
 create_subparser(
     subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
-    usage="{} [-j J] kmerscanner [options] bams > dat".format(__file__),
+    usage="{} [-j njobs] kmerscanner [options] bams > dat".format(__file__),
     rules={
         ("readfiles",): {
             "help": "name(s) of input sam/fasta/fastq file(s)", "nargs": "+"

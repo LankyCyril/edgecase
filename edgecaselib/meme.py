@@ -1,10 +1,10 @@
 from sys import stdout, stderr
 from pysam import AlignmentFile, FastxFile
-from shutil import which
-from os import path, access, X_OK
+from os import path
 from re import search
 from subprocess import Popen, PIPE, check_output
 from edgecaselib.formats import filter_bam
+from edgecaselib.util import get_executable
 
 
 from contextlib import contextmanager
@@ -12,23 +12,6 @@ from contextlib import contextmanager
 def TemporaryDirectory():
     """Temporary TemporaryDirectory plug for development purposes"""
     yield "data/datasets/twins/sandbox/edge-meme"
-
-
-def get_executable(exe_name, suggested_binary, fail_if_none=True):
-    """Wrapper to find executable"""
-    if suggested_binary is None:
-        binary = which(exe_name)
-        if (binary is None) and fail_if_none:
-            raise OSError("{} not found".format(exe_name))
-        else:
-            return binary
-    else:
-        if path.isfile(suggested_binary) and access(suggested_binary, X_OK):
-            return suggested_binary
-        elif fail_if_none:
-            raise OSError("{} not accessible".format(suggested_binary))
-        else:
-            return None
 
 
 def guess_bg_fmt(background):
