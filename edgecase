@@ -133,14 +133,26 @@ create_subparser(
 
 create_subparser(
     subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
-    usage="{} [-j njobs] kmerscanner [options] bams > dat".format(__file__),
+    usage="{} [-j njobs] kmerscanner [options] bam > dat".format(__file__),
     rules={
-        ("readfiles",): {
-            "help": "name(s) of input sam/fasta/fastq file(s)", "nargs": "+"
+        ("bam",): {
+            "help": "name of input SAM/BAM file"
         },
-        ("--fmt",): {
-            "help": "format of input file(s)", "default": "sam",
-            "choices": {"sam", "fastx"}
+        ("-f", "--flags"): {
+            "help": "process only entries with all these sam flags present",
+            "default": "0", "type": str, "metavar": "f"
+        },
+        ("-g", "--flags-any"): {
+            "help": "process only entries with any of these sam flags present",
+            "default": "65535", "type": str, "metavar": "g"
+        },
+        ("-F", "--flag-filter"): {
+            "help": "process only entries with none of these sam flags present",
+            "default": "0", "type": str, "metavar": "F"
+        },
+        ("-q", "--min-quality"): {
+            "help": "process only entries with MAPQ >= Q",
+            "default": 0, "type": int, "metavar": "Q"
         },
         ("--motifs",): {
             "help": "target motif sequences", "default": "TTAGGG", "metavar": "M"
