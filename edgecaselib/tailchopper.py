@@ -56,7 +56,16 @@ def cigar_chopper(entry, ecx, integer_target, relax_radius=0):
 
 def find_closest_position(positions, anchor_pos, relax_radius):
     """Find closest mapping position within `relax_radius` of anchor"""
-    read_pos = positions.index(anchor_pos)
+    for step in range(0, relax_radius+1):
+        for adjusted_anchor_pos in anchor_pos-step, anchor_pos, anchor_pos+step:
+            try:
+                read_pos = positions.index(adjusted_anchor_pos)
+            except ValueError:
+                pass
+            else:
+                return read_pos
+    else:
+        raise ValueError("Mapped position not found within radius")
 
 
 def relative_chopper(entry, ecx, integer_target, relax_radius):
