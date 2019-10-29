@@ -1,6 +1,8 @@
 from sys import stderr
 from regex import compile
 from re import split
+from shutil import which
+from os import path, access, X_OK
 
 
 MAINCHROMS_ENSEMBL = {str(i) for i in range(1, 23)} | {"X", "Y"}
@@ -47,3 +49,20 @@ def natsorted_chromosomes(chromosomes):
         print("Warning: " + msg, file=stderr)
         print("The error was: '{}'".format(e), file=stderr)
         return sorted(chromosomes)
+
+
+def get_executable(exe_name, suggested_binary, fail_if_none=True):
+    """Wrapper to find executable"""
+    if suggested_binary is None:
+        binary = which(exe_name)
+        if (binary is None) and fail_if_none:
+            raise OSError("{} not found".format(exe_name))
+        else:
+            return binary
+    else:
+        if path.isfile(suggested_binary) and access(suggested_binary, X_OK):
+            return suggested_binary
+        elif fail_if_none:
+            raise OSError("{} not accessible".format(suggested_binary))
+        else:
+            return None

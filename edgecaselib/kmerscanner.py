@@ -2,7 +2,7 @@ from sys import stdout, stderr
 from regex import compile, IGNORECASE
 from numpy import zeros, array, cumsum
 from multiprocessing import Pool
-from edgecaselib.formats import ReadFileChain
+from edgecaselib.formats import filter_bam
 from edgecaselib.tailchopper import get_cigar_clip_length
 from pysam import AlignmentFile
 from types import SimpleNamespace
@@ -71,7 +71,7 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
         return None, zeros(1)
 
 
-def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tail_test, num_reads, jobs):
+def pattern_scanner(entry_iterator, samfilters, pattern, cutoff, window_size, head_test, tail_test, num_reads, jobs):
     """Calculate density of pattern hits in a rolling window along each read"""
     simple_entry_iterator = (
         SimpleNamespace(
@@ -87,7 +87,7 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
             ),
             cigarstring=getattr(entry, "cigarstring", "")
         )
-        for entry in entry_iterator
+        for entry in filter_bam(entry_iterator, samfilters)
     )
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
@@ -107,7 +107,7 @@ def pattern_scanner(entry_iterator, pattern, cutoff, window_size, head_test, tai
         )
 
 
-def interpret_arguments(head_test, tail_test, cutoff, fmt, motifs):
+def interpret_arguments(head_test, tail_test, cutoff, motifs):
     """Parse and check arguments"""
     if (head_test is not None) and (tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
@@ -115,31 +115,27 @@ def interpret_arguments(head_test, tail_test, cutoff, fmt, motifs):
         raise ValueError("--cutoff has no effect without a head/tail test")
     elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
-    if fmt == "sam":
-        manager = AlignmentFile
-    elif fmt == "fastx":
-        raise NotImplementedError("--fmt fastx")
-    else:
-        raise ValueError("Unknown --fmt: '{}'".format(fmt))
     motif_patterns = OrderedDict([
         [motif, get_circular_pattern(motif)]
         for motif in motifs.split("|")
     ])
-    return manager, motif_patterns
+    return motif_patterns
 
 
-def main(readfiles, fmt="sam", motifs="TTAGGG", head_test=None, tail_test=None, cutoff=None, window_size=120, num_reads=None, jobs=1, file=stdout, **kwargs):
+def main(bam, flags, flags_any, flag_filter, min_quality, motifs, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
-    manager, motif_patterns = interpret_arguments(
-        head_test, tail_test, cutoff, fmt, motifs
+    motif_patterns = interpret_arguments(
+        head_test, tail_test, cutoff, motifs
     )
     print(*DAT_HEADER, sep="\t", file=file)
     # scan fastq for target motif queries, parallelizing on reads:
     # TODO: motif and pattern per read
     for motif, pattern in motif_patterns.items():
-        with ReadFileChain(readfiles, manager) as entry_iterator:
+        with AlignmentFile(bam) as entry_iterator:
             scanner = pattern_scanner(
-                entry_iterator, pattern, window_size=window_size,
+                entry_iterator, pattern=pattern,
+                samfilters=[flags, flags_any, flag_filter, min_quality],
+                window_size=window_size,
                 head_test=head_test, tail_test=tail_test,
                 cutoff=cutoff, num_reads=num_reads, jobs=jobs
             )

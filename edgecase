@@ -14,7 +14,10 @@ def create_subparser(subparsers, name, help, usage, rules):
         name, help=help, usage=usage, formatter_class=WideHelpFormatter
     )
     for rule_args, rule_kwargs in rules.items():
-        _subparser.add_argument(*rule_args, **rule_kwargs)
+        if ("metavar" in rule_kwargs) or ("action" in rule_kwargs):
+            _subparser.add_argument(*rule_args, **rule_kwargs)
+        else:
+            _subparser.add_argument(*rule_args, metavar="?", **rule_kwargs)
 
 
 parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
@@ -28,93 +31,64 @@ create_subparser(
     subparsers, "tailpuller", help="select overhanging reads",
     usage="{} tailpuller [options] bam > sam".format(__file__),
     rules={
-        ("bam",): {
-            "help": "name of input BAM/SAM file"
-        },
-        ("-x", "--index"): {
-            "help": "location of the reference .ecx index",
-            "required": True, "metavar": "X", "default": "no default, required"
-        },
-        ("-F", "--flag-filter"): {
-            "help": "process only sam entries with none of these flags present",
-            "default": "0", "type": str, "metavar": "F"
-        },
-        ("-m", "--max-read-length"): {
-            "help": "max read length to consider when selecting lookup regions",
-            "default": None, "type": int, "metavar": "M"
-        }
+        ("bam",): {"help": "name of input BAM/SAM file"},
+        ("-x", "--index"): {"help": "location of the reference .ecx index", "required": True, "metavar": "X", "default": "no default, required"},
+        ("-F", "--flag-filter"): {"help": "process only sam entries with none of these flags present", "default": "0", "type": str, "metavar": "F"},
+        ("-m", "--max-read-length"): {"help": "max read length to consider when selecting lookup regions", "default": None, "type": int, "metavar": "M"}
     }
 )
 
 create_subparser(
     subparsers, "tailchopper", help="get overhanging heads/tails of reads",
-    usage="{} tailchopper [options] bam > fasta".format(__file__),
+    usage="{} [-j njobs] tailchopper [options] bam > fasta".format(__file__),
     rules={
-        ("bam",): {
-            "help": "name of input BAM/SAM file"
-        },
-        ("-x", "--index"): {
-            "help": "location of the reference .ecx index",
-            "required": True, "metavar": "X", "default": "no default, required"
-        },
-        ("-f", "--flags"): {
-            "help": "process only entries with all these sam flags present",
-            "default": "0", "type": str, "metavar": "f"
-        },
-        ("-g", "--flags-any"): {
-            "help": "process only entries with any of these sam flags present",
-            "default": "65535", "type": str, "metavar": "g"
-        },
-        ("-F", "--flag-filter"): {
-            "help": "process only entries with none of these sam flags present",
-            "default": "0", "type": str, "metavar": "F"
-        },
-        ("-q", "--min-quality"): {
-            "help": "process only entries with MAPQ >= Q",
-            "default": 0, "type": int, "metavar": "Q"
-        },
-        ("-t", "--target"): {
-            "help": "either an ECX flag (cut relative to reference) or 'cigar'",
-            "default": "tract_anchor",
-            "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}
-        }
+        ("bam",): {"help": "name of input BAM/SAM file"},
+        ("-x", "--index"): {"help": "location of the reference .ecx index", "required": True, "metavar": "X", "default": "no default, required"},
+        ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
+        ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
+        ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
+        ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"},
+        ("-t", "--target"): {"help": "either an ECX flag (cut relative to reference) or 'cigar'", "default": "tract_anchor", "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}},
+        ("-r", "--relax-radius"): {"help": "radius around anchor to look for mapped position in read", "default": 0, "type": int}
     }
 )
 
 create_subparser(
-    subparsers, "kmerscanner", help="perform kmer scan",
-    usage="{} [-j J] kmerscanner [options] bams > dat".format(__file__),
+    subparsers, "meme", help="discover motifs in candidate reads",
+    usage="{} [-j njobs] meme [options] bams > dat".format(__file__),
     rules={
-        ("readfiles",): {
-            "help": "name(s) of input sam/fasta/fastq file(s)", "nargs": "+"
-        },
-        ("--fmt",): {
-            "help": "format of input file(s)", "default": "sam",
-            "choices": {"sam", "fastx"}
-        },
-        ("--motifs",): {
-            "help": "target motif sequences", "default": "TTAGGG", "metavar": "M"
-        },
-        ("--head-test",): {
-            "help": "length of head to use for density filter (if specified)",
-            "default": None, "type": int, "metavar": "H"
-        },
-        ("--tail-test",): {
-            "help": "length of tail to use for density filter (if specified)",
-            "default": None, "type": int, "metavar": "T"
-        },
-        ("-c", "--cutoff"): {
-            "help": "use hard cutoff for density",
-            "default": None, "type": float, "metavar": "C"
-        },
-        ("-w", "--window-size"): {
-            "help": "size of the rolling window",
-            "default": 120, "type": int, "metavar": "W"
-        },
-        ("-n", "--num-reads"): {
-            "help": "expected number of reads in input (for progress display)",
-            "default": None, "type": int, "metavar": "N"
-        }
+        ("readfile",): {"help": "name of input sam/bam/fasta/fastq file"},
+        ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
+        ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
+        ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
+        ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
+        ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"},
+        ("--fasta-get-markov",): {"help": "fasta-get-markov binary (unless in $PATH)"},
+        ("--bioawk",): {"help": "bioawk binary (unless in $PATH)"},
+        ("--samtools",): {"help": "samtools binary (unless in $PATH)"},
+        ("--meme",): {"help": "meme binary (unless in $PATH)"},
+        ("--minw",): {"help": "minw for meme", "default": 3, "type": int},
+        ("--maxw",): {"help": "maxw for meme", "default": 100, "type": int},
+        ("--background", "--bg"): {"help": "background file (SAM/BAM or HMM)", "required": True, "default": "no default, required", "metavar": "B"},
+        ("--evt",): {"help": "evt for meme", "default": .1, "type": float}
+    }
+)
+
+create_subparser(
+    subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
+    usage="{} [-j njobs] kmerscanner [options] bam > dat".format(__file__),
+    rules={
+        ("bam",): {"help": "name of input SAM/BAM file"},
+        ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
+        ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
+        ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
+        ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"},
+        ("--motifs",): {"help": "target motif sequences", "default": "TTAGGG", "metavar": "M"},
+        ("--head-test",): {"help": "length of head to use for density filter (if specified)", "default": None, "type": int, "metavar": "H"},
+        ("--tail-test",): {"help": "length of tail to use for density filter (if specified)", "default": None, "type": int, "metavar": "T"},
+        ("-c", "--cutoff"): {"help": "use hard cutoff for density", "default": None, "type": float, "metavar": "C"},
+        ("-w", "--window-size"): {"help": "size of the rolling window", "default": 120, "type": int, "metavar": "W"},
+        ("-n", "--num-reads"): {"help": "expected number of reads in input (for progress display)", "default": None, "type": int, "metavar": "N"}
     }
 )
 
@@ -122,43 +96,16 @@ create_subparser(
     subparsers, "densityplot", help="visualize densities of candidate reads",
     usage="{} densityplot [options] dat > pdf".format(__file__),
     rules={
-        ("dat",): {
-            "help": "input density file"
-        },
-        ("-z", "--gzipped") : {
-            "help": "input is gzipped (must specify if any of -qfF present)",
-            "action": "store_true"
-        },
-        ("-x", "--index"): {
-            "help": "location of the reference .ecx index",
-            "required": True, "metavar": "X", "default": "no default, required"
-        },
-        ("-f", "--flags"): {
-            "help": "process only entries with all these sam flags present",
-            "default": "0", "type": str, "metavar": "f"
-        },
-        ("-g", "--flags-any"): {
-            "help": "process only entries with any of these sam flags present",
-            "default": "65535", "type": str, "metavar": "g"
-        },
-        ("-F", "--flag-filter"): {
-            "help": "process only entries with none of these sam flags present",
-            "default": "0", "type": str, "metavar": "F"
-        },
-        ("-q", "--min-quality"): {
-            "help": "process only entries with MAPQ >= Q",
-            "default": 0, "type": int, "metavar": "Q"
-        },
-        ("-b", "--bin-size"): {
-            "help": "size of each bin in bp for visualization speedup",
-            "default": 100, "type": int, "metavar": "B"
-        },
-        ("--title",): {
-            "help": "figure title (defaults to input filename)", "metavar": "T"
-        },
-        ("--no-align",): {
-            "help": "plot unaligned", "action": "store_true"
-        }
+        ("dat",): {"help": "input density file"},
+        ("-z", "--gzipped") : {"help": "input is gzipped (must specify if any of -qfF present)", "action": "store_true"},
+        ("-x", "--index"): {"help": "location of the reference .ecx index", "required": True, "metavar": "X", "default": "no default, required"},
+        ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
+        ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
+        ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
+        ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"},
+        ("-b", "--bin-size"): {"help": "size of each bin in bp for visualization speedup", "default": 100, "type": int, "metavar": "B"},
+        ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"},
+        ("--no-align",): {"help": "plot unaligned", "action": "store_true"}
     }
 )
 
@@ -166,41 +113,15 @@ create_subparser(
     subparsers, "assembler", help="assemble haplotypes at ends of chromosomes",
     usage="{} assembler [options] bam".format(__file__),
     rules={
-        ("bam",): {
-            "help": "input tailpuller file"
-        },
-        ("-f", "--flags"): {
-            "help": "process only entries with all these sam flags present",
-            "default": "0", "type": str, "metavar": "f"
-        },
-        ("-g", "--flags-any"): {
-            "help": "process only entries with any of these sam flags present",
-            "default": "65535", "type": str, "metavar": "g"
-        },
-        ("-F", "--flag-filter"): {
-            "help": "process only entries with none of these sam flags present",
-            "default": "0", "type": str, "metavar": "F"
-        },
-        ("-q", "--min-quality"): {
-            "help": "process only entries with MAPQ >= Q",
-            "default": 0, "type": int, "metavar": "Q"
-        },
-        ("-x", "--index"): {
-            "help": "location of the reference .ecx index",
-            "metavar": "X", "default": None
-        },
-        ("-c", "--chromosomes"): {
-            "help": "target chromosome(s) (if not specified, target all)",
-            "default": None, "metavar": "C"
-        },
-        ("-k", "--unimer-size"): {
-            "help": "unimer size used for assembly",
-            "default": 15, "type": int, "metavar": "K"
-        },
-        ("-o", "--output-prefix"): {
-            "help": "output prefix",
-            "required": True, "metavar": "O", "default": "no default, required"
-        }
+        ("bam",): {"help": "input tailpuller file"},
+        ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
+        ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
+        ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
+        ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"},
+        ("-x", "--index"): {"help": "location of the reference .ecx index", "metavar": "X", "default": None},
+        ("-c", "--chromosomes"): {"help": "target chromosome(s) (if not specified, target all)", "default": None, "metavar": "C"},
+        ("-k", "--unimer-size"): {"help": "unimer size used for assembly", "default": 15, "type": int, "metavar": "K"},
+        ("-o", "--output-prefix"): {"help": "output prefix", "required": True, "metavar": "O", "default": "no default, required"}
     }
 )
 
