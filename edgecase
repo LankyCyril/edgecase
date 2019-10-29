@@ -48,8 +48,7 @@ create_subparser(
         ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
         ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
         ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"},
-        ("-t", "--target"): {"help": "either an ECX flag (cut relative to reference) or 'cigar'", "default": "tract_anchor", "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}},
-        ("-r", "--relax-radius"): {"help": "radius around anchor to look for mapped position in read", "default": 0, "type": int}
+        ("-t", "--target"): {"help": "either an ECX flag (cut relative to reference) or 'cigar'", "default": "tract_anchor", "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}}
     }
 )
 
