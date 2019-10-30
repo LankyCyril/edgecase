@@ -23,6 +23,8 @@ def get_cigar_clip_length(entry, prime):
 
 def update_aligned_segment(entry, map_pos, start=None, end=None):
     """Update sequence, cigar, quality string in-place"""
+    if (end is not None) and (start is not None) and (end < start):
+        start, end = end, start
     qualities_substring = entry.query_qualities[start:end]
     entry.query_sequence = entry.query_sequence[start:end]
     if entry.query_sequence:
