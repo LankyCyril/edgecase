@@ -133,8 +133,8 @@
             \captionof{figure}{
                 Distribution of major motifs in the \\ telomeric reads from an
                 internal nanopore sequencing dataset, basecalled with
-                \textit{guppy} without the flip-flop model. The offending motif
-                (orange) is [GAA]*n.
+                \textit{guppy} without the flip-flop model. \\
+                The offending motif (orange) is [GAA]*n.
             }
     \end{center}
 }
@@ -142,8 +142,17 @@
 
 \headerbox{}{name=flipflop,span=1,column=3,below=hg38ext,boxheaderheight=0mm,boxColorOne=bluebox}
 {
-    ONT flipflop
-    \vspace{1in}
+    \begin{center}
+        \includegraphics[width=\linewidth]{twins-flipflop-densityplot.pdf}
+            \captionof{figure}{
+                Distribution of major motifs in the \\ telomeric reads from an
+                internal nanopore sequencing dataset, basecalled with
+                \textit{guppy} \textbf{with} the flip-flop model.
+                The main offending motif (orange) is CCAGG. The additional
+                offending motif (purple) is TTAAAA. The same motifs are present
+                in Genome In a Bottle nanopore data.
+            }
+    \end{center}
 }
 
 
@@ -186,7 +195,7 @@
 }
 
 
-\headerbox{}{name=unimizers,span=1,column=3,below=no_flipflop,above=bottom,boxheaderheight=0mm}
+\headerbox{}{name=unimizers,span=1,column=3,below=flipflop,above=bottom,boxheaderheight=0mm}
 {
     Assembly graph
 }
