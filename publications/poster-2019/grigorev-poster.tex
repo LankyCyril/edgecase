@@ -1,0 +1,182 @@
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND OTHER DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass[paperwidth=42in,paperheight=47.75in,portrait]{baposter}
+
+\usepackage[font=small,labelfont=bf]{caption} % Required for specifying captions to tables and figures
+\usepackage{booktabs} % Horizontal rules in tables
+\usepackage{relsize} % Used for making text smaller in some places
+
+\usepackage[sfdefault,light]{roboto}
+\graphicspath{{figures/}} % Directory in which figures are stored
+
+\definecolor{bordercol}{RGB}{100,40,40} % Border color of content boxes
+\definecolor{headercol1}{RGB}{255,255,255} % Background color for the header in the content boxes (left side)
+\definecolor{headercol2}{RGB}{255,255,255} % Background color for the header in the content boxes (right side)
+\definecolor{headerfontcol}{RGB}{0,0,0} % Text color for the header text in the content boxes
+\definecolor{boxcolor}{RGB}{255,255,255} % Background color for the content in the content boxes
+
+\begin{document}
+
+\begin{poster}{
+grid=false,
+borderColor=bordercol,
+headerColorOne=headercol1,
+headerColorTwo=headercol2,
+headerFontColor=headerfontcol,
+boxColorOne=boxcolor,
+headershape=rectangle,
+headerfont=\Large\sf\bf,
+textborder=rectangle,
+background=none,
+headerborder=open,
+boxshade=plain,
+linewidth=1
+}
+{}
+%
+%----------------------------------------------------------------------------------------
+%	TITLE AND AUTHOR NAME
+%----------------------------------------------------------------------------------------
+%
+{\sf\bf \indent Long read sequencing and local graph assembly \\ reveal heterogeneity of telomeres}
+{\vspace{.4em} Grigorev K, Foox J, Bezdan D, Butler D, Mason C \\
+{\small Institute for Computational Biomedicine, Weill Cornell Medicine}}
+{\includegraphics[scale=1.7]{logo.pdf}}
+
+%----------------------------------------------------------------------------------------
+%	INTRODUCTION
+%----------------------------------------------------------------------------------------
+
+\headerbox{Introduction}{name=introduction,column=0,row=0}{
+
+Telomeres are regions of repetitive nucleotide sequences capping eukaryotic chromosomes that protect the ends of chromosomes from deterioration. Telomeres are known to generally shorten after each cell replication, eventually blocking somatic cell division and preventing genomic instability. As such, their length is an important marker in senescence, where it can inversely correlate with a subject’s age, and in cancers, where both telomere shortening and unrestricted elongation have been suggested as risk factors.
+
+Given their length and repetitive nature, telomeric regions cannot be veritably assembled from reads of kilobase-order lengths (Sanger sequencing) or sub-1Kbp reads (second-generation sequencing), making telomere resolution a very costly and generally intractable problem. Recently, with third-generation technologies like SMRT and nanopore sequencing attaining read lengths on the order of tens and hundreds kilobase pairs, with the longest reads reported as 2Mbp, it became possible to routinely read into the telomeric regions and inspect their structure and length.
+
+We describe a framework for extracting telomeric reads from third-generation sequencing experiments and describing their sequence content and prevalent motifs. We find that human telomeric sequences exhibit surprising heterogeneity, suggesting the possibility of localization of previously reported non-canonical motifs as well as novel sequences.
+
+We also propose a local graph assembly algorithm capable of describing the haplotypic diversity of telomeres. Given the lower complexity of such reads, established methods for long read overlap and assembly that rely on MinHash sketches and minimizers are unsuitable for this problem and fail to detect most correct overlaps when compared to the computationally prohibitive, but mathematically correct Smith-Waterman alignment. We implement a modified method relying on \textit{unimizers} (minimizers occurring once within a given read) that improves overlaps and reduces complexity of the assembly graph, and locally assemble branching telomeric sequences using the computationally efficient A-Bruijn structure.
+
+}
+
+%----------------------------------------------------------------------------------------
+%	MATERIALS AND METHODS
+%----------------------------------------------------------------------------------------
+
+\headerbox{Materials and Methods}{name=methods,column=0,below=introduction}{
+
+\begin{description}
+\item[ER1] Sed a orci non ipsum posuere placerat. Nunc in mi augue, a adipiscing massa. Donec dapibus gravida odio, condimentum convallis urna.\item[ER2] Nullam sagittis cursus neque, sit amet mollis elit auctor in. Etiam sed lectus a nulla rhoncus interdum a tempus nunc. Sed at eleifend purus.
+\end{description}
+
+Nullam sollicitudin lobortis urna quis varius. Nullam sagittis blandit diam, $DN = G_t(V_t,E_t)$, risus $E_t \subseteq V_t \times V_t$ ($\forall t \geq 0$). vel tortor justo, $G_0$, quis malesuada lorem.
+
+\begin{equation}
+\cos^3 \theta =\frac{1}{4}\cos\theta+\frac{3}{4}\cos 3\theta
+\label{eq:refname}
+\end{equation}
+
+Vivamus porta lacus et lectus \textbf{porta lacus}. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis. torte $G_t$ hac millis \textbf{plates} Idk 
+}
+
+%----------------------------------------------------------------------------------------
+%	CONCLUSION
+%----------------------------------------------------------------------------------------
+
+\headerbox{Conclusion}{name=conclusion,column=0,below=methods}{
+
+Fusce at erat vitae metus porttitor auctor sit amet at ante. In id dolor tellus, non aliquet elit. Vestibulum bibendum, augue sed laoreet congue, enim nisi ultricies diam, ac pharetra mi dui ut sapien. Maecenas fermentum, neque ut scelerisque consequat, purus leo ultrices nulla, quis scelerisque risus elit non turpis. 
+
+\begin{enumerate}
+\item Cras ac ipsum eu nisl imperdiet interdum nunc bibendum, est in pulvinar facilisis, mi purus fringilla tellus, eu varius ipsum ante laoreet ipsum
+\item Sed cursus erat quis odio laoreet facilisis maecenas vehicula
+\end{enumerate}
+}
+
+%----------------------------------------------------------------------------------------
+%	REFERENCES
+%----------------------------------------------------------------------------------------
+
+\headerbox{References}{name=references,column=0,below=conclusion}{
+
+\smaller % Reduce the font size in this block
+\renewcommand{\section}[2]{\vskip 0.05em} % Get rid of the default "References" section title
+\nocite{*} % Insert publications even if they are not cited in the poster
+
+\bibliographystyle{unsrt}
+\bibliography{sample} % Use sample.bib as the bibliography file
+}
+
+%----------------------------------------------------------------------------------------
+%	ACKNOWLEDGEMENTS
+%----------------------------------------------------------------------------------------
+
+\headerbox{Acknowledgements}{name=acknowledgements,column=0,below=references, above=bottom}{
+
+\smaller % Reduce the font size in this block
+Fusce mattis tellus ac odio imperdiet lobortis. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Phasellus commodo blandit euismod. Ut porttitor cursus magna. Mauris adipiscing pellentesque ipsum nec facilisis. Cras ornare bibendum bibendum. Ut a elit purus, vel adipiscing.
+} 
+
+%----------------------------------------------------------------------------------------
+%	RESULTS 1
+%----------------------------------------------------------------------------------------
+
+\headerbox{Results Heading}{name=results1,span=2,column=1,row=0}{ % To reduce this block to 1 column width, remove 'span=2'
+
+Nunc sit amet sem ut nulla tincidunt mattis vel nec mauris. Vestibulum odio tellus, lobortis. Vel adipiscing, Aliquam dictum, ligula egestas commodo posuere, lectus lectus congue ligula, sed posuere urna lectus at nisi. Aenean commodo risus ut dolor (viverra scelerisque). Nullam varius, lacus et interdum hendrerit, odio orci ultrices mauris, id interdum eros mauris at urna. Fusce in nisi eros, sit amet volutpat turpis, \textbf{porttior magna} (commodo blandit euismod) \textbf{facilisis ornate magnis} (dis magnis). 
+
+%------------------------------------------------
+
+\begin{center}
+\begin{tabular}{l l l}
+\toprule
+\textbf{Treatments} & \textbf{Response 1} & \textbf{Response 2}\\
+\midrule
+Treatment 1 & 0.0003262 & 0.562 \\
+Treatment 2 & 0.0015681 & 0.910 \\
+Treatment 3 & 0.0009271 & 0.296 \\
+\bottomrule
+\end{tabular}
+\captionof{table}{Table caption}
+\end{center}
+}
+
+%----------------------------------------------------------------------------------------
+%	RESULTS 2
+%----------------------------------------------------------------------------------------
+
+\headerbox{Results Heading 2}{name=results2,span=2,column=1,below=results1,above=bottom}{ % To reduce this block to 1 column width, remove 'span=2'
+
+Nunc sit amet sem ut nulla tincidunt mattis vel nec mauris. Vestibulum odio tellus, lobortis. Vel adipiscing, Aliquam dictum, ligula egestas commodo posuere, lectus lectus congue ligula, sed posuere urna lectus at nisi. Aenean commodo risus ut dolor (viverra scelerisque). Nullam varius, lacus et interdum hendrerit, odio orci ultrices mauris, id interdum eros mauris at urna. Fusce in nisi eros, sit amet volutpat turpis, \textbf{porttior magna} (commodo blandit euismod) \textbf{facilisis ornate magnis} (dis magnis). 
+
+%------------------------------------------------
+
+\begin{center}
+\includegraphics[width=0.49\linewidth]{placeholder}
+\includegraphics[width=0.49\linewidth]{placeholder}
+\captionof{figure}{Figure caption 1 (left); Figure caption 2 (right)}
+\end{center}
+
+%------------------------------------------------
+
+Aliquam ac justo lectus. Nunc ultrices aliquet purus non dictum. Nulla facilisi. Quisque vitae urna non purus sollicitudin venenatis. Aliquam erat volutpat. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. In hendrerit tortor sed massa consequat eu viverra justo porta. Ut nec felis sem, non elementum.
+
+%------------------------------------------------
+
+\begin{center}
+\includegraphics[width=0.8\linewidth]{placeholder}
+\captionof{figure}{Figure caption}
+\end{center}
+
+%------------------------------------------------
+
+Nunc sit amet sem ut nulla tincidunt mattis vel nec mauris. Vestibulum odio tellus, lobortis. Vel adipiscing, Aliquam dictum, ligula egestas commodo posuere, lectus lectus congue ligula, sed posuere urna lectus at nisi. Aenean commodo risus ut dolor (viverra scelerisque). Nullam varius, lacus et interdum hendrerit, odio orci ultrices mauris, id interdum eros mauris at urna. Fusce in nisi eros, sit amet volutpat turpis, \textbf{porttior magna} (commodo blandit euismod) \textbf{facilisis ornate magnis} (dis magnis). Aliquam ac justo lectus. Nunc ultrices aliquet purus non dictum. Nulla facilisi. Quisque vitae urna non purus sollicitudin venenatis. Aliquam erat volutpat. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. In hendrerit tortor sed massa consequat eu viverra justo porta. Ut nec felis sem, non elementum.
+}
+
+%----------------------------------------------------------------------------------------
+
+\end{poster}
+
+\end{document}
