@@ -6,9 +6,12 @@
 \usepackage[sfdefault,light]{roboto}
 
 \graphicspath{{figures/}} % Directory in which figures are stored
-\definecolor{bordercol}{RGB}{100,40,40} % Border color of content boxes
-\definecolor{boxcolor}{RGB}{255,255,255} % Background color for the header in the content boxes (left side)
-\definecolor{headerfontcol}{RGB}{179,27,27} % Text color for the header text in the content boxes
+\definecolor{bordercol}{RGB}{100,40,40}
+\definecolor{boxcolor}{RGB}{255,255,255}
+\definecolor{headerfontcol}{RGB}{179,27,27}
+\definecolor{graybox}{RGB}{220,220,220}
+\definecolor{greenbox}{RGB}{210,245,210}
+\definecolor{greenbox_adj}{RGB}{215,235,215}
 
 \begin{document}
 
@@ -16,7 +19,7 @@
     columns=4,
     borderColor=bordercol,headerColorOne=boxcolor,headerColorTwo=boxcolor,headerFontColor=headerfontcol,boxColorOne=boxcolor,
     background=none,boxshade=plain,
-    headershape=rectangle,textborder=rectangle,headerborder=open,
+    headershape=rectangle,textborder=none,headerborder=none,
     headerfont=\Large\sf\bf,
     grid=false,linewidth=1
 }
@@ -27,7 +30,7 @@
 {\includegraphics[scale=1.7]{logo.pdf}}
 
 
-\headerbox{Abstract}{name=abstract,column=0,row=0,span=1}
+\headerbox{Abstract}{name=abstract,column=0,row=0,span=1,boxColorOne=graybox,headerColorOne=graybox,headerColorTwo=graybox}
 {
     Telomeres are regions of repetitive nucleotide sequences capping eukaryotic chromosomes that protect the ends of chromosomes from deterioration.
     Telomeres are known to generally shorten after each cell replication, eventually blocking somatic cell division and preventing genomic instability.
@@ -63,21 +66,69 @@
 }
 
 
-\headerbox{Acknowledgements}{name=acknowledgements,column=0,below=references,above=bottom}
+\headerbox{Acknowledgements}{name=acknowledgements,column=0,below=references,above=bottom,boxColorOne=graybox,headerColorOne=graybox,headerColorTwo=graybox}
 {
     ACKS HERE
 }
 
 
-\headerbox{Introduction}{name=introduction,span=3,column=1,row=0}
+\headerbox{Introduction}{name=telomere_sequencing,span=1,column=1,row=0,boxColorOne=graybox,headerColorOne=graybox,headerColorTwo=graybox}
 {
-    Nunc sit amet sem ut nulla tincidunt mattis vel nec mauris. Vestibulum odio tellus, lobortis. Vel adipiscing, Aliquam dictum, ligula egestas commodo posuere, lectus lectus congue ligula, sed posuere urna lectus at nisi. Aenean commodo risus ut dolor (viverra scelerisque). Nullam varius, lacus et interdum hendrerit, odio orci ultrices mauris, id interdum eros mauris at urna. Fusce in nisi eros, sit amet volutpat turpis, \textbf{porttior magna} (commodo blandit euismod) \textbf{facilisis ornate magnis} (dis magnis). 
+    \vspace{2in}
 }
 
 
-\headerbox{Methods}{name=methods,span=3,column=1,below=introduction}
+\headerbox{}{name=riethman,span=1,column=2,row=0,boxheaderheight=0mm,boxColorOne=graybox,headerColorOne=graybox,headerColorTwo=graybox}
 {
-    Nunc sit amet sem ut nulla tincidunt mattis vel nec mauris. Vestibulum odio tellus, lobortis. Vel adipiscing, Aliquam dictum, ligula egestas commodo posuere, lectus lectus congue ligula, sed posuere urna lectus at nisi. Aenean commodo risus ut dolor (viverra scelerisque). Nullam varius, lacus et interdum hendrerit, odio orci ultrices mauris, id interdum eros mauris at urna. Fusce in nisi eros, sit amet volutpat turpis, \textbf{porttior magna} (commodo blandit euismod) \textbf{facilisis ornate magnis} (dis magnis). 
+    Riethman subtelomeres
+    \vspace{2in}
+}
+
+
+\headerbox{}{name=wetlab_telomeres,span=1,column=3,row=0,boxheaderheight=0mm,boxColorOne=graybox,headerColorOne=graybox,headerColorTwo=graybox}
+{
+    Wetlab results from NASA
+    \vspace{2in}
+}
+
+
+\headerbox{Methods}{name=hg38ext,span=1,column=1,below=telomere_sequencing}
+{
+    hg38ext
+    \vspace{2in}
+}
+
+
+\headerbox{}{name=pipeline,span=2,column=2,below=telomere_sequencing,boxheaderheight=0mm}
+{
+    edgeCase pipeline
+}
+
+
+\headerbox{Results}{name=giab_pb,span=1,column=1,below=hg38ext,boxColorOne=greenbox,headerColorOne=greenbox_adj,headerColorTwo=greenbox_adj}
+{
+    GIAB PB
+    \vspace{2in}
+}
+
+
+\headerbox{}{name=no_flipflop,span=1,column=2,below=hg38ext,boxheaderheight=0mm,boxColorOne=greenbox}
+{
+    ONT no flipflop
+    \vspace{2in}
+}
+
+
+\headerbox{}{name=flipflop,span=1,column=3,below=hg38ext,boxheaderheight=0mm,boxColorOne=greenbox}
+{
+    ONT flipflop
+    \vspace{2in}
+}
+
+
+\headerbox{}{name=meme,span=1,column=1,below=giab_pb,above=bottom,boxheaderheight=0mm,boxColorOne=greenbox}
+{
+    MEME
 
     \begin{center}
     \includegraphics[width=0.49\linewidth]{placeholder}
@@ -87,15 +138,15 @@
 }
 
 
-\headerbox{Results}{name=results,span=3,column=1,below=methods}
+\headerbox{Further work}{name=unimizers,span=1,column=2,below=giab_pb,above=bottom}
 {
-    Aliquam ac justo lectus. Nunc ultrices aliquet purus non dictum. Nulla facilisi. Quisque vitae urna non purus sollicitudin venenatis. Aliquam erat volutpat. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. In hendrerit tortor sed massa consequat eu viverra justo porta. Ut nec felis sem, non elementum.
+    Unimizers
 }
 
 
-\headerbox{Further work}{name=further_work,span=3,column=1,below=results,above=bottom}
+\headerbox{}{name=unimizers,span=1,column=3,below=giab_pb,above=bottom,boxheaderheight=0mm}
 {
-    Nunc sit amet sem ut nulla tincidunt mattis vel nec mauris. Vestibulum odio tellus, lobortis. Vel adipiscing, Aliquam dictum, ligula egestas commodo posuere, lectus lectus congue ligula, sed posuere urna lectus at nisi. Aenean commodo risus ut dolor (viverra scelerisque). Nullam varius, lacus et interdum hendrerit, odio orci ultrices mauris, id interdum eros mauris at urna. Fusce in nisi eros, sit amet volutpat turpis, \textbf{porttior magna} (commodo blandit euismod) \textbf{facilisis ornate magnis} (dis magnis). Aliquam ac justo lectus. Nunc ultrices aliquet purus non dictum. Nulla facilisi. Quisque vitae urna non purus sollicitudin venenatis. Aliquam erat volutpat. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. In hendrerit tortor sed massa consequat eu viverra justo porta. Ut nec felis sem, non elementum.
+    Assembly graph
 }
 
 
