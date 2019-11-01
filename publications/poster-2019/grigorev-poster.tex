@@ -53,7 +53,7 @@
     reads, established methods for long read overlap and assembly that rely on MinHash sketches and minimizers are unsuitable for this problem and fail
     to detect most correct overlaps when compared to the computationally prohibitive, but mathematically correct Smith-Waterman alignment.
     We implement a modified method relying on \textit{unimizers} (minimizers occurring once within a given read) that improves overlaps and reduces
-    complexity of the assembly graph, and locally assemble branching telomeric sequences using the computationally efficient A-Bruijn structure.
+    complexity of the assembly graph, and locally assemble branching telomeric sequences \\ using the computationally efficient \\ A-Bruijn structure.
 }
 
 
@@ -109,22 +109,26 @@
 
 \headerbox{Results}{name=giab_pb,span=1,column=1,below=hg38ext,boxColorOne=bluebox,headerColorOne=bluebox_adj,headerColorTwo=bluebox_adj}
 {
-    GIAB PB
-    \vspace{2in}
+    \begin{center}
+        \includegraphics[width=\linewidth]{giab-pacbio-densityplot.pdf}
+            \captionof{figure}{
+                GIAB PacBio
+            }
+    \end{center}
 }
 
 
 \headerbox{}{name=no_flipflop,span=1,column=2,below=hg38ext,boxheaderheight=0mm,boxColorOne=bluebox}
 {
     ONT no flipflop
-    \vspace{2in}
+    \vspace{1in}
 }
 
 
 \headerbox{}{name=flipflop,span=1,column=3,below=hg38ext,boxheaderheight=0mm,boxColorOne=bluebox}
 {
     ONT flipflop
-    \vspace{2in}
+    \vspace{1in}
 }
 
 
@@ -140,7 +144,7 @@
 }
 
 
-\headerbox{Further work}{name=unimizers,span=1,column=2,below=giab_pb,above=bottom}
+\headerbox{Further work}{name=unimizers,span=1,column=2,below=no_flipflop,above=bottom}
 {
     \begin{center}
         \includegraphics[width=\linewidth]{unimizers.png}
@@ -167,7 +171,7 @@
 }
 
 
-\headerbox{}{name=unimizers,span=1,column=3,below=giab_pb,above=bottom,boxheaderheight=0mm}
+\headerbox{}{name=unimizers,span=1,column=3,below=no_flipflop,above=bottom,boxheaderheight=0mm}
 {
     Assembly graph
 }
