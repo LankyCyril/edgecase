@@ -60,6 +60,7 @@
 \headerbox{References}{name=references,column=0,below=abstract}
 {
     REFS HERE
+    \vspace{1in}
 %\renewcommand{\section}[2]{\vskip 0.05em} % Get rid of the default "References" section title
 %\nocite{*} % Insert publications even if they are not cited in the poster
 %
@@ -174,7 +175,7 @@
         \includegraphics[width=\linewidth]{unimizers.png}
             \captionof{figure}{
                 Comparison between \textit{minimizers} (gray) and
-                \textit{\textbf{unimizers}} (blue) for \textit{k}=16 and
+                \textit{\textbf{unimizers}} (blue), both for \textit{k}=16 and
                 \textit{w}=11.
                 \\
                 Unimizers are minimizers that occur only once per given read.
@@ -185,11 +186,8 @@
                 \\
                 Arrays of unimizers have an advantage of
                 \textit{\textbf{directionality}} compared to minimizers and
-                can 1) identify overlaps of low-complexity reads and
-                2) be used to construct de Bruijn-like graphs (ABruijn graphs
-                originally introduced in a different framework
-                \textit{[Pevzner, 2004; % 10.1101/gr.2395204
-                Lin, 2016]}) % doi.org/10.1073/pnas.1604560113
+                can identify overlaps of low-complexity reads \\
+                while minimizers fail to do so.
             }
     \end{center}
 }
@@ -197,7 +195,10 @@
 
 \headerbox{}{name=unimizers,span=1,column=3,below=flipflop,above=bottom,boxheaderheight=0mm}
 {
-    Assembly graph
+        2) be used to construct de Bruijn-like graphs (ABruijn graphs
+        originally introduced in a different framework
+        \textit{[Pevzner, 2004; % 10.1101/gr.2395204
+        Lin, 2016]}) % doi.org/10.1073/pnas.1604560113
 }
 
 
