@@ -4,6 +4,8 @@
 \usepackage{booktabs} % Horizontal rules in tables
 \usepackage{relsize} % Used for making text smaller in some places
 \usepackage[sfdefault,light]{roboto}
+\usepackage[backend=bibtex,style=nature]{biblatex}
+\addbibresource{references.bib}
 
 \graphicspath{{figures/}} % Directory in which figures are stored
 \definecolor{bordercol}{RGB}{100,40,40}
@@ -33,7 +35,7 @@
 
 
 \headerbox{Abstract}{name=abstract,column=0,row=0,span=1,boxColorOne=graybox,headerColorOne=graybox,headerColorTwo=graybox}
-{
+{\small
     Telomeres are regions of repetitive nucleotide sequences capping eukaryotic chromosomes that protect the ends of chromosomes from deterioration.
     Telomeres are known to generally shorten after each cell replication, eventually blocking somatic cell division and preventing genomic instability.
     As such, their length is an important marker in senescence, where it can inversely correlate with a subject’s age, and in cancers, where both
@@ -53,33 +55,30 @@
     reads, established methods for long read overlap and assembly that rely on MinHash sketches and minimizers are unsuitable for this problem and fail
     to detect most correct overlaps when compared to the computationally prohibitive, but mathematically correct Smith-Waterman alignment.
     We implement a modified method relying on \textit{unimizers} (minimizers occurring once within a given read) that improves overlaps and reduces
-    complexity of the assembly graph, and locally assemble branching telomeric sequences \\ using the computationally efficient \\ A-Bruijn structure.
+    complexity of the assembly graph, and locally assemble branching telomeric sequences using the computationally efficient A-Bruijn structure.
 }
 
 
 \headerbox{References}{name=references,column=0,below=abstract}
 {
-    REFS HERE
-    \vspace{1in}
-%\renewcommand{\section}[2]{\vskip 0.05em} % Get rid of the default "References" section title
-%\nocite{*} % Insert publications even if they are not cited in the poster
-%
-%\bibliographystyle{unsrt}
-%\bibliography{sample} % Use sample.bib as the bibliography file
+    \begingroup
+    \raggedright
+    \AtNextBibliography{\footnotesize}
+    \printbibliography[heading=none]
+    \endgroup
 }
 
 
 \headerbox{Acknowledgements}{name=acknowledgements,column=0,below=references,boxColorOne=graybox,headerColorOne=graybox,headerColorTwo=graybox}
-{
-    ACKS HERE
-    \vspace{.8in}
+{\small
+    Susan Bailey (Colorado State University)
 }
 
 
 \headerbox{}{name=copyright,column=0,below=acknowledgements,above=bottom,boxheaderheight=0mm}
-{\tiny
-    \textcopyright{} 2019 Institute for Computational Biomedicine,
-    Weill Cornell Medicine
+{\scriptsize
+    ~\\~\\~\\
+    \textcopyright{} 2019 Weill Cornell Medicine
 }
 
 
@@ -88,8 +87,8 @@
     \begin{center}
         \includegraphics[width=\linewidth]{t2t.png}
             \captionof{figure}{
-                Telomere-to-telomere sequencing of the human X chromosome
-                    (adapted from \textit{[Miga et al., 2019]}). % 10.1101/735928
+                Telomere-to-telomere sequencing of the human X chromosome \\
+                    (adapted from \textit{Miga et al., 2019} \cite{t2t}).
             }
     \end{center}
 }
@@ -101,7 +100,7 @@
         \includegraphics[width=\linewidth]{riethman.png}
             \captionof{figure}{
                 Sequencing of human subtelomeres (adapted from
-                \textit{[Stong et al., 2014]}). % 10.1101/gr.166983.113
+                \textit{Stong et al., 2014} \cite{riethman2014}).
             }
     \end{center}
 }
@@ -113,8 +112,7 @@
         \includegraphics[width=\linewidth]{twin-telomeres-wetlab.png}
             \captionof{figure}{
                 Elongation of telomeres observed \\
-                during space flight in the NASA Twins Study
-                \textit{[Garrett-Bakelman et al., 2019]} % 10.1126/science.aau8650
+                during space flight in the NASA Twins Study \cite{nasatwins}.
             }
     \end{center}
 }
@@ -153,9 +151,7 @@
         \includegraphics[width=\linewidth]{giab-pacbio-densityplot.pdf}
             \captionof{figure}{
                 Distribution of major motifs in the \\ telomeric reads from the
-                SMRT hg002 Genome In a Bottle
-                \textit{[Zook et al., 2016]} % 10.1038/sdata.2016.25
-                sample. \\
+                SMRT hg002 Genome In a Bottle \cite{giab} sample. \\
                 The density plots suggest that two haplotypes are present, with
                 a shorter and a longer distance between the non-canonical TTGGGG
                 runs. The similarity of overall distributions suggests that the
@@ -204,8 +200,7 @@
             \captionof{figure}{
                 Motifs in segments of SMRT reads extending past the annotated
                 subtelomere. \\
-                Motif discovery was performed with MEME
-                \textit{[Bailey et al., 1994]}
+                Motif discovery was performed with MEME \cite{meme}.
             }
     \end{center}
 }
@@ -242,7 +237,7 @@
             \captionof{figure}{
                 The directionality of unimizers allows to more easily construct
                 de Bruijn-like graphs (A-Bruijn graphs originally introduced in
-                a different framework \textit{[Pevzner et al., 2004]}). % 10.1101/gr.2395204
+                a different framework \cite{abruijn2004}).
         }
     \end{center}
 }
