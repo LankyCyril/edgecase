@@ -1,5 +1,5 @@
 from sys import stdout
-from edgecaselib.formats import load_index, interpret_flags
+from edgecaselib.formats import load_index, filter_bam
 from pysam import AlignmentFile
 from functools import reduce
 from operator import __or__
@@ -35,10 +35,10 @@ def updated_entry(entry, flags, is_q=False):
     return new_entry
 
 
-def filter_entries(bam_data, ecxfd, flag_filter):
+def filter_entries(bam_data, ecxfd, samfilters):
     """Only pass reads extending past regions specified in the ECX"""
-    for entry in bam_data:
-        if (entry.flag & flag_filter == 0) and (entry.reference_name in ecxfd):
+    for entry in filter_bam(bam_data, samfilters):
+        if entry.reference_name in ecxfd:
             # find positions of start and end of read relative to reference:
             p_pos = get_terminal_pos(entry, cigarpos=0)
             q_pos = get_terminal_pos(entry, cigarpos=-1)
@@ -86,10 +86,10 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
             )
 
 
-def main(bam, index, flag_filter, max_read_length, file=stdout, **kwargs):
+def main(bam, index, flags, flags_any, flag_filter, min_quality, max_read_length, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
-    int_flag_filter = interpret_flags(flag_filter)
+    samfilters = [flags, flags_any, flag_filter, min_quality]
     with AlignmentFile(bam) as bam_data:
         reflens = dict(zip(bam_data.references, bam_data.lengths))
         print(str(bam_data.header).rstrip("\n"), file=file)
@@ -100,5 +100,5 @@ def main(bam, index, flag_filter, max_read_length, file=stdout, **kwargs):
             bam_chunk = get_bam_chunk(
                 bam_data, chrom, ecxfd, reflens, max_read_length
             )
-            for entry in filter_entries(bam_chunk, ecxfd, int_flag_filter):
+            for entry in filter_entries(bam_chunk, ecxfd, samfilters):
                 print(entry.to_string(), file=file)
