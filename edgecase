@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from itertools import chain
+from sys import argv
 import edgecaselib
 
 
@@ -116,7 +117,13 @@ create_subparser(
     }
 )
 
-kwargs = dict(parser.parse_args()._get_kwargs())
+try:
+    kwargs = dict(parser.parse_args()._get_kwargs())
+except SystemExit:
+    if (len(argv) > 1) and (argv[1] in subparsers.choices):
+        if ("-h" not in argv) and ("--help" not in argv):
+            exit(subparsers.choices[argv[1]].print_help() or 1)
+    exit(1)
 if kwargs["subparser"] in subparsers.choices:
     getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
 else:
