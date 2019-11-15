@@ -34,12 +34,13 @@ def interpret_args(fmt, fasta_get_markov, bioawk, samtools, meme, background):
         raise ValueError("Unsupported --fmt: '{}'".format(fmt))
     bg_fmt = guess_bg_fmt(background)
     if bg_fmt == "sam":
+        error_mask = "No {} found, needed to generate background"
         if get_executable("fasta-get-markov", fasta_get_markov, False) is None:
-            raise ValueError("need fasta-get-markov for background, not found")
+            raise ValueError(error_mask.format("fasta-get-markov"))
         if get_executable("bioawk", bioawk, False) is None:
-            raise ValueError("need bioawk for background, not found")
+            raise ValueError(error_mask.format("bioawk"))
         if get_executable("samtools", samtools, False) is None:
-            raise ValueError("need samtools for background, not found")
+            raise ValueError(error_mask.format("samtools"))
     return (
         manager,
         get_executable("fasta-get-markov", fasta_get_markov, False),
