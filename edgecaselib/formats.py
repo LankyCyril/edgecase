@@ -79,7 +79,7 @@ def filter_and_read_tsv(dat, gzipped, samfilters):
             datflt_name = path.join(tempdir, "dat.gz")
             with gzopen(datflt_name, mode="wt") as datflt:
                 decorated_line_iterator = tqdm(
-                    dat_handle, desc="Filtering", unit=" records"
+                    dat_handle, desc="Filtering", unit=" lines"
                 )
                 for line in decorated_line_iterator:
                     if line[0] == "#":
@@ -178,7 +178,11 @@ def load_index(index_filename, as_filter_dict=False):
     if not path.isfile(index_filename):
         raise FileNotFoundError(index_filename)
     else:
-        ecx = read_csv(index_filename, sep="\t", skiprows=1, escapechar="#")
+        ecx = read_csv(
+            index_filename, sep="\t", skiprows=1,
+            escapechar="#", na_values="-"
+        )
+        ecx = ecx[ecx["blacklist"].isnull()]
         if as_filter_dict:
             slim_ecx = ecx[["rname", "pos", "flag", "prime"]]
             rnames = set(slim_ecx["rname"])

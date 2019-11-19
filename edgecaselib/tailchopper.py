@@ -21,24 +21,31 @@ def get_cigar_clip_length(entry, prime):
         )
 
 
-def update_aligned_segment(entry, start=None, end=None):
+def update_aligned_segment(entry, map_pos, start=None, end=None):
     """Update sequence, cigar, quality string in-place"""
+    if (end is not None) and (start is not None) and (end < start):
+        start, end = end, start
     qualities_substring = entry.query_qualities[start:end]
     entry.query_sequence = entry.query_sequence[start:end]
-    entry.cigarstring = None
+    if entry.query_sequence:
+        entry.cigarstring = str(len(entry.query_sequence)) + "S"
+    else:
+        entry.cigarstring = None
     entry.flag |= 4
     entry.query_qualities = qualities_substring
 
 
-def cigar_chopper(entry, ecx, integer_target, relax_radius=0):
+def cigar_chopper(entry, ecx, integer_target):
     """Return only clipped part of sequence"""
     is_q = (entry.flag & 0x8000 != 0)
+    error = None
     if is_q:
         cigar_clip = search(r'(\d+[SH])+$', entry.cigarstring)
     else:
         cigar_clip = search(r'^(\d+[SH])+', entry.cigarstring)
     if not cigar_clip:
-        update_aligned_segment(entry, 0, 0)
+        update_aligned_segment(entry, None, 0, 0)
+        error = "No clipped sequence"
     else:
         clip_length = sum(
             int(clip) for clip in split(r'[SH]', cigar_clip.group())
@@ -46,31 +53,61 @@ def cigar_chopper(entry, ecx, integer_target, relax_radius=0):
         )
         if clip_length > 0:
             if is_q:
-                update_aligned_segment(entry, -clip_length, None)
+                map_pos = entry.reference_end - 1
+                update_aligned_segment(entry, map_pos, -clip_length, None)
             else:
-                update_aligned_segment(entry, None, clip_length)
+                map_pos = entry.reference_start
+                update_aligned_segment(entry, map_pos, None, clip_length)
         else:
-            update_aligned_segment(entry, 0, 0)
-    return entry
+            update_aligned_segment(entry, None, 0, 0)
+            error = "No clipped sequence"
+    return entry, error
 
 
-def find_closest_position(positions, anchor_pos, relax_radius):
+def find_map_and_cut_positions(entry, anchor_pos, is_q):
     """Find closest mapping position within `relax_radius` of anchor"""
-    for step in range(0, relax_radius+1):
-        for adjusted_anchor_pos in anchor_pos-step, anchor_pos, anchor_pos+step:
+    positions = entry.get_reference_positions(full_length=True)
+    try:
+        cut_pos = positions.index(anchor_pos)
+        if is_q:
+            return cut_pos, cut_pos
+        else:
+            return entry.reference_start, cut_pos
+    except ValueError:
+        if entry.reference_start <= anchor_pos < entry.reference_end:
+            ref_map_length = entry.reference_end - 1 - entry.reference_start
             try:
-                read_pos = positions.index(adjusted_anchor_pos)
+                read_map_length = (
+                    positions.index(entry.reference_end-1) -
+                    positions.index(entry.reference_start)
+                )
             except ValueError:
-                pass
+                raise IndexError("SAM error? Last mapped position not on read")
+            ref_anchor_distance = anchor_pos - entry.reference_start
+            cut_pos = int(round(
+                ref_anchor_distance * read_map_length / ref_map_length
+            ))
+            if is_q:
+                return cut_pos, cut_pos
             else:
-                return read_pos
-    else:
-        raise ValueError("Mapped position not found within radius")
+                return entry.reference_start, cut_pos
+        elif is_q:
+            if entry.reference_start >= anchor_pos:
+                return entry.reference_start, entry.reference_start
+            elif entry.reference_end < anchor_pos:
+                raise ValueError("Anchor position beyond mapped portion")
+        else:
+            if entry.reference_end < anchor_pos:
+                return entry.reference_start, entry.reference_end - 1
+            elif entry.reference_start > anchor_pos:
+                raise ValueError("Anchor position beyond mapped portion")
+    raise ValueError("Satisfactory cutting position not found")
 
 
-def relative_chopper(entry, ecx, integer_target, relax_radius):
+def relative_chopper(entry, ecx, integer_target):
     """Return only part of sequence past the anchor"""
     is_q = (entry.flag & 0x8000 != 0)
+    error = None
     prime = 3 if is_q else 5
     indexer = (
         (ecx["rname"]==entry.reference_name) &
@@ -81,28 +118,27 @@ def relative_chopper(entry, ecx, integer_target, relax_radius):
         raise ValueError("Ambiguous index entry: {}".format(anchor_positions))
     elif len(anchor_positions) == 0:
         update_aligned_segment(entry, 0, 0)
+        error = "No anchor data in index"
     else:
         anchor_pos = anchor_positions.iloc[0]
-        positions = entry.get_reference_positions(full_length=True)
         try:
-            read_pos = find_closest_position(
-                positions, anchor_pos, relax_radius=relax_radius
+            map_pos, cut_pos = find_map_and_cut_positions(
+                entry, anchor_pos, is_q
             )
-        except ValueError:
-            update_aligned_segment(entry, 0, 0)
+        except ValueError as e:
+            update_aligned_segment(entry, None, 0, 0)
+            error = str(e)
         else:
             if is_q:
-                update_aligned_segment(entry, read_pos, None)
+                update_aligned_segment(entry, map_pos, cut_pos, None)
             else:
-                update_aligned_segment(entry, None, -read_pos)
-    return entry
+                update_aligned_segment(entry, map_pos, None, -cut_pos)
+    return entry, error
 
 
-def main(bam, index, flags, flags_any, flag_filter, min_quality, target, relax_radius, jobs=1, file=stdout, **kwargs):
+def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1, file=stdout, **kwargs):
     """Interpret arguments and dispatch data to subroutines"""
     if target == "cigar":
-        if relax_radius != 0:
-            raise ValueError("Cannot relax radius with --target=cigar")
         chopper, integer_target = cigar_chopper, None
     else:
         chopper, integer_target = relative_chopper, interpret_flags(target)
@@ -112,10 +148,13 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, relax_r
         samfilters = [flags, flags_any, flag_filter, min_quality]
         for entry in filter_bam(alignment, samfilters):
             if entry.query_sequence:
-                chopped_entry = chopper(
-                    entry, ecx, integer_target, relax_radius
+                chopped_entry, error = chopper(
+                    entry, ecx, integer_target
                 )
                 if chopped_entry.query_sequence:
                     print(chopped_entry.to_string(), file=file)
                 else:
-                    print("Unchoppable:", entry.query_name, file=stderr)
+                    error_message = "Skipping {} ({})".format(
+                        entry.query_name, error or "Zero length chop"
+                    )
+                    print(error_message, file=stderr)

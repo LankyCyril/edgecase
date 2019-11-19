@@ -71,7 +71,7 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
         return None, zeros(1)
 
 
-def pattern_scanner(entry_iterator, samfilters, pattern, cutoff, window_size, head_test, tail_test, num_reads, jobs):
+def pattern_scanner(entry_iterator, samfilters, motif, pattern, cutoff, window_size, head_test, tail_test, num_reads, jobs):
     """Calculate density of pattern hits in a rolling window along each read"""
     simple_entry_iterator = (
         SimpleNamespace(
@@ -100,7 +100,7 @@ def pattern_scanner(entry_iterator, samfilters, pattern, cutoff, window_size, he
             density_calculator, simple_entry_iterator
         )
         # iterate pairs (entry.query_name, density_array), same as calculate_density():
-        desc = "Calculating density of " + pattern.pattern.split(r'|')[0]
+        desc = "Calculating density of " + motif
         yield from tqdm(
             read_density_iterator, desc=desc,
             unit="read", total=num_reads
@@ -133,7 +133,7 @@ def main(bam, flags, flags_any, flag_filter, min_quality, motifs, head_test, tai
     for motif, pattern in motif_patterns.items():
         with AlignmentFile(bam) as entry_iterator:
             scanner = pattern_scanner(
-                entry_iterator, pattern=pattern,
+                entry_iterator, motif=motif, pattern=pattern,
                 samfilters=[flags, flags_any, flag_filter, min_quality],
                 window_size=window_size,
                 head_test=head_test, tail_test=tail_test,
