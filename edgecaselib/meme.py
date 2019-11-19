@@ -11,7 +11,7 @@ from contextlib import contextmanager
 @contextmanager
 def TemporaryDirectory():
     """Temporary TemporaryDirectory plug for development purposes"""
-    yield "data/datasets/twins/sandbox/edge-meme"
+    yield "data/datasets/giab/sandbox/edge-meme"
 
 
 def guess_bg_fmt(background):
