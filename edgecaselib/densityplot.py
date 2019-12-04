@@ -146,13 +146,11 @@ def plot_exploded_densities(densities, ecx, bin_size, no_align, title, flags=Non
                 pdf.savefig(page, bbox_inches="tight")
 
 
-def plot_combined_density(binned_density_dataframe, ecx, chrom, no_align, motif_order, motif_colors, motif_hatches, title, flags, flags_any, flag_filter, min_quality, ax):
-    """Plot stacked area charts with bootstrapped CIs"""
-    m_ord = motif_order.split("|") if motif_order else DEFAULT_MOTIFS
-    m_clr = motif_colors.split("|") if motif_colors else DEFAULT_MOTIF_COLORS
-    m_hch = motif_hatches.split("|") if motif_hatches else DEFAULT_MOTIF_HATCHES
-    skinny_cols = ["name", "motif"] + list(binned_density_dataframe.columns[8:])
-    skinny_bdf = binned_density_dataframe[skinny_cols]
+def stack_motif_densities(binned_density_dataframe, m_ord):
+    """Prepare densities for plotting the stacked area chart"""
+    skinny_bdf = binned_density_dataframe[
+        ["name", "motif"] + list(binned_density_dataframe.columns[8:])
+    ]
     motif_bdfs = [
         skinny_bdf[skinny_bdf["motif"]==motif] \
             .set_index("name").drop(columns="motif")
@@ -163,20 +161,30 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, no_align, motif_
     for i in range(len(motif_bdfs)):
         motif_bdfs[i] = motif_bdfs[i].reset_index()
         motif_bdfs[i]["motif"] = m_ord[i]
-    plottable_df = concat(motif_bdfs, axis=0).melt(
+    return concat(motif_bdfs, axis=0).melt(
         id_vars=["name", "motif"], var_name="position", value_name="density"
     )
+
+
+def get_motif_data(plottable_df, motif):
+    """Extract condensed averaged data for one motif (for fill_between)"""
+    return plottable_df[plottable_df["motif"]==motif].dropna(how="any") \
+        .groupby(["motif", "position"], as_index=False).mean()
+
+
+def plot_combined_density(binned_density_dataframe, ecx, chrom, no_align, motif_order, motif_colors, motif_hatches, title, flags, flags_any, flag_filter, min_quality, ax):
+    """Plot stacked area charts with bootstrapped CIs"""
+    m_ord = motif_order.split("|") if motif_order else DEFAULT_MOTIFS
+    m_clr = motif_colors.split("|") if motif_colors else DEFAULT_MOTIF_COLORS
+    m_hch = motif_hatches.split("|") if motif_hatches else DEFAULT_MOTIF_HATCHES
+    plottable_df = stack_motif_densities(binned_density_dataframe, m_ord)
     for i in range(len(m_ord)):
-        upper_motif_data = plottable_df[plottable_df["motif"]==m_ord[i]] \
-            .dropna(how="any") \
-            .groupby(["motif", "position"], as_index=False).mean()
+        upper_motif_data = get_motif_data(plottable_df, m_ord[i])
         if i == 0:
             lower_motif_data = upper_motif_data.copy()
             lower_motif_data["y"] = 0
         else:
-            lower_motif_data = plottable_df[plottable_df["motif"]==m_ord[i-1]] \
-                .dropna(how="any") \
-                .groupby(["motif", "position"], as_index=False).mean()
+            lower_motif_data = get_motif_data(plottable_df, m_ord[i-1])
         ax.fill_between(
             x=upper_motif_data["position"],
             y1=lower_motif_data["density"], y2=upper_motif_data["density"],
@@ -186,7 +194,13 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, no_align, motif_
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
         palette={m: "black" for m in set(plottable_df["motif"])}, ax=ax
     )
-    ax.set(xlabel=chrom, ylabel="density")
+    plottable_flags = ecx.loc[ecx["rname"]==chrom, ["pos", "flag"]]
+    for _, pos, flag in plottable_flags.itertuples():
+        ax.axvline(pos, -.2, 1.2, ls="--", lw=4, c=FLAG_COLORS[flag], alpha=.4)
+    ax.set(
+        xlim=(plottable_df["position"].min(), plottable_df["position"].max()),
+        xlabel=chrom, ylim=(0, 1), ylabel="density"
+    )
 
 
 def plot_densities(densities, ecx, bin_size, no_align, motif_order, motif_colors, motif_hatches, title, flags=None, flags_any=None, flag_filter=None, min_quality=0, file=stdout.buffer):
@@ -194,7 +208,7 @@ def plot_densities(densities, ecx, bin_size, no_align, motif_order, motif_colors
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
     figure, axs = subplots(
-        figsize=(32, 2*len(densities)), nrows=len(densities), squeeze=False
+        figsize=(20, len(densities)), nrows=len(densities), squeeze=False
     )
     for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:,0]):
         plot_combined_density(
