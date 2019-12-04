@@ -199,7 +199,7 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, no_align, motif_
         ax.axvline(pos, -.2, 1.2, ls="--", lw=4, c=FLAG_COLORS[flag], alpha=.4)
     ax.set(
         xlim=(plottable_df["position"].min(), plottable_df["position"].max()),
-        xlabel=chrom, ylim=(0, 1), ylabel="density"
+        xlabel=chrom, ylim=(0, 1), ylabel="density", yticks=[]
     )
 
 
@@ -208,7 +208,8 @@ def plot_densities(densities, ecx, bin_size, no_align, motif_order, motif_colors
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
     figure, axs = subplots(
-        figsize=(20, len(densities)), nrows=len(densities), squeeze=False
+        figsize=(16, len(densities)), gridspec_kw={"hspace": 1},
+        nrows=len(densities), squeeze=False
     )
     for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:,0]):
         plot_combined_density(
