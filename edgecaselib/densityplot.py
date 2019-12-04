@@ -203,6 +203,18 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, no_align, motif_
     )
 
 
+def align_subplots(axs):
+    """Modify xlim of related axes to make their scales match"""
+    ax_spans = []
+    for ax in axs:
+        xlim = ax.get_xlim()
+        ax_spans.append(xlim[1] - xlim[0])
+    max_span = max(ax_spans)
+    for ax in axs:
+        minx = ax.get_xlim()[0]
+        ax.set(xlim=(minx, minx+max_span))
+
+
 def plot_densities(densities, ecx, bin_size, no_align, motif_order, motif_colors, motif_hatches, title, flags=None, flags_any=None, flag_filter=None, min_quality=0, file=stdout.buffer):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
@@ -217,6 +229,7 @@ def plot_densities(densities, ecx, bin_size, no_align, motif_order, motif_colors
             motif_hatches, title, flags, flags_any, flag_filter,
             min_quality, ax=ax
         )
+    align_subplots(axs[:,0])
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
