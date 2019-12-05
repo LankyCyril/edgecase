@@ -30,6 +30,11 @@ DEFAULT_COLORS = ["cornflowerblue", "red", "cornflowerblue", "red"]
 DEFAULT_HATCHES = ["x", "x", None, None]
 
 
+def split_hatch(hatches_pattern):
+    """Split provided hatches pattern into individual ones"""
+    return [h if h != "None" else None for h in hatches_pattern.split("|")]
+
+
 def explain_sam_flags(flag, sep="|"):
     """Convert an integer flag into string"""
     return sep.join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)

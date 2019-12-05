@@ -2,6 +2,7 @@ from sys import stdout, stderr
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
 from edgecaselib.formats import DEFAULT_MOTIFS, DEFAULT_COLORS, DEFAULT_HATCHES
+from edgecaselib.formats import split_hatch
 from edgecaselib.util import natsorted_chromosomes
 from matplotlib.pyplot import subplots, rc_context, switch_backend
 from matplotlib.backends.backend_pdf import PdfPages
@@ -282,7 +283,7 @@ def interpret_arguments(exploded, motif_order, motif_colors, motif_hatches, samf
             raise NotImplementedError("--no-align without --exploded")
         m_ord = motif_order.split("|") if motif_order else DEFAULT_MOTIFS
         m_clr = motif_colors.split("|") if motif_colors else DEFAULT_COLORS
-        m_hch = motif_hatches.split("|") if motif_hatches else DEFAULT_HATCHES
+        m_hch = split_hatch(motif_hatches) if motif_hatches else DEFAULT_HATCHES
         flags, _, flag_filter, _ = samfilters
         if "is_q" in (flags2set(flags) - flags2set(flag_filter)):
             is_q = True
