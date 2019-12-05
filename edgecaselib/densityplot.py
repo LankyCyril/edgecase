@@ -113,8 +113,7 @@ def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_ali
         plottable_flags = ecx.loc[ecx["rname"]==chrom, ["pos", "flag"]]
         for _, pos, flag in plottable_flags.itertuples():
             trace_ax.axvline(
-                pos, -.2, 1.2, ls="--", lw=4,
-                c=FLAG_COLORS[flag], alpha=.4
+                pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4
             )
     axs[0, 0].set(title="{}\n-f={} -g={} -F={} -q={}".format(title, *samfilters))
     return page
@@ -175,17 +174,23 @@ def get_motif_data(plottable_df, motif):
 def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_order, motif_colors, motif_hatches, title, m_ord, m_clr, m_hch, target_anchor, is_q, ax):
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df = stack_motif_densities(binned_density_dataframe, m_ord)
-    for i in range(len(m_ord)):
-        upper_motif_data = get_motif_data(plottable_df, m_ord[i])
+    for i in range(len(m_ord)+1):
+        if i == len(m_ord):
+            upper_motif_data = get_motif_data(plottable_df, m_ord[0])
+            upper_motif_data["density"] = 1
+            color, hatch = "thistle", "*"
+        else:
+            upper_motif_data = get_motif_data(plottable_df, m_ord[i])
+            color, hatch = m_clr[i], m_hch[i]
         if i == 0:
             lower_motif_data = upper_motif_data.copy()
-            lower_motif_data["y"] = 0
+            lower_motif_data["density"] = 0
         else:
             lower_motif_data = get_motif_data(plottable_df, m_ord[i-1])
         ax.fill_between(
             x=upper_motif_data["position"],
             y1=lower_motif_data["density"], y2=upper_motif_data["density"],
-            color=m_clr[i], hatch=m_hch[i], alpha=.35
+            color=color, hatch=hatch, alpha=.35
         )
     lineplot(
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
@@ -198,7 +203,7 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_order, mot
     )
     plottable_flags = ecx.loc[indexer, ["pos", "flag"]]
     for _, pos, flag in plottable_flags.itertuples():
-        ax.axvline(pos, -.2, 1.2, ls="--", lw=4, c=FLAG_COLORS[flag], alpha=.4)
+        ax.axvline(pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4)
     short_chrom_name_match = search(r'([Cc]hr)?[0-9XYM]+([pq]tel)?', chrom)
     if short_chrom_name_match:
         short_chrom_name = short_chrom_name_match.group()
@@ -243,10 +248,12 @@ def plot_densities(densities, ecx, motif_order, motif_colors, motif_hatches, tit
     switch_backend("Agg")
     figure, axs = subplots(
         figsize=(16, len(densities)), gridspec_kw={"hspace": 1},
-        nrows=len(densities), squeeze=False
+        nrows=len(densities), squeeze=False, frameon=False
     )
     ax2chrom = {}
     for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:,0]):
+        for spine in ["top", "left", "right"]:
+            ax.spines[spine].set_visible(False)
         plot_combined_density(
             bdf, ecx, chrom, motif_order, motif_colors, motif_hatches,
             title, m_ord, m_clr, m_hch, target_anchor, is_q, ax=ax
