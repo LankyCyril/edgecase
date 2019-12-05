@@ -1,6 +1,7 @@
 from sys import stdout
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
+from edgecaselib.formats import DEFAULT_MOTIFS, DEFAULT_COLORS, DEFAULT_HATCHES
 from edgecaselib.util import natsorted_chromosomes
 from matplotlib.pyplot import subplots, rc_context, switch_backend
 from matplotlib.backends.backend_pdf import PdfPages
@@ -11,11 +12,6 @@ from tqdm import tqdm
 from os import path
 from pandas import concat
 from re import search
-
-
-DEFAULT_MOTIFS = ["CCCCAA", "CCCTAA", "TTGGGG", "TTAGGG"]
-DEFAULT_COLORS = ["cornflowerblue", "red", "cornflowerblue", "red"]
-DEFAULT_HATCHES = ["x", "x", None, None]
 
 
 def motif_subplots(nreads, chrom, max_mapq):
@@ -171,14 +167,24 @@ def get_motif_data(plottable_df, motif):
         .groupby(["motif", "position"], as_index=False).mean()
 
 
+def shorten_chrom_name(chrom):
+    short_chrom_name_match = search(r'([Cc]hr)?[0-9XYM]+([pq]tel)?', chrom)
+    if short_chrom_name_match:
+        short_chrom_name = short_chrom_name_match.group()
+    else:
+        short_chrom_name = chrom[:5]
+    if short_chrom_name != chrom:
+        short_chrom_name = short_chrom_name + "..."
+    return short_chrom_name
+
+
 def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_order, motif_colors, motif_hatches, title, m_ord, m_clr, m_hch, target_anchor, is_q, ax):
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df = stack_motif_densities(binned_density_dataframe, m_ord)
     for i in range(len(m_ord)+1):
         if i == len(m_ord):
             upper_motif_data = get_motif_data(plottable_df, m_ord[0])
-            upper_motif_data["density"] = 1
-            color, hatch = "thistle", "*"
+            upper_motif_data["density"], color, hatch = 1, "thistle", "*"
         else:
             upper_motif_data = get_motif_data(plottable_df, m_ord[i])
             color, hatch = m_clr[i], m_hch[i]
@@ -196,21 +202,18 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_order, mot
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
         palette={m: "black" for m in set(plottable_df["motif"])}, ax=ax
     )
-    prime = 3 if is_q else 5
     indexer = (
-        (ecx["rname"]==chrom) & (ecx["prime"]==prime) &
+        (ecx["rname"]==chrom) & (ecx["prime"]==(3 if is_q else 5)) &
         (ecx["flag"]==interpret_flags(target_anchor))
     )
     plottable_flags = ecx.loc[indexer, ["pos", "flag"]]
     for _, pos, flag in plottable_flags.itertuples():
         ax.axvline(pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4)
-    short_chrom_name_match = search(r'([Cc]hr)?[0-9XYM]+([pq]tel)?', chrom)
-    if short_chrom_name_match:
-        short_chrom_name = short_chrom_name_match.group()
-    else:
-        short_chrom_name = chrom[:5]
-    if short_chrom_name != chrom:
-        short_chrom_name = short_chrom_name + "..."
+    short_chrom_name = shorten_chrom_name(chrom)
+    ax.set(xlim=(
+        plottable_df["position"].values.min(),
+        plottable_df["position"].values.max()
+    ))
     ax.set(xlabel="", ylim=(0, 1), ylabel=short_chrom_name, yticks=[])
 
 
@@ -274,7 +277,7 @@ def interpret_arguments(exploded, motif_order, motif_colors, motif_hatches, samf
                 raise NotImplementedError("--motif-* with --exploded")
         if no_align:
             raise ValueError("--no-align with --exploded")
-        target_anchor, is_q = None, None
+        target_anchor, is_q, m_ord, m_clr, m_hch = None, None, None, None, None
     else:
         m_ord = motif_order.split("|") if motif_order else DEFAULT_MOTIFS
         m_clr = motif_colors.split("|") if motif_colors else DEFAULT_COLORS

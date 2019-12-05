@@ -25,6 +25,11 @@ ALL_SAM_FLAGS = [
 ]
 
 
+DEFAULT_MOTIFS = ["CCCCAA", "CCCTAA", "TTGGGG", "TTAGGG"]
+DEFAULT_COLORS = ["cornflowerblue", "red", "cornflowerblue", "red"]
+DEFAULT_HATCHES = ["x", "x", None, None]
+
+
 def explain_sam_flags(flag, sep="|"):
     """Convert an integer flag into string"""
     return sep.join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
