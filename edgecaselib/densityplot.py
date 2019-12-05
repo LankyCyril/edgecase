@@ -1,4 +1,4 @@
-from sys import stdout
+from sys import stdout, stderr
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
 from edgecaselib.formats import DEFAULT_MOTIFS, DEFAULT_COLORS, DEFAULT_HATCHES
@@ -274,11 +274,12 @@ def interpret_arguments(exploded, motif_order, motif_colors, motif_hatches, samf
     if exploded:
         for motif_argument in motif_order, motif_colors, motif_hatches:
             if motif_argument is not None:
-                raise NotImplementedError("--motif-* with --exploded")
-        if no_align:
-            raise ValueError("--no-align with --exploded")
+                message = "--motif-* with --exploded not fully implemented yet"
+                print(message, file=stderr)
         target_anchor, is_q, m_ord, m_clr, m_hch = None, None, None, None, None
     else:
+        if no_align:
+            raise NotImplementedError("--no-align without --exploded")
         m_ord = motif_order.split("|") if motif_order else DEFAULT_MOTIFS
         m_clr = motif_colors.split("|") if motif_colors else DEFAULT_COLORS
         m_hch = motif_hatches.split("|") if motif_hatches else DEFAULT_HATCHES
