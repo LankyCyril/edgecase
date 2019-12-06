@@ -10,13 +10,7 @@ from pandas import DataFrame, concat
 from uuid import uuid4
 from regex import finditer, IGNORECASE
 from itertools import count
-
-
-from contextlib import contextmanager
-@contextmanager
-def TemporaryDirectory():
-    """Temporary TemporaryDirectory plug for development purposes"""
-    yield "data/datasets/giab/sandbox/edge-meme"
+from tempfile import TemporaryDirectory
 
 
 def guess_bg_fmt(background):
