@@ -23,6 +23,8 @@ def TemporaryDirectory():
 
 def guess_bg_fmt(background):
     """Decide if `background` is in SAM/BAM format or is a MEME HMM"""
+    if background is None:
+        return None
     with open(background, mode="rb") as bg_handle:
         line = next(bg_handle)
     if search(br'^#.*Markov frequencies', line):
@@ -166,12 +168,20 @@ def run_meme(meme, jobs, readfile, background, lengths_array, nmotifs, evt, temp
             meme_output_dir = path.join(
                 tempdir, str(minw)+"-"+str(maxw)+"."+str(it)
             )
-            check_output([
-                meme, "-p", str(jobs), "-dna", "-mod", "anr", "-minsites", "1",
-                "-minw", str(minw), "-maxw", str(maxw), "-bfile", background,
-                "-nmotifs", str(nmotifs), "-evt", str(evt), "-brief", "0",
-                "-oc", meme_output_dir, current_readfile
-            ])
+            if background is None:
+                check_output([
+                    meme, "-p", str(jobs), "-mod", "anr",
+                    "-dna", "-minsites", "2", "-nmotifs", str(nmotifs),
+                    "-minw", str(minw), "-maxw", str(maxw), "-evt", str(evt),
+                    "-brief", "0", "-oc", meme_output_dir, current_readfile
+                ])
+            else:
+                check_output([
+                    meme, "-p", str(jobs), "-bfile", background, "-mod", "anr",
+                    "-dna", "-minsites", "2", "-nmotifs", str(nmotifs),
+                    "-minw", str(minw), "-maxw", str(maxw), "-evt", str(evt),
+                    "-brief", "0", "-oc", meme_output_dir, current_readfile
+                ])
             next_meme_report, current_readfile, stop_flag = find_and_mask_motifs(
                 current_readfile, tempdir, meme_output_dir, nmotifs
             )

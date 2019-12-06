@@ -72,7 +72,7 @@ create_subparser(
         ("--fasta-get-markov",): {"help": "fasta-get-markov binary (unless in $PATH)"},
         ("--meme",): {"help": "meme binary (unless in $PATH)"},
         ("--lengths",): {"help": "motif lengths to try, in order", "default": "6,5-7,8-100"},
-        ("--background", "--bg"): {"help": "background file (SAM/BAM or HMM)", "required": True, "default": "no default, required", "metavar": "B"},
+        ("--background", "--bg"): {"help": "background file (SAM/BAM or HMM)", "metavar": "B"},
         ("--nmotifs",): {"help": "nmotifs for each iteration of MEME", "default": 10, "type": int},
         ("--evt",): {"help": "evt for each iteration of MEME", "default": .1, "type": float}
     }
