@@ -62,12 +62,14 @@ def convert_background(sam, tempdir, fasta_get_markov, max_order=6, max_entries=
     """Convert a SAM/BAM file into Markov background for MEME"""
     print("SAM/BAM -> HMM...", file=stderr, flush=True)
     fasta_lines = []
+    i = 0
     with AlignmentFile(sam) as alignment:
-        for i, entry in enumerate(alignment):
+        for entry in alignment:
             if i >= max_entries:
                 break
-            else:
+            elif entry.seq:
                 fasta_lines.extend([">"+entry.qname, entry.seq])
+                i += 1
     hmm = run(
         [fasta_get_markov, "-m", str(max_order)],
         input="\n".join(fasta_lines), encoding="ascii", stdout=PIPE
