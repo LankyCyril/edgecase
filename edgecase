@@ -65,7 +65,7 @@ create_subparser(
 
 create_subparser(
     subparsers, "meme", help="discover motifs in candidate reads",
-    usage="{} meme [options] readfile > dat".format(__file__),
+    usage="{} meme [options] readfile > tsv".format(__file__),
     rules={
         ("readfile",): {"help": "name of input sam/bam/fasta/fastq file"},
         ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},

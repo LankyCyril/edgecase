@@ -4,14 +4,12 @@ from os import path
 from re import search
 from subprocess import PIPE, check_output, run
 from edgecaselib.formats import filter_bam
+from edgecaselib.formats import MEME_HEADER_FMT, MEME_REGEX_HEADER_FMT
 from edgecaselib.util import get_executable, circularize_motif
 from pandas import DataFrame, concat
 from uuid import uuid4
 from regex import finditer, IGNORECASE
 from itertools import count
-
-MEME_FMT = r'^MOTIF\s([A-Za-z]+)\sMEME-([0-9]+).*llr.*E-value\s*=\s*([0-9e.-]+)'
-MEME_REGEX_FMT = r'Motif\s[A-Za-z]+\sMEME-([0-9]+)\sregular\sexpression'
 
 
 from contextlib import contextmanager
@@ -110,7 +108,7 @@ def parse_meme_output(meme_txt, expect_nmotifs):
         meme_report = meme_report_handle.readlines()
     meme_df_as_list = []
     for line in meme_report:
-        header_matcher = search(MEME_FMT, line)
+        header_matcher = search(MEME_HEADER_FMT, line)
         if header_matcher:
             meme_df_as_list.append([
                 alpha_inversion(header_matcher.group(1)),
@@ -122,7 +120,7 @@ def parse_meme_output(meme_txt, expect_nmotifs):
     meme_df = DataFrame(data=meme_df_as_list, columns=["motif", "meme_id", "e"])
     meme_df["regex"] = None
     for i, line in enumerate(meme_report):
-        regex_header_matcher = search(MEME_REGEX_FMT, line)
+        regex_header_matcher = search(MEME_REGEX_HEADER_FMT, line)
         if regex_header_matcher:
             _id = int(regex_header_matcher.group(1))
             _regex = meme_report[i+2].strip()
