@@ -65,18 +65,16 @@ create_subparser(
 
 create_subparser(
     subparsers, "meme", help="discover motifs in candidate reads",
-    usage="{} meme [options] bams > dat".format(__file__),
+    usage="{} meme [options] readfile > dat".format(__file__),
     rules={
         ("readfile",): {"help": "name of input sam/bam/fasta/fastq file"},
         ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
         ("--fasta-get-markov",): {"help": "fasta-get-markov binary (unless in $PATH)"},
-        ("--bioawk",): {"help": "bioawk binary (unless in $PATH)"},
-        ("--samtools",): {"help": "samtools binary (unless in $PATH)"},
         ("--meme",): {"help": "meme binary (unless in $PATH)"},
-        ("--minw",): {"help": "minw for meme", "default": 3, "type": int},
-        ("--maxw",): {"help": "maxw for meme", "default": 100, "type": int},
+        ("--lengths",): {"help": "motif lengths to try, in order", "default": "6,5-7,8-100"},
         ("--background", "--bg"): {"help": "background file (SAM/BAM or HMM)", "required": True, "default": "no default, required", "metavar": "B"},
-        ("--evt",): {"help": "evt for meme", "default": .1, "type": float}
+        ("--nmotifs",): {"help": "nmotifs for each iteration of MEME", "default": 10, "type": int},
+        ("--evt",): {"help": "evt for each iteration of MEME", "default": .1, "type": float}
     }
 )
 
