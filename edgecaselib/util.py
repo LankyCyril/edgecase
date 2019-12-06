@@ -1,6 +1,6 @@
 from sys import stderr
 from regex import compile
-from re import split
+from re import split, search, finditer, IGNORECASE
 from shutil import which
 from os import path, access, X_OK
 
@@ -15,6 +15,11 @@ MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}
 MOTIF_COMPLEMENT_PATTERN = compile(r'|'.join(MOTIF_COMPLEMENTS.keys()))
 
 
+def validate_motif(motif):
+    """Make sure motif conforms to what we've implemented"""
+    return (search(r'^[ACGT\[\]\.]*$', motif, flags=IGNORECASE) is not None)
+
+
 def motif_revcomp(motif, ignorecase=True):
     """Reverse-complement a regex-like motif; only allows a subset of regex syntax (ACGT, dot, square brackets)"""
     if ignorecase:
@@ -25,6 +30,25 @@ def motif_revcomp(motif, ignorecase=True):
         return MOTIF_COMPLEMENT_PATTERN.sub(matcher, motif[::-1])
     except KeyError:
         raise ValueError("Unsupported character(s) in motif: {}".format(motif))
+
+
+def circularize_motif(motif, revcomp=True, as_regex=True):
+    """Make circular regex pattern if motif is valid"""
+    if not validate_motif(motif):
+        raise ValueError("Motif syntax not supported: '{}'".format(motif))
+    breakpoints = [
+        match.start() for match
+        in finditer(r'\[[ACGT]+\]|[ACGT]', motif, flags=IGNORECASE)
+    ]
+    inversions = {
+        motif[b:] + motif[:b] for b in breakpoints
+    }
+    if revcomp:
+        inversions |= circularize_motif(motif_revcomp(motif), False, False)
+    if as_regex:
+        return r'|'.join(sorted(inversions))
+    else:
+        return inversions
 
 
 def chromosome_natsort(chrom):

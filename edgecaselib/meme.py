@@ -4,7 +4,7 @@ from os import path
 from re import search
 from subprocess import PIPE, check_output, run
 from edgecaselib.formats import filter_bam
-from edgecaselib.util import get_executable
+from edgecaselib.util import get_executable, circularize_motif
 from pandas import DataFrame, concat
 from uuid import uuid4
 from regex import finditer, IGNORECASE
@@ -136,7 +136,10 @@ def find_and_mask_motifs(current_readfile, tempdir, meme_output_dir, expect_nmot
     )
     if meme_report is None:
         return None, current_readfile, True
-    maskable_regex = r'|'.join(set(meme_report["regex"])).lower()
+    circular_motifs = {
+        circularize_motif(motif) for motif in meme_report["regex"]
+    }
+    maskable_regex = r'|'.join(circular_motifs).lower()
     next_readfile = path.join(tempdir, str(uuid4()) + ".fa")
     with FastxFile(current_readfile) as unmasked:
         with open(next_readfile, mode="wt") as masked:
