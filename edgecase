@@ -71,7 +71,8 @@ create_subparser(
         ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
         ("--fasta-get-markov",): {"help": "fasta-get-markov binary (unless in $PATH)"},
         ("--meme",): {"help": "meme binary (unless in $PATH)"},
-        ("--lengths",): {"help": "motif lengths to try, in order", "default": "6,5-7,8-100"},
+        ("--lengths",): {"help": "motif lengths to try, in order", "default": "5,6,7,8-100"},
+        ("--keep-masking",): {"help": "mask found motifs before proceeding to the next lengths", "action": "store_true"},
         ("--background", "--bg"): {"help": "background file (SAM/BAM or HMM)", "metavar": "B"},
         ("--nmotifs",): {"help": "nmotifs for each iteration of MEME", "default": 10, "type": int},
         ("--evt",): {"help": "evt for each iteration of MEME", "default": .1, "type": float}

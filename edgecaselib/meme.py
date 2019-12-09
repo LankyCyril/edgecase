@@ -125,7 +125,7 @@ def parse_meme_output(meme_txt, expect_nmotifs):
     return meme_df.groupby(["motif", "regex"], as_index=False).min(), stop_flag
 
 
-def find_and_mask_motifs(current_readfile, tempdir, meme_output_dir, expect_nmotifs):
+def parse_for_motifs(current_readfile, tempdir, meme_output_dir, expect_nmotifs, keep_masking):
     """Parse the MEME output"""
     meme_report, stop_flag = parse_meme_output(
         path.join(meme_output_dir, "meme.txt"), expect_nmotifs
@@ -136,24 +136,27 @@ def find_and_mask_motifs(current_readfile, tempdir, meme_output_dir, expect_nmot
         circularize_motif(motif) for motif in meme_report["regex"]
     }
     maskable_regex = r'|'.join(circular_motifs).lower()
-    next_readfile = path.join(tempdir, str(uuid4()) + ".fa")
-    with FastxFile(current_readfile) as unmasked:
-        with open(next_readfile, mode="wt") as masked:
-            for entry in unmasked:
-                seq_as_list = list(entry.sequence)
-                match_iter = finditer(
-                    maskable_regex, entry.sequence,
-                    overlapped=True, flags=IGNORECASE
-                )
-                for match in match_iter:
-                    s, e = match.span()
-                    seq_as_list[s:e] = ["N"] * (e - s)
-                print(">" + entry.name, file=masked)
-                print("".join(seq_as_list), file=masked)
+    if keep_masking:
+        next_readfile = path.join(tempdir, str(uuid4()) + ".fa")
+        with FastxFile(current_readfile) as unmasked:
+            with open(next_readfile, mode="wt") as masked:
+                for entry in unmasked:
+                    seq_as_list = list(entry.sequence)
+                    match_iter = finditer(
+                        maskable_regex, entry.sequence,
+                        overlapped=True, flags=IGNORECASE
+                    )
+                    for match in match_iter:
+                        s, e = match.span()
+                        seq_as_list[s:e] = ["N"] * (e - s)
+                    print(">" + entry.name, file=masked)
+                    print("".join(seq_as_list), file=masked)
+    else:
+        next_readfile = current_readfile
     return meme_report, next_readfile, stop_flag
 
 
-def run_meme(meme, jobs, readfile, background, lengths_array, nmotifs, evt, tempdir):
+def run_meme(meme, jobs, readfile, background, lengths_array, keep_masking, nmotifs, evt, tempdir):
     """Run the MEME binary with preset parameters"""
     current_readfile = readfile
     meme_reports = []
@@ -176,8 +179,9 @@ def run_meme(meme, jobs, readfile, background, lengths_array, nmotifs, evt, temp
                     "-minw", str(minw), "-maxw", str(maxw), "-evt", str(evt),
                     "-brief", "0", "-oc", meme_output_dir, current_readfile
                 ])
-            next_meme_report, current_readfile, stop_flag = find_and_mask_motifs(
-                current_readfile, tempdir, meme_output_dir, nmotifs
+            next_meme_report, current_readfile, stop_flag = parse_for_motifs(
+                current_readfile, tempdir, meme_output_dir,
+                expect_nmotifs=nmotifs, keep_masking=keep_masking
             )
             if next_meme_report is not None:
                 meme_reports.append(next_meme_report)
@@ -186,7 +190,7 @@ def run_meme(meme, jobs, readfile, background, lengths_array, nmotifs, evt, temp
     return concat(meme_reports, axis=0)
 
 
-def main(readfile, fmt, flags, flags_any, flag_filter, min_quality, fasta_get_markov, background, meme, lengths, nmotifs, evt, jobs=1, file=stdout, **kwargs):
+def main(readfile, fmt, flags, flags_any, flag_filter, min_quality, fasta_get_markov, background, meme, lengths, keep_masking, nmotifs, evt, jobs=1, file=stdout, **kwargs):
     # parse arguments
     manager, fasta_get_markov, meme, bg_fmt = interpret_args(
         fmt, fasta_get_markov, meme, background
@@ -201,7 +205,7 @@ def main(readfile, fmt, flags, flags_any, flag_filter, min_quality, fasta_get_ma
             samfilters = [flags, flags_any, flag_filter, min_quality]
             readfile = convert_input(readfile, manager, tempdir, samfilters)
         combined_meme_report = run_meme(
-            meme, jobs, readfile, background, lengths_array,
+            meme, jobs, readfile, background, lengths_array, keep_masking,
             nmotifs, evt, tempdir
         )
     combined_meme_report.to_csv(file, sep="\t", index=False)
