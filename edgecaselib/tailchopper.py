@@ -31,7 +31,8 @@ def update_aligned_segment(entry, map_pos, start=None, end=None):
         entry.cigarstring = str(len(entry.query_sequence)) + "S"
     else:
         entry.cigarstring = None
-    entry.flag |= 4
+    if map_pos is not None:
+        entry.reference_start += map_pos
     entry.query_qualities = qualities_substring
 
 

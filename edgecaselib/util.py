@@ -1,6 +1,6 @@
 from sys import stderr
 from regex import compile
-from re import split
+from re import split, search, finditer, IGNORECASE
 from shutil import which
 from os import path, access, X_OK
 
@@ -13,6 +13,11 @@ ALPHABET = list("ACGT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
 MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}
 MOTIF_COMPLEMENT_PATTERN = compile(r'|'.join(MOTIF_COMPLEMENTS.keys()))
+
+
+def validate_motif(motif):
+    """Make sure motif conforms to what we've implemented"""
+    return (search(r'^[ACGT\[\]\.]*$', motif, flags=IGNORECASE) is not None)
 
 
 def motif_revcomp(motif, ignorecase=True):
