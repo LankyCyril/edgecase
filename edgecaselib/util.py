@@ -32,25 +32,6 @@ def motif_revcomp(motif, ignorecase=True):
         raise ValueError("Unsupported character(s) in motif: {}".format(motif))
 
 
-def circularize_motif(motif, revcomp=True, as_regex=True):
-    """Make circular regex pattern if motif is valid"""
-    if not validate_motif(motif):
-        raise ValueError("Motif syntax not supported: '{}'".format(motif))
-    breakpoints = [
-        match.start() for match
-        in finditer(r'\[[ACGT]+\]|[ACGT]', motif, flags=IGNORECASE)
-    ]
-    inversions = {
-        motif[b:] + motif[:b] for b in breakpoints
-    }
-    if revcomp:
-        inversions |= circularize_motif(motif_revcomp(motif), False, False)
-    if as_regex:
-        return r'|'.join(sorted(inversions))
-    else:
-        return inversions
-
-
 def chromosome_natsort(chrom):
     """Natural order sorting that undestands chr1, 4, chr10, chr14_K*, 7ptel etc"""
     keyoder = []

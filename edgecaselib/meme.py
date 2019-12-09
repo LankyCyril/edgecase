@@ -5,12 +5,20 @@ from re import search
 from subprocess import PIPE, check_output, run
 from edgecaselib.formats import filter_bam
 from edgecaselib.formats import MEME_HEADER_FMT, MEME_REGEX_HEADER_FMT
-from edgecaselib.util import get_executable, circularize_motif
+from edgecaselib.util import get_executable
 from pandas import DataFrame, concat
 from uuid import uuid4
 from regex import finditer, IGNORECASE
 from itertools import count
 from tempfile import TemporaryDirectory
+from contextlib import contextmanager
+
+
+def IntermediateDir(dirname):
+    @contextmanager
+    def IntermediateDirManager():
+        yield dirname
+    return IntermediateDirManager
 
 
 def guess_bg_fmt(background):
@@ -25,7 +33,7 @@ def guess_bg_fmt(background):
         return "sam"
 
 
-def interpret_args(fmt, fasta_get_markov, meme, background):
+def interpret_args(fmt, fasta_get_markov, meme, background, lengths):
     """Parse and check arguments"""
     if fmt == "sam":
         manager = AlignmentFile
@@ -38,16 +46,6 @@ def interpret_args(fmt, fasta_get_markov, meme, background):
         error_mask = "No {} found, needed to generate background"
         if get_executable("fasta-get-markov", fasta_get_markov, False) is None:
             raise ValueError(error_mask.format("fasta-get-markov"))
-    return (
-        manager,
-        get_executable("fasta-get-markov", fasta_get_markov, False),
-        get_executable("meme", meme),
-        bg_fmt
-    )
-
-
-def interpret_lengths(lengths):
-    """Convert a lengths string into an array of minw and maxw"""
     lengths_array = []
     for span in lengths.split(","):
         fields = span.split("-")
@@ -55,7 +53,12 @@ def interpret_lengths(lengths):
             raise ValueError("Incorrect syntax: '{}'".format(lengths))
         else:
             lengths_array.append([int(fields[0]), int(fields[-1])])
-    return lengths_array
+    return (
+        manager,
+        get_executable("fasta-get-markov", fasta_get_markov, False),
+        get_executable("meme", meme),
+        bg_fmt, lengths_array
+    )
 
 
 def convert_background(sam, tempdir, fasta_get_markov, max_order=6, max_entries=1000000):
@@ -86,16 +89,9 @@ def convert_input(bam, manager, tempdir, samfilters):
     fasta = path.join(tempdir, "input.fa")
     with manager(bam) as alignment, open(fasta, mode="wt") as fasta_handle:
         for entry in filter_bam(alignment, samfilters, "SAM/BAM -> FASTA"):
-            print(
-                ">{}\n{}".format(entry.qname, entry.query_sequence),
-                file=fasta_handle
-            )
+            entry_str = ">{}\n{}".format(entry.qname, entry.query_sequence)
+            print(entry_str, file=fasta_handle)
     return fasta
-
-
-def alpha_inversion(motif):
-    """Get alphanumerically smallest inversion of motif"""
-    return min(motif[i:]+motif[:i] for i in range(len(motif)))
 
 
 def parse_meme_output(meme_txt, expect_nmotifs):
@@ -107,13 +103,16 @@ def parse_meme_output(meme_txt, expect_nmotifs):
         header_matcher = search(MEME_HEADER_FMT, line)
         if header_matcher:
             meme_df_as_list.append([
-                alpha_inversion(header_matcher.group(1)),
+                header_matcher.group(1),
                 int(header_matcher.group(2)), float(header_matcher.group(3))
             ])
     if len(meme_df_as_list) == 0:
         return None, True
     stop_flag = (len(meme_df_as_list) < expect_nmotifs)
-    meme_df = DataFrame(data=meme_df_as_list, columns=["motif", "meme_id", "e"])
+    meme_df = DataFrame(
+        data=meme_df_as_list,
+        columns=["motif", "meme_id", "e-value"]
+    )
     meme_df["regex"] = None
     for i, line in enumerate(meme_report):
         regex_header_matcher = search(MEME_REGEX_HEADER_FMT, line)
@@ -122,7 +121,8 @@ def parse_meme_output(meme_txt, expect_nmotifs):
             _regex = meme_report[i+2].strip()
             meme_df.loc[meme_df["meme_id"]==_id, "regex"] = _regex
     meme_df = meme_df.drop(columns="meme_id")
-    return meme_df.groupby(["motif", "regex"], as_index=False).min(), stop_flag
+    meme_df_groupby = meme_df.groupby(["motif", "regex"], as_index=False)
+    return meme_df_groupby.min(), stop_flag
 
 
 def parse_for_motifs(current_readfile, tempdir, meme_output_dir, expect_nmotifs, keep_masking):
@@ -132,11 +132,8 @@ def parse_for_motifs(current_readfile, tempdir, meme_output_dir, expect_nmotifs,
     )
     if meme_report is None:
         return None, current_readfile, True
-    circular_motifs = {
-        circularize_motif(motif) for motif in meme_report["regex"]
-    }
-    maskable_regex = r'|'.join(circular_motifs).lower()
     if keep_masking:
+        maskable_regex = r'|'.join(meme_report["regex"]).lower()
         next_readfile = path.join(tempdir, str(uuid4()) + ".fa")
         with FastxFile(current_readfile) as unmasked:
             with open(next_readfile, mode="wt") as masked:
@@ -154,6 +151,10 @@ def parse_for_motifs(current_readfile, tempdir, meme_output_dir, expect_nmotifs,
     else:
         next_readfile = current_readfile
     return meme_report, next_readfile, stop_flag
+
+
+def combine_meme_reports(meme_reports):
+    return concat(meme_reports, axis=0)
 
 
 def run_meme(meme, jobs, readfile, background, lengths_array, keep_masking, nmotifs, evt, tempdir):
@@ -184,19 +185,24 @@ def run_meme(meme, jobs, readfile, background, lengths_array, keep_masking, nmot
                 expect_nmotifs=nmotifs, keep_masking=keep_masking
             )
             if next_meme_report is not None:
+                next_meme_report["minw"] = minw
+                next_meme_report["maxw"] = maxw
                 meme_reports.append(next_meme_report)
             if stop_flag:
                 break
-    return concat(meme_reports, axis=0)
+    return combine_meme_reports(meme_reports)
 
 
-def main(readfile, fmt, flags, flags_any, flag_filter, min_quality, fasta_get_markov, background, meme, lengths, keep_masking, nmotifs, evt, jobs=1, file=stdout, **kwargs):
-    # parse arguments
-    manager, fasta_get_markov, meme, bg_fmt = interpret_args(
-        fmt, fasta_get_markov, meme, background
+def main(readfile, fmt, flags, flags_any, flag_filter, min_quality, fasta_get_markov, background, meme, lengths, keep_masking, nmotifs, evt, intermediate_dir, jobs=1, file=stdout, **kwargs):
+    # parse arguments:
+    manager, fasta_get_markov, meme, bg_fmt, lengths_array = interpret_args(
+        fmt, fasta_get_markov, meme, background, lengths
     )
-    lengths_array = interpret_lengths(lengths)
-    with TemporaryDirectory() as tempdir:
+    if intermediate_dir:
+        dirmanager = IntermediateDir(intermediate_dir)
+    else:
+        dirmanager = TemporaryDirectory
+    with dirmanager() as tempdir:
         if bg_fmt == "sam": # will need to convert SAM to HMM
             background = convert_background(
                 background, tempdir, fasta_get_markov
