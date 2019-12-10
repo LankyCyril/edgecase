@@ -11,8 +11,8 @@ dependencies:
   - bioawk=1.0=h84994c4_4
   - blas=2.10=openblas
   - bzip2=1.0.8=h516909a_0
-  - ca-certificates=2019.9.11=hecc5488_0
-  - certifi=2019.9.11=py36_0
+  - ca-certificates=2019.11.28=hecc5488_0
+  - certifi=2019.11.28=py36_0
   - curl=7.65.2=hf8cf82a_0
   - cycler=0.10.0=py_1
   - dbus=1.13.6=he372182_0
@@ -29,6 +29,8 @@ dependencies:
   - htslib=1.9=ha228f0b_7
   - icu=58.2=hf484d3e_1000
   - intel-openmp=2019.4=243
+  - jellyfish=2.2.10=h6bb024c_1
+  - jemalloc=4.5.0=0
   - jpeg=9c=h14c3975_1001
   - kiwisolver=1.1.0=py36hc9558a2_0
   - krb5=1.16.3=h05b26f9_1001
@@ -61,7 +63,7 @@ dependencies:
   - networkx=2.3=py_0
   - openblas=0.3.6=h6e990d7_4
   - openmpi=4.0.1=hc99cbb1_2
-  - openssl=1.1.1c=h516909a_0
+  - openssl=1.1.1d=h516909a_0
   - pcre=8.41=hf484d3e_1003
   - perl=5.26.2=h516909a_1006
   - perl-app-cpanminus=1.7044=pl526_1
