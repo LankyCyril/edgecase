@@ -72,7 +72,18 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
         return None, zeros(1)
 
 
-def pattern_scanner(entry_iterator, samfilters, motif, pattern, cutoff, window_size, head_test, tail_test, num_reads, jobs):
+def calculate_density_of_patterns(entry, motif_patterns, cutoff, window_size, head_test, tail_test):
+    """Calculate density of hits of each pattern in a rolling window along given read"""
+    entry_set = []
+    for motif, pattern in motif_patterns.items():
+        entry_mod, density_array = calculate_density(
+            entry, pattern, cutoff, window_size, head_test, tail_test
+        )
+        entry_set.append([entry_mod, motif, density_array])
+    return entry_set
+
+
+def pattern_scanner(entry_iterator, samfilters, motif_patterns, cutoff, window_size, head_test, tail_test, num_reads, jobs):
     """Calculate density of pattern hits in a rolling window along each read"""
     simple_entry_iterator = (
         SimpleNamespace(
@@ -93,15 +104,15 @@ def pattern_scanner(entry_iterator, samfilters, motif, pattern, cutoff, window_s
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
-            calculate_density, pattern=pattern,
+            calculate_density_of_patterns, motif_patterns=motif_patterns,
             window_size=window_size, head_test=head_test, tail_test=tail_test, cutoff=cutoff
         )
         # lazy multiprocess evaluation:
         read_density_iterator = pool.imap_unordered(
             density_calculator, simple_entry_iterator
         )
-        # iterate pairs (entry.query_name, density_array), same as calculate_density():
-        desc = "Calculating density of " + motif
+        # iterate pairs (entry.query_name, density_array), same as calculate_density_of_patterns():
+        desc = "Calculating density"
         yield from tqdm(
             read_density_iterator, desc=desc,
             unit="read", total=num_reads
@@ -117,9 +128,11 @@ def interpret_arguments(head_test, tail_test, cutoff, motif_file):
     elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
     motif_data = read_csv(motif_file, sep="\t", escapechar="#")
+    if "length" not in motif_data.columns:
+        motif_data["length"] = motif_data["motif"].apply(lambda m: len(m))
+    motif_data = motif_data.sort_values(by="length", ascending=False)
     motif_patterns = OrderedDict([
-        [motif, get_circular_pattern(motif)]
-        for motif in motif_data["motif"]
+        [motif, get_circular_pattern(motif)] for motif in motif_data["motif"]
     ])
     if "count" in motif_data.columns:
         total_counts = dict(zip(
@@ -137,18 +150,17 @@ def main(bam, flags, flags_any, flag_filter, min_quality, motif_file, head_test,
     )
     print(*DAT_HEADER, sep="\t", file=file)
     # scan fastq for target motif queries, parallelizing on reads:
-    # TODO: motif and pattern per read
-    for motif, pattern in motif_patterns.items():
-        with AlignmentFile(bam) as entry_iterator:
-            scanner = pattern_scanner(
-                entry_iterator, motif=motif, pattern=pattern,
-                samfilters=[flags, flags_any, flag_filter, min_quality],
-                window_size=window_size,
-                head_test=head_test, tail_test=tail_test,
-                cutoff=cutoff, num_reads=num_reads, jobs=jobs
-            )
-            # output densities of reads that pass filter:
-            for entry, density_array in scanner:
+    with AlignmentFile(bam) as entry_iterator:
+        scanner = pattern_scanner(
+            entry_iterator, motif_patterns=motif_patterns,
+            samfilters=[flags, flags_any, flag_filter, min_quality],
+            window_size=window_size,
+            head_test=head_test, tail_test=tail_test,
+            cutoff=cutoff, num_reads=num_reads, jobs=jobs
+        )
+        # output densities of reads that pass filter:
+        for entry_set in scanner:
+            for entry, motif, density_array in entry_set:
                 if entry: # non-null result, entry passed filters
                     meta_fields = [
                         entry.query_name, entry.flag, entry.reference_name,
