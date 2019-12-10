@@ -1,1 +1,1 @@
-from . import tailpuller, tailchopper, kmerscanner, densityplot, assembler, meme
+from . import tailpuller, tailchopper, kmerscanner, densityplot, assembler, meme, repeatfinder

@@ -20,7 +20,7 @@ DEFAULT_RULES = {
 }
 
 EXCLUDE_RULES = {
-    ("-x", "--index"): {"meme", "kmerscanner"}
+    ("-x", "--index"): {"meme", "repeatfinder", "kmerscanner"}
 }
 
 
@@ -60,6 +60,19 @@ create_subparser(
     rules={
         ("bam",): {"help": "name of input BAM/SAM file"},
         ("-t", "--target"): {"help": "either an ECX flag (cut relative to reference) or 'cigar'", "default": "tract_anchor", "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}}
+    }
+)
+
+create_subparser(
+    subparsers, "repeatfinder", help="discover enriched repeats in candidate sequences",
+    usage="{} repeatfinder [options] sequencefile > tsv".format(__file__),
+    rules={
+        ("sequencefile",): {"help": "name of input sam/bam/fasta/fastq file"},
+        ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
+        ("-m", "--min-k"): {"help": "smallest target repeat length", "default": 4, "type": int},
+        ("-M", "--max-k"): {"help": "largest target repeat length", "default": 8, "type": int},
+        ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
+        ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"}
     }
 )
 
