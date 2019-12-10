@@ -43,7 +43,7 @@ def get_edge_density(entry, pattern, head_test, tail_test):
     return len(pattern_matches) / len(subsequence)
 
 
-def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test):
+def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test, positions_accounted_for):
     """Calculate density of pattern hits in a rolling window along given read"""
     if cutoff: # if cutoff specified, filter by hard cutoff
         edge_density = get_edge_density(
@@ -58,6 +58,7 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
         pattern_positions = array([
             match.start() for match
             in pattern.finditer(entry.query_sequence, overlapped=True)
+            if match.start() not in positions_accounted_for
         ])
         if len(pattern_positions):
             canvas[pattern_positions] = True
@@ -67,19 +68,24 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test)
             roller = cumsum(canvas, axis=0)
             roller[window_size:] = roller[window_size:] - roller[:-window_size]
             density_array = roller[window_size-1:] / window_size
-        return entry, density_array
+        return True, density_array, pattern_positions
     else: # effectively skip
-        return None, zeros(1)
+        return False, zeros(1), array([])
 
 
 def calculate_density_of_patterns(entry, motif_patterns, cutoff, window_size, head_test, tail_test):
     """Calculate density of hits of each pattern in a rolling window along given read"""
     entry_set = []
+    positions_accounted_for = set()
     for motif, pattern in motif_patterns.items():
-        entry_mod, density_array = calculate_density(
-            entry, pattern, cutoff, window_size, head_test, tail_test
+        passes_filter, density_array, pattern_positions = calculate_density(
+            entry, pattern, cutoff, window_size, head_test, tail_test,
+            positions_accounted_for=positions_accounted_for
         )
-        entry_set.append([entry_mod, motif, density_array])
+        if passes_filter:
+            entry_set.append([entry, motif, density_array])
+        if len(pattern_positions):
+            positions_accounted_for |= set(pattern_positions)
     return entry_set
 
 
