@@ -42,7 +42,7 @@ def motif_subplots(nreads, chrom, max_mapq):
 
 def plot_motif_densities(read_data, trace_ax, legend=False):
     """Plot traces for motif densities of one read"""
-    trace_data = read_data.iloc[:,8:].T
+    trace_data = read_data.iloc[:,9:].T
     trace_data.columns = read_data["motif"]
     try:
         lineplot(data=trace_data, ax=trace_ax, legend=legend, dashes=False)
@@ -91,7 +91,7 @@ def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_ali
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(len(names), chrom, max_mapq)
-    pos_range = binned_density_dataframe.columns[8:]
+    pos_range = binned_density_dataframe.columns[9:]
     for i, name, (trace_ax, meta_ax) in zip(count(), names, axs):
         read_data = binned_density_dataframe[
             binned_density_dataframe["name"]==name
@@ -145,7 +145,7 @@ def plot_exploded_densities(densities, ecx, no_align, title, samfilters, file=st
 def stack_motif_densities(binned_density_dataframe, m_ord):
     """Prepare densities for plotting the stacked area chart"""
     skinny_bdf = binned_density_dataframe[
-        ["name", "motif"] + list(binned_density_dataframe.columns[8:])
+        ["name", "motif"] + list(binned_density_dataframe.columns[9:])
     ]
     motif_bdfs = [
         skinny_bdf[skinny_bdf["motif"]==motif] \
