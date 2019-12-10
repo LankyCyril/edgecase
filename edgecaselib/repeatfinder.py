@@ -110,5 +110,8 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
     sorted_analysis = sorted_analysis[
         ["motif", "length", "count", "p_adjusted"]
     ]
+    sorted_analysis.columns = [
+        "#motif", "length", "count", "p_adjusted(length)"
+    ]
     sorted_analysis.to_csv(file, sep="\t", index=False)
     print("Done", file=stderr, flush=True)
