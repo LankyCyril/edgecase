@@ -98,7 +98,7 @@ create_subparser(
     usage="{} kmerscanner [options] bam > dat".format(__file__),
     rules={
         ("bam",): {"help": "name of input SAM/BAM file"},
-        ("--motifs",): {"help": "target motif sequences", "default": "CCCCAA|CCCTAA|TTGGGG|TTAGGG", "metavar": "M"},
+        ("--motif-file",): {"help": "file with repeated motif sequences (output of `repeatfinder`)", "required": True, "default": "no default, required", "metavar": "M"},
         ("--head-test",): {"help": "length of head to use for density filter (if specified)", "default": None, "type": int, "metavar": "H"},
         ("--tail-test",): {"help": "length of tail to use for density filter (if specified)", "default": None, "type": int, "metavar": "T"},
         ("-c", "--cutoff"): {"help": "use hard cutoff for density", "default": None, "type": float, "metavar": "C"},

@@ -1,6 +1,6 @@
 from sys import stdout, stderr
 from regex import compile, IGNORECASE
-from numpy import zeros, array, cumsum
+from numpy import zeros, array, cumsum, nan
 from multiprocessing import Pool
 from edgecaselib.formats import filter_bam
 from edgecaselib.tailchopper import get_cigar_clip_length
@@ -9,10 +9,11 @@ from types import SimpleNamespace
 from functools import partial
 from tqdm import tqdm
 from collections import OrderedDict
+from pandas import read_csv
 
 
 DAT_HEADER = [
-    "#name", "flag", "chrom", "pos", "mapq", "motif",
+    "#name", "flag", "chrom", "pos", "mapq", "motif", "total_count",
     "clip_5prime", "clip_3prime", "density"
 ]
 
@@ -107,7 +108,7 @@ def pattern_scanner(entry_iterator, samfilters, motif, pattern, cutoff, window_s
         )
 
 
-def interpret_arguments(head_test, tail_test, cutoff, motifs):
+def interpret_arguments(head_test, tail_test, cutoff, motif_file):
     """Parse and check arguments"""
     if (head_test is not None) and (tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
@@ -115,17 +116,24 @@ def interpret_arguments(head_test, tail_test, cutoff, motifs):
         raise ValueError("--cutoff has no effect without a head/tail test")
     elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
         print("Warning: head/tail test has no effect without --cutoff", file=stderr)
+    motif_data = read_csv(motif_file, sep="\t", escapechar="#")
     motif_patterns = OrderedDict([
         [motif, get_circular_pattern(motif)]
-        for motif in motifs.split("|")
+        for motif in motif_data["motif"]
     ])
-    return motif_patterns
+    if "count" in motif_data.columns:
+        total_counts = dict(zip(
+            motif_data["motif"], motif_data["count"]
+        ))
+    else:
+        total_counts = {m: nan for m in motif_data["motif"]}
+    return motif_patterns, total_counts
 
 
-def main(bam, flags, flags_any, flag_filter, min_quality, motifs, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
+def main(bam, flags, flags_any, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
-    motif_patterns = interpret_arguments(
-        head_test, tail_test, cutoff, motifs
+    motif_patterns, total_counts = interpret_arguments(
+        head_test, tail_test, cutoff, motif_file
     )
     print(*DAT_HEADER, sep="\t", file=file)
     # scan fastq for target motif queries, parallelizing on reads:
@@ -144,7 +152,8 @@ def main(bam, flags, flags_any, flag_filter, min_quality, motifs, head_test, tai
                 if entry: # non-null result, entry passed filters
                     meta_fields = [
                         entry.query_name, entry.flag, entry.reference_name,
-                        entry.reference_start, entry.mapping_quality, motif,
+                        entry.reference_start, entry.mapping_quality,
+                        motif, total_counts[motif],
                         get_cigar_clip_length(entry, 5),
                         get_cigar_clip_length(entry, 3)
                     ]
