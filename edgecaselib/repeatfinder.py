@@ -93,6 +93,19 @@ def analyze_repeats(full_report, adj="fdr_bh"):
         return ktl.groupby(ktl_grouper, as_index=False).sum()
 
 
+def format_analysis(filtered_analysis):
+    formatted_analysis = filtered_analysis.sort_values(
+        by=["count", "p_adjusted"], ascending=[False, True]
+    )
+    formatted_analysis = formatted_analysis[
+        ["motif", "length", "count", "p_adjusted"]
+    ]
+    formatted_analysis.columns = [
+        "#motif", "length", "count", "p_adjusted(length)"
+    ]
+    return formatted_analysis
+
+
 def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_p_adjusted, jellyfish, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
@@ -107,14 +120,6 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
         )
     analysis = analyze_repeats(full_report)
     filtered_analysis = analysis[analysis["p_adjusted"]<max_p_adjusted]
-    sorted_analysis = filtered_analysis.sort_values(
-        by=["count", "p_adjusted"], ascending=[False, True]
-    )
-    sorted_analysis = sorted_analysis[
-        ["motif", "length", "count", "p_adjusted"]
-    ]
-    sorted_analysis.columns = [
-        "#motif", "length", "count", "p_adjusted(length)"
-    ]
-    sorted_analysis.to_csv(file, sep="\t", index=False)
+    formatted_analysis = format_analysis(filtered_analysis)
+    formatted_analysis.to_csv(file, sep="\t", index=False)
     print("Done", file=stderr, flush=True)
