@@ -61,7 +61,10 @@ def analyze_repeats(full_report, adj="fdr_bh"):
     """Analyze repeat enrichment"""
     lengths = unique(full_report["length"].values)
     if adj is None:
-        message = "\rCalculating for {}... ".format(lengths)
+        if len(lengths) != 1:
+            message = "`{}` can only be directly called with the `adj` argument"
+            raise NotImplementedError(message.format("analyze_repeats"))
+        message = "\rCalculating for k={}... ".format(lengths[0])
         print(message, end="", file=stderr, flush=True)
         total_count = full_report["count"].sum()
         N = 4**lengths[0]
