@@ -70,7 +70,7 @@ create_subparser(
         ("sequencefile",): {"help": "name of input sam/bam/fasta/fastq file"},
         ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
         ("-m", "--min-k"): {"help": "smallest target repeat length", "default": 4, "type": int},
-        ("-M", "--max-k"): {"help": "largest target repeat length", "default": 8, "type": int},
+        ("-M", "--max-k"): {"help": "largest target repeat length", "default": 7, "type": int},
         ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
         ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"}
     }
