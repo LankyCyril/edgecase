@@ -54,6 +54,7 @@ def find_repeats(sequencefile, min_k, max_k, jellyfish, jobs, tempdir):
 
 
 def lowest_alpha_inversion(kmer):
+    """Get alphabetically lowest inversion of kmer (e.g., for TTAGGG will return AGGGTT)"""
     return min(kmer[i:]+kmer[:i] for i in range(len(kmer)))
 
 
@@ -97,6 +98,7 @@ def analyze_repeats(full_report, adj="fdr_bh"):
 
 
 def format_analysis(filtered_analysis):
+    """Make dataframe prettier"""
     formatted_analysis = filtered_analysis.sort_values(
         by=["count", "p_adjusted"], ascending=[False, True]
     )
@@ -104,7 +106,7 @@ def format_analysis(filtered_analysis):
         ["motif", "length", "count", "p_adjusted"]
     ]
     formatted_analysis.columns = [
-        "#motif", "length", "count", "p_adjusted(length)"
+        "#motif", "length", "count", "p_adjusted"
     ]
     return formatted_analysis
 
