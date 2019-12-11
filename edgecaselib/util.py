@@ -1,6 +1,6 @@
 from sys import stderr
 from regex import compile
-from re import split, search, finditer, IGNORECASE
+from re import split, search, IGNORECASE
 from shutil import which
 from os import path, access, X_OK
 
