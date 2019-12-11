@@ -24,11 +24,11 @@ def get_circular_pattern(motif):
     atoms = atom_pattern.findall(motif)
     if "".join(atoms) != motif:
         raise ValueError("Could not parse motif: {}".format(motif))
-    inversions = {
-        "".join(atoms[i:] + atoms[:i])
+    doubled_inversions = {
+        "".join(atoms[i:] + atoms[:i]) * 2
         for i in range(len(atoms))
     }
-    return compile(r'|'.join(inversions), flags=IGNORECASE)
+    return compile(r'|'.join(doubled_inversions), flags=IGNORECASE)
 
 
 def get_edge_density(entry, pattern, head_test, tail_test):
