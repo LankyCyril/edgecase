@@ -1,7 +1,7 @@
 from sys import stdout, stderr
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
-from edgecaselib.formats import DEFAULT_MOTIFS, DEFAULT_COLORS, DEFAULT_HATCHES
+from edgecaselib.formats import DEFAULT_MOTIF_COLORS, DEFAULT_MOTIF_HATCHES
 from edgecaselib.formats import split_hatch
 from edgecaselib.util import natsorted_chromosomes
 from matplotlib.pyplot import subplots, rc_context, switch_backend
@@ -42,7 +42,7 @@ def motif_subplots(nreads, chrom, max_mapq):
 
 def plot_motif_densities(read_data, trace_ax, legend=False):
     """Plot traces for motif densities of one read"""
-    trace_data = read_data.iloc[:,8:].T
+    trace_data = read_data.iloc[:,9:].T
     trace_data.columns = read_data["motif"]
     try:
         lineplot(data=trace_data, ax=trace_ax, legend=legend, dashes=False)
@@ -91,7 +91,7 @@ def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_ali
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(len(names), chrom, max_mapq)
-    pos_range = binned_density_dataframe.columns[8:]
+    pos_range = binned_density_dataframe.columns[9:]
     for i, name, (trace_ax, meta_ax) in zip(count(), names, axs):
         read_data = binned_density_dataframe[
             binned_density_dataframe["name"]==name
@@ -142,24 +142,28 @@ def plot_exploded_densities(densities, ecx, no_align, title, samfilters, file=st
                 pdf.savefig(page, bbox_inches="tight")
 
 
-def stack_motif_densities(binned_density_dataframe, m_ord):
+def stack_motif_densities(binned_density_dataframe):
     """Prepare densities for plotting the stacked area chart"""
+    motif_order = binned_density_dataframe[["motif", "total_count"]] \
+        .drop_duplicates().sort_values(by="total_count", ascending=False) \
+        ["motif"].drop_duplicates().values
     skinny_bdf = binned_density_dataframe[
-        ["name", "motif"] + list(binned_density_dataframe.columns[8:])
+        ["name", "motif"] + list(binned_density_dataframe.columns[9:])
     ]
     motif_bdfs = [
         skinny_bdf[skinny_bdf["motif"]==motif] \
             .set_index("name").drop(columns="motif")
-        for motif in m_ord
+        for motif in motif_order
     ]
     for i in range(1, len(motif_bdfs)):
         motif_bdfs[i] += motif_bdfs[i-1]
     for i in range(len(motif_bdfs)):
         motif_bdfs[i] = motif_bdfs[i].reset_index()
-        motif_bdfs[i]["motif"] = m_ord[i]
-    return concat(motif_bdfs, axis=0).melt(
+        motif_bdfs[i]["motif"] = motif_order[i]
+    plottable_df = concat(motif_bdfs, axis=0).melt(
         id_vars=["name", "motif"], var_name="position", value_name="density"
     )
+    return plottable_df, motif_order
 
 
 def get_motif_data(plottable_df, motif):
@@ -179,21 +183,21 @@ def shorten_chrom_name(chrom):
     return short_chrom_name
 
 
-def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_order, motif_colors, motif_hatches, title, m_ord, m_clr, m_hch, target_anchor, is_q, ax):
+def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_colors, motif_hatches, title, m_clr, m_hch, target_anchor, is_q, ax):
     """Plot stacked area charts with bootstrapped CIs"""
-    plottable_df = stack_motif_densities(binned_density_dataframe, m_ord)
-    for i in range(len(m_ord)+1):
-        if i == len(m_ord):
-            upper_motif_data = get_motif_data(plottable_df, m_ord[0])
-            upper_motif_data["density"], color, hatch = 1, "thistle", "*"
+    plottable_df, motif_order = stack_motif_densities(binned_density_dataframe)
+    for i in range(len(motif_order)+1):
+        if i == len(motif_order):
+            upper_motif_data = get_motif_data(plottable_df, motif_order[0])
+            upper_motif_data["density"], color, hatch = 1, "silver", "*"
         else:
-            upper_motif_data = get_motif_data(plottable_df, m_ord[i])
+            upper_motif_data = get_motif_data(plottable_df, motif_order[i])
             color, hatch = m_clr[i], m_hch[i]
         if i == 0:
             lower_motif_data = upper_motif_data.copy()
             lower_motif_data["density"] = 0
         else:
-            lower_motif_data = get_motif_data(plottable_df, m_ord[i-1])
+            lower_motif_data = get_motif_data(plottable_df, motif_order[i-1])
         ax.fill_between(
             x=upper_motif_data["position"],
             y1=lower_motif_data["density"], y2=upper_motif_data["density"],
@@ -246,7 +250,7 @@ def align_subplots(ax2chrom, ecx, target_anchor, is_q):
         ))
 
 
-def plot_densities(densities, ecx, motif_order, motif_colors, motif_hatches, title, m_ord, m_clr, m_hch, target_anchor, is_q, file=stdout.buffer):
+def plot_densities(densities, ecx, motif_colors, motif_hatches, title, m_clr, m_hch, target_anchor, is_q, file=stdout.buffer):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
@@ -259,8 +263,8 @@ def plot_densities(densities, ecx, motif_order, motif_colors, motif_hatches, tit
         for spine in ["top", "left", "right"]:
             ax.spines[spine].set_visible(False)
         plot_combined_density(
-            bdf, ecx, chrom, motif_order, motif_colors, motif_hatches,
-            title, m_ord, m_clr, m_hch, target_anchor, is_q, ax=ax
+            bdf, ecx, chrom, motif_colors, motif_hatches,
+            title, m_clr, m_hch, target_anchor, is_q, ax=ax
         )
         ax.ticklabel_format(useOffset=False, style="plain")
         ax2chrom[ax] = chrom
@@ -268,22 +272,27 @@ def plot_densities(densities, ecx, motif_order, motif_colors, motif_hatches, tit
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
-def interpret_arguments(exploded, motif_order, motif_colors, motif_hatches, samfilters, title, dat, no_align):
+def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title, dat, no_align):
     """Parse and check arguments"""
     flags2set = lambda f: set(explain_sam_flags(interpret_flags(f)).split("|"))
     potential_target_anchors = {"tract_anchor", "ucsc_mask_anchor", "fork"}
     if exploded:
-        for motif_argument in motif_order, motif_colors, motif_hatches:
+        for motif_argument in motif_colors, motif_hatches:
             if motif_argument is not None:
                 message = "--motif-* with --exploded not fully implemented yet"
                 print(message, file=stderr)
-        target_anchor, is_q, m_ord, m_clr, m_hch = None, None, None, None, None
+        target_anchor, is_q, m_clr, m_hch = None, None, None, None
     else:
         if no_align:
             raise NotImplementedError("--no-align without --exploded")
-        m_ord = motif_order.split("|") if motif_order else DEFAULT_MOTIFS
-        m_clr = motif_colors.split("|") if motif_colors else DEFAULT_COLORS
-        m_hch = split_hatch(motif_hatches) if motif_hatches else DEFAULT_HATCHES
+        if motif_colors:
+            m_clr = motif_colors.split("|")
+        else:
+            m_clr = DEFAULT_MOTIF_COLORS
+        if motif_hatches:
+            m_hch = split_hatch(motif_hatches)
+        else:
+            m_hch = DEFAULT_MOTIF_HATCHES
         flags, _, flag_filter, _ = samfilters
         if "is_q" in (flags2set(flags) - flags2set(flag_filter)):
             is_q = True
@@ -302,14 +311,14 @@ def interpret_arguments(exploded, motif_order, motif_colors, motif_hatches, samf
             raise NotImplementedError(error_message)
     if title is None:
         title = path.split(dat)[-1]
-    return target_anchor, is_q, m_ord, m_clr, m_hch, title
+    return target_anchor, is_q, m_clr, m_hch, title
 
 
-def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, exploded, motif_order, motif_colors, motif_hatches, no_align, title, file=stdout.buffer, **kwargs):
+def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, exploded, motif_colors, motif_hatches, no_align, title, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flags_any, flag_filter, min_quality]
-    target_anchor, is_q, m_ord, m_clr, m_hch, title = interpret_arguments(
-        exploded, motif_order, motif_colors, motif_hatches,
+    target_anchor, is_q, m_clr, m_hch, title = interpret_arguments(
+        exploded, motif_colors, motif_hatches,
         samfilters, title, dat, no_align
     )
     ecx = load_index(index)
@@ -320,6 +329,6 @@ def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_si
         )
     else:
         plot_densities(
-            densities, ecx, motif_order, motif_colors, motif_hatches,
-            title, m_ord, m_clr, m_hch, target_anchor, is_q, file
+            densities, ecx, motif_colors, motif_hatches,
+            title, m_clr, m_hch, target_anchor, is_q, file
         )

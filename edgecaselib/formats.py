@@ -1,7 +1,8 @@
 from sys import stderr
 from contextlib import contextmanager, ExitStack
 from itertools import chain
-from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
+from numpy import linspace, array, mean, concatenate, fromstring, full, vstack
+from numpy import nan, unique
 from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
 from tempfile import TemporaryDirectory
@@ -24,11 +25,12 @@ ALL_SAM_FLAGS = [
     "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
+DEFAULT_MOTIF_COLORS = [
+    "#88CCEE", "#DDCC77", "#CC6677", "#AA4499",
+    "#882255", "#332288", "#117733", "#44AA99"
+]
 
-DEFAULT_MOTIFS = ["CCCCAA", "CCCTAA", "TTGGGG", "TTAGGG"]
-DEFAULT_COLORS = ["cornflowerblue", "red", "cornflowerblue", "red"]
-DEFAULT_HATCHES = ["x", "x", None, None]
-
+DEFAULT_MOTIF_HATCHES = [None] * len(DEFAULT_MOTIF_COLORS)
 
 MEME_HEADER_FMT = r'^MOTIF\s([A-Za-z]+)\sMEME-([0-9]+).*llr.*E-value\s*=\s*([0-9e.-]+)'
 MEME_REGEX_HEADER_FMT = r'Motif\s[A-Za-z]+\sMEME-([0-9]+)\sregular\sexpression'
@@ -158,6 +160,16 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
     )
 
 
+def are_motifs_consistent(raw_densities):
+    checker = raw_densities[["chrom", "motif"]].drop_duplicates()
+    if len(unique(checker["chrom"].value_counts().values)) != 1:
+        return False
+    elif len(unique(checker["motif"].value_counts().values)) != 1:
+        return False
+    else:
+        return True
+
+
 def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
     if not any(samfilters): # all zero / None
@@ -165,6 +177,8 @@ def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
         raw_densities = filter_and_read_tsv(dat, gzipped, samfilters)
+    if not are_motifs_consistent(raw_densities):
+        raise IOError("Inconsistent number of motifs in DAT")
     if each_once:
         raw_densities["length"] = raw_densities["density"].apply(
             lambda d: d.count(",")+1
