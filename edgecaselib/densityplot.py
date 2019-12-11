@@ -6,7 +6,7 @@ from edgecaselib.formats import split_hatch
 from edgecaselib.util import natsorted_chromosomes
 from matplotlib.pyplot import subplots, rc_context, switch_backend
 from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Patch
 from seaborn import lineplot
 from itertools import count
 from tqdm import tqdm
@@ -145,7 +145,7 @@ def plot_exploded_densities(densities, ecx, no_align, title, samfilters, file=st
 def stack_motif_densities(binned_density_dataframe):
     """Prepare densities for plotting the stacked area chart"""
     motif_order = binned_density_dataframe[["motif", "total_count"]] \
-        .drop_duplicates().sort_values(by="total_count", ascending=False) \
+        .drop_duplicates().sort_values(by="total_count") \
         ["motif"].drop_duplicates().values
     skinny_bdf = binned_density_dataframe[
         ["name", "motif"] + list(binned_density_dataframe.columns[9:])
@@ -183,16 +183,21 @@ def shorten_chrom_name(chrom):
     return short_chrom_name
 
 
-def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_colors, motif_hatches, title, m_clr, m_hch, target_anchor, is_q, ax):
+def plot_combined_density(binned_density_dataframe, ecx, chrom, title, m_clr, m_hch, target_anchor, is_q, ax):
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df, motif_order = stack_motif_densities(binned_density_dataframe)
+    if len(motif_order) > len(m_clr):
+        raise ValueError("Will not plot more motifs than available colors")
+    else:
+        ordered_m_clr = m_clr[::-1][:len(motif_order)]
+        ordered_m_hch = m_hch[::-1][:len(motif_order)]
     for i in range(len(motif_order)+1):
         if i == len(motif_order):
             upper_motif_data = get_motif_data(plottable_df, motif_order[0])
             upper_motif_data["density"], color, hatch = 1, "silver", "*"
         else:
             upper_motif_data = get_motif_data(plottable_df, motif_order[i])
-            color, hatch = m_clr[i], m_hch[i]
+            color, hatch = ordered_m_clr[i], ordered_m_hch[i]
         if i == 0:
             lower_motif_data = upper_motif_data.copy()
             lower_motif_data["density"] = 0
@@ -201,11 +206,12 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_colors, mo
         ax.fill_between(
             x=upper_motif_data["position"],
             y1=lower_motif_data["density"], y2=upper_motif_data["density"],
-            color=color, hatch=hatch, alpha=.35
+            color=color, hatch=hatch, alpha=.7
         )
     lineplot(
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
-        palette={m: "black" for m in set(plottable_df["motif"])}, ax=ax
+        palette={m: "black" for m in set(plottable_df["motif"])},
+        linewidth=.5, alpha=.7, ax=ax
     )
     indexer = (
         (ecx["rname"]==chrom) & (ecx["prime"]==(3 if is_q else 5)) &
@@ -220,6 +226,7 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, motif_colors, mo
         plottable_df["position"].values.max()
     ))
     ax.set(xlabel="", ylim=(0, 1), ylabel=short_chrom_name, yticks=[])
+    return motif_order, ordered_m_clr, ordered_m_hch
 
 
 def align_subplots(ax2chrom, ecx, target_anchor, is_q):
@@ -250,7 +257,27 @@ def align_subplots(ax2chrom, ecx, target_anchor, is_q):
         ))
 
 
-def plot_densities(densities, ecx, motif_colors, motif_hatches, title, m_clr, m_hch, target_anchor, is_q, file=stdout.buffer):
+def add_legend(motif_order, m_clr, m_hch, ax, exploded, is_q):
+    """Add custom legend"""
+    if exploded:
+        raise NotImplementedError("Custom legend for exploded density plot")
+    else:
+        handles = [
+            Patch(label=motif, fc=color, ec="black", hatch=hatch, alpha=.7)
+            for motif, color, hatch in zip(motif_order, m_clr, m_hch)
+        ][::-1]
+        background_handle = [
+            Patch(label="other", fc="silver", ec="black", hatch="*", alpha=.7)
+        ]
+        if is_q:
+            loc="upper left"
+        else:
+            loc="upper right"
+        ax.legend(handles=handles+background_handle, loc=loc, framealpha=1)
+        ax.set(zorder=float("inf"))
+
+
+def plot_densities(densities, ecx, title, m_clr, m_hch, target_anchor, is_q, file=stdout.buffer):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
@@ -259,16 +286,19 @@ def plot_densities(densities, ecx, motif_colors, motif_hatches, title, m_clr, m_
         nrows=len(densities), squeeze=False, frameon=False
     )
     ax2chrom = {}
-    for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:,0]):
+    for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:, 0]):
         for spine in ["top", "left", "right"]:
             ax.spines[spine].set_visible(False)
-        plot_combined_density(
-            bdf, ecx, chrom, motif_colors, motif_hatches,
-            title, m_clr, m_hch, target_anchor, is_q, ax=ax
+        motif_order, ordered_m_clr, ordered_m_hch = plot_combined_density(
+            bdf, ecx, chrom, title, m_clr, m_hch, target_anchor, is_q, ax=ax
         )
         ax.ticklabel_format(useOffset=False, style="plain")
         ax2chrom[ax] = chrom
     align_subplots(ax2chrom, ecx, target_anchor, is_q)
+    add_legend(
+        motif_order, ordered_m_clr, ordered_m_hch, axs[0, 0],
+        exploded=False, is_q=is_q
+    )
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
@@ -293,6 +323,9 @@ def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title
             m_hch = split_hatch(motif_hatches)
         else:
             m_hch = DEFAULT_MOTIF_HATCHES
+        if len(m_clr) != len(m_hch):
+            msg = "The numbers of motif colors and motif hatches do not match"
+            raise ValueError(msg)
         flags, _, flag_filter, _ = samfilters
         if "is_q" in (flags2set(flags) - flags2set(flag_filter)):
             is_q = True
@@ -329,6 +362,5 @@ def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_si
         )
     else:
         plot_densities(
-            densities, ecx, motif_colors, motif_hatches,
-            title, m_clr, m_hch, target_anchor, is_q, file
+            densities, ecx, title, m_clr, m_hch, target_anchor, is_q, file
         )
