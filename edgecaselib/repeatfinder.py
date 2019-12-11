@@ -8,7 +8,7 @@ from tqdm import tqdm
 from subprocess import check_output
 from pandas import read_csv, concat, merge
 from numpy import unique
-from scipy.stats import chi2_contingency
+from scipy.stats import fisher_exact
 from statsmodels.stats.multitest import multipletests
 
 
@@ -57,40 +57,43 @@ def lowest_alpha_inversion(kmer):
     return min(kmer[i:]+kmer[:i] for i in range(len(kmer)))
 
 
-def analyze_repeats(full_report, adj="fdr_bh"):
-    """Analyze repeat enrichment"""
-    lengths = unique(full_report["length"].values)
-    if adj is None:
-        if len(lengths) != 1:
-            message = "`{}` can only be directly called with the `adj` argument"
-            raise NotImplementedError(message.format("analyze_repeats"))
-        message = "\rCalculating for k={}... ".format(lengths[0])
-        print(message, end="", file=stderr, flush=True)
-        total_count = full_report["count"].sum()
-        N = 4**lengths[0]
-        median_count = full_report["count"].median()
-        chi2s = full_report[full_report["count"]>=median_count].copy()
-        chi2s["p"] = chi2s["count"].apply(
-            lambda c: chi2_contingency([[c, total_count-c], [1, N]])[1]
-        )
-        return chi2s
+def get_motifs_fisher(single_length_report):
+    """Analyze repeat enrichment given the same motif length"""
+    lengths = unique(single_length_report["length"].values)
+    if len(lengths) != 1:
+        raise ValueError("`get_motifs_fisher`: multiple lengths found")
     else:
-        chi2s = concat([
-            analyze_repeats(
-                full_report[full_report["length"]==length], adj=None
-            )
-            for length in lengths
-        ])
-        chi2s["motif"] = chi2s["kmer"].apply(lowest_alpha_inversion)
-        motif_p = chi2s[["motif", "p"]].groupby("motif", as_index=False).max()
-        motif_p["p_adjusted"] = multipletests(motif_p["p"], method="fdr_bh")[1]
-        chi2s = merge(
-            chi2s, motif_p[["motif", "p_adjusted"]],
-            on="motif", how="outer"
+        k = lengths[0]
+    message = "\rCalculating enrichment for k={}... ".format(lengths[0])
+    print(message, end="", file=stderr, flush=True)
+    total_count = single_length_report["count"].sum()
+    N = 4**k
+    median_count = single_length_report["count"].median()
+    high_indexer = (single_length_report["count"]>=median_count)
+    fishers = single_length_report[high_indexer].copy()
+    fishers["p"] = fishers["count"].apply(
+        lambda c: fisher_exact([[c, total_count-c], [1, N]])[1]
+    )
+    return fishers
+
+
+def analyze_repeats(full_report, adj="fdr_bh"):
+    """Analyze repeat enrichment for multiple lengths and apply multiple testing adjustment"""
+    fishers = concat([
+        get_motifs_fisher(
+            full_report[full_report["length"]==length]
         )
-        ktl = chi2s[["count", "motif", "length", "p_adjusted"]]
-        ktl_grouper = ["motif", "length", "p_adjusted"]
-        return ktl.groupby(ktl_grouper, as_index=False).sum()
+        for length in unique(full_report["length"].values)
+    ])
+    fishers["motif"] = fishers["kmer"].apply(lowest_alpha_inversion)
+    motif_p = fishers[["motif", "p"]].groupby("motif", as_index=False).max()
+    motif_p["p_adjusted"] = multipletests(motif_p["p"], method=adj)[1]
+    fishers = merge(
+        fishers, motif_p[["motif", "p_adjusted"]], on="motif", how="outer"
+    )
+    ktl = fishers[["count", "motif", "length", "p_adjusted"]]
+    ktl_grouper = ["motif", "length", "p_adjusted"]
+    return ktl.groupby(ktl_grouper, as_index=False).sum()
 
 
 def format_analysis(filtered_analysis):
