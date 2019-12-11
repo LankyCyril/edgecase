@@ -38,9 +38,12 @@ def find_repeats(sequencefile, min_k, max_k, jellyfish, jobs, tempdir):
     per_k_reports = []
     for k in tqdm(range(min_k, max_k+1), desc="Sweeping lengths"):
         db = path.join(tempdir, "{}.db".format(k))
+        # instead of looking for e.g. TTAGGG, look for TTAGGGTTAGGG,
+        # this implies repeat context and larger motifs like TTAGGGA do
+        # not confound it:
         check_output([
             jellyfish, "count", "-t", str(jobs), "-s", "2G", "-L", "0",
-            "-m", str(k), "-o", db, sequencefile
+            "-m", str(k*2), "-o", db, sequencefile
         ])
         tsv = path.join(tempdir, "{}.tsv".format(k))
         check_output([
@@ -48,6 +51,10 @@ def find_repeats(sequencefile, min_k, max_k, jellyfish, jobs, tempdir):
             "-o", tsv, db
         ])
         k_report = read_csv(tsv, sep="\t", names=["kmer", "count"])
+        # for downstream analyses, roll back to single motif:
+        doubles_indexer = k_report["kmer"].apply(lambda kmer:kmer[:k]==kmer[k:])
+        k_report = k_report[doubles_indexer]
+        k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
         k_report["length"] = k
         per_k_reports.append(k_report)
     return concat(per_k_reports, axis=0)
@@ -97,7 +104,7 @@ def analyze_repeats(full_report, adj="fdr_bh"):
     return ktl.groupby(ktl_grouper, as_index=False).sum()
 
 
-def format_analysis(filtered_analysis):
+def format_analysis(filtered_analysis, max_motifs):
     """Make dataframe prettier"""
     formatted_analysis = filtered_analysis.sort_values(
         by=["count", "p_adjusted"], ascending=[False, True]
@@ -108,10 +115,10 @@ def format_analysis(filtered_analysis):
     formatted_analysis.columns = [
         "#motif", "length", "count", "p_adjusted"
     ]
-    return formatted_analysis
+    return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_p_adjusted, jellyfish, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, jellyfish, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
@@ -125,6 +132,6 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
         )
     analysis = analyze_repeats(full_report)
     filtered_analysis = analysis[analysis["p_adjusted"]<max_p_adjusted]
-    formatted_analysis = format_analysis(filtered_analysis)
+    formatted_analysis = format_analysis(filtered_analysis, max_motifs)
     formatted_analysis.to_csv(file, sep="\t", index=False)
     print("Done", file=stderr, flush=True)
