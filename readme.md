@@ -1,62 +1,108 @@
 edgeCase
 ========
 
-## ./kmer-scan.py
 
-Performs calculation of density of a given kmer in a rolling window along each
-read.  
-Description of command-line options is available by running
-`python3 kmer-scan.py -h`.
-
-#### By default, performs two passes:
-
-1. Calculates densities in terminal windows (either heads or tails, depending on
-whether --head-test xor --tail-test is specified with the size of the terminal
-window). These densities are then fit to a Gaussian mixture model to separate
-background level of densities and a distribution of significant densities
-(the clustering can be stored by supplying --output-gmm).
-2. For each read, tests if the density of the terminal window belongs to the
-distribution of significant densities (with a p-value of 1e-5, which can be
-modified by passing --pmax), and if so, calculates and outputs densities in the
-rolling window along the read.
-
-This allows to select telomeric candidates based on how they relate to the reads
-in the entire sample, regardless of absolute density or true "repeatedness" of
-the kmer. The advantage of this approach is that it does not require a priori
-knowledge of how conserved the repeat is; however, if the entire sample has low
-density of the target kmer, it will yield false positives.
-
-#### If --cutoff is specified instead, performs only one pass:
-
-1. Calculates densities in terminal windows (either heads or tails, depending on
-whether --head-test xor --tail-test is specified with the size of the terminal
-window). For any given read, if this density exceeds the specified hard cutoff,
-calculates and outputs densities in the rolling window along the read.
-
-This allows to select telomeric candidates based on an a priori expected
-density. The advantage of this approach is that we are still able to select
-candidate reads regardless of how much like a repeat their ends look; however,
-we are biasing the search by providing a hard cutoff.
-
-#### If neither --cutoff nor --head-test nor --tail-test are specified, performs only one pass:
-
-1. Calculates and outputs densities in the rolling window along each read.
-
-This is useful for cross-validation of results from other tools.
-
-
-## ./plot-metric.py
-
-Plots heatmap-like visualizations of the metric (e.g. density) along candidate
-reads.  
-Description of command-line options is available by running
-`python3 plot-metric.py -h`.
-
-The input file must be in the output format of kmer-scan.py, tab-separated:
+From a set of aligned reads (BAM/SAM file) and a reference, edgeCase currently can create:
+* 5AC and 3AC SAM files: subsets of reads mapped to ends of main chromosomes and extending into terminal hard-masked regions
+* 5OOB and 3OOB FASTQ files: parts of 5AC and 3AC reads completely in the masked region
+* density DAT files: densities of given motifs in a rolling window along each read in a set
+* density PDF files: densities of motifs, visualized with respect to alignment
 
 ```
-read_name    value    value    value   value    value    ...
-read_name    value    value    value   value    value    ...
-read_name    value    value    value   value    value    ...
-read_name    value    value    value   value    value    ...
+usage: ./edgecase [-h] [-j J] {kmerscanner,tailpuller,tailchopper,densityplot} ...
+
+positional arguments:
+    tailpuller        select overhanging reads
+    tailchopper       get clipped heads/tails of reads
+    kmerscanner       perform kmer scan
+    densityplot       visualize densities of candidate reads
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -j J, --jobs J      number of jobs to run in parallel (default: 1)
+```
+
+### tailpuller
+
+Subsets a sorted BAM/SAM file to either 5AC or 3AC SAM file.
+
+```
+usage: ./edgecase tailpuller [options] bams > sam
+
+positional arguments:
+  bams                     name(s) of input BAM/SAM file(s)
+
+optional arguments:
+  -h, --help               show this help message and exit
+  -r R, --reference R      reference FASTA (default: no default, required)
+  -p {5,3}, --prime {5,3}  which 'prime' end to output (default: 5)
+```
+
+### tailchopper
+
+Truncates reads in a 5AC or 3AC file to a FASTQ of sequences of soft/hard-clipped ends.  
+(usually, this corresponds to regions completely overhanging onto the reference hard mask).  
+NB! Needs `--prime` to be set, as it has no knowledge of how the SAM was generated.
+
+```
+usage: ./edgecase tailchopper [options] bams > fasta
+
+positional arguments:
+  bams                     name(s) of input BAM/SAM file(s)
+
+optional arguments:
+  -h, --help               show this help message and exit
+  -p {5,3}, --prime {5,3}  which 'prime' end to output (default: 5)
+```
+
+### kmerscanner
+
+In a rolling window along each read in a SAM file, calculates densities of given motifs and outputs a DAT file.  
+Optionally filters input by terminal density (outputs data only for reads exceeding density cutoff).  
+By default, outputs data for all input reads.
+
+```
+usage: ./edgecase [-j J] kmerscanner [options] bams > dat
+
+positional arguments:
+  bams                   name(s) of input BAM/SAM file(s)
+
+optional arguments:
+  -h, --help             show this help message and exit
+  --motif M              target motif sequence (default: TTAGGG)
+  --head-test H          length of head to use for density filter (if specified) (default: None)
+  --tail-test T          length of tail to use for density filter (if specified) (default: None)
+  -c C, --cutoff C       use hard cutoff for density (default: None)
+  -w W, --window-size W  size of the rolling window (default: 120)
+  -n N, --num-reads N    expected number of reads in input (for progress display) (default: None)
+```
+
+### densityplot
+
+Visualizes density data of reads, placing them to their mapping positions on the reference.
+
+```
+usage: ./edgecase densityplot [options] dat > png
+
+positional arguments:
+  dat                 input density file
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -b B, --bin-size B  size of each bin in bp for visualization speedup (default: 100)
+  --title TITLE       figure title (defaults to input filename) (default: None)
+```
+
+### Visual guide to read terminology
+```
+  ~~~~~~~~~~~                            5AC "5 prime anchored":       reads that map to (and beyond)  5' ends
+  ~~~~~~                                 5OOB "5 prime out of bounds": the soft or hard clipped edges of reads     
+               ~~~~~~~~                  AR-IB "Anchored in bounds":   reads mapped &  fully within chromosome
+                         ~~~~~~~~~~      3AC "3 prime anchored":       reads that map to (and beyond) 3'  ends
+                              ~~~~~      3OOB "3 prime out of bounds": the soft or hard clipped edges of reads
+******===========================******
+
+~~~  a NanoPore read
+***  hard-masked region of reference chromosome
+===  normal, unmasked region of reference chromosome
 ```

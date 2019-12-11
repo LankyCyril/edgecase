@@ -1,123 +1,148 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from edgecaselib import tailpuller, tailchopper, kmerscanner, densityplot
+from itertools import chain
+from sys import argv
+import edgecaselib
 
 
 def WideHelpFormatter(prog):
     """Supply formatter class to ArgumentParser with wider fields than default"""
-    return ArgumentDefaultsHelpFormatter(prog, max_help_position=50, width=150)
+    return ArgumentDefaultsHelpFormatter(prog, max_help_position=30, width=150)
 
 
-def create_subparser(subparsers, name, help, usage, rules):
+DEFAULT_RULES = {
+    ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
+    ("-x", "--index"): {"help": "location of the reference .ecx index", "required": True, "metavar": "X", "default": "no default, required"},
+    ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
+    ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
+    ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
+    ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"}
+}
+
+EXCLUDE_RULES = {
+    ("-x", "--index"): {"meme", "repeatfinder", "kmerscanner"}
+}
+
+
+def create_subparser(subparsers, subparser_name, help, usage, rules):
     """Wrapper for easily creating subparsers and pushing into parent parser"""
     _subparser = subparsers.add_parser(
-        name, help=help, usage=usage, formatter_class=WideHelpFormatter
+        subparser_name, help=help, usage=usage,
+        formatter_class=WideHelpFormatter
     )
-    for rule_args, rule_kwargs in rules.items():
-        _subparser.add_argument(*rule_args, **rule_kwargs)
+    for rule_args, rule_kwargs in chain(DEFAULT_RULES.items(), rules.items()):
+        if subparser_name not in EXCLUDE_RULES.get(rule_args, set()):
+            if ("metavar" in rule_kwargs) or ("action" in rule_kwargs):
+                _subparser.add_argument(*rule_args, **rule_kwargs)
+            elif rule_args[0][0] != "-":
+                _subparser.add_argument(
+                    *rule_args, metavar=rule_args[0], **rule_kwargs
+                )
+            else:
+                _subparser.add_argument(*rule_args, metavar="?", **rule_kwargs)
 
 
 parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
-parser.add_argument(
-    "-j", "--jobs", help="number of jobs to run in parallel",
-    default=1, type=int, metavar="J"
-)
-subparsers = parser.add_subparsers(help="subcommands", dest="subparser")
-
-create_subparser(
-    subparsers, "kmerscanner", help="perform kmer scan",
-    usage="{} [-j J] kmerscanner [options] fastqs > txt".format(__file__),
-    rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
-        },
-        ("--motif",): {
-            "help": "target motif sequence",
-            "default": "TTAGGG", "metavar": "M"
-        },
-        ("--head-test",): {
-            "help": "length of head to use for density filter (if specified)",
-            "default": None, "type": int, "metavar": "H"
-        },
-        ("--tail-test",): {
-            "help": "length of tail to use for density filter (if specified)",
-            "default": None, "type": int, "metavar": "T"
-        },
-        ("-c", "--cutoff"): {
-            "help": "use hard cutoff for density",
-            "default": None, "type": float, "metavar": "C"
-        },
-        ("-w", "--window-size"): {
-            "help": "size of the rolling window",
-            "default": 120, "type": int, "metavar": "W"
-        },
-        ("-n", "--num-reads"): {
-            "help": "expected number of reads in input (for progress display)",
-            "default": None, "type": int, "metavar": "N"
-        }
-    }
-)
+subparsers = parser.add_subparsers(dest="subparser")
 
 create_subparser(
     subparsers, "tailpuller", help="select overhanging reads",
-    usage="{} tailpuller [options] bams > sam".format(__file__),
+    usage="{} tailpuller [options] bam > sam".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
-        },
-        ("-r", "--reference"): {
-            "help": "reference FASTA",
-            "required": True, "metavar": "R", "default": "no default, required"
-        },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
-        }
+        ("bam",): {"help": "name of input BAM/SAM file"},
+        ("-m", "--max-read-length"): {"help": "max read length to consider when selecting lookup regions", "default": None, "type": int, "metavar": "M"}
     }
 )
 
 create_subparser(
-    subparsers, "tailchopper", help="get clipped heads/tails of reads",
-    usage="{} tailchopper [options] bams > fasta".format(__file__),
+    subparsers, "tailchopper", help="get overhanging heads/tails of reads",
+    usage="{} tailchopper [options] bam > fasta".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
-        },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
-        }
+        ("bam",): {"help": "name of input BAM/SAM file"},
+        ("-t", "--target"): {"help": "either an ECX flag (cut relative to reference) or 'cigar'", "default": "tract_anchor", "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}}
+    }
+)
+
+create_subparser(
+    subparsers, "repeatfinder", help="discover enriched repeats in candidate sequences",
+    usage="{} repeatfinder [options] sequencefile > tsv".format(__file__),
+    rules={
+        ("sequencefile",): {"help": "name of input sam/bam/fasta/fastq file"},
+        ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
+        ("-m", "--min-k"): {"help": "smallest target repeat length", "default": 4, "type": int},
+        ("-M", "--max-k"): {"help": "largest target repeat length", "default": 7, "type": int},
+        ("-n", "--max-motifs"): {"help": "maximum number of motifs to report", "default": 8, "type": int},
+        ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
+        ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"}
+    }
+)
+
+create_subparser(
+    subparsers, "meme", help="discover motifs in candidate reads",
+    usage="{} meme [options] readfile > tsv".format(__file__),
+    rules={
+        ("readfile",): {"help": "name of input sam/bam/fasta/fastq file"},
+        ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
+        ("--fasta-get-markov",): {"help": "fasta-get-markov binary (unless in $PATH)"},
+        ("--meme",): {"help": "meme binary (unless in $PATH)"},
+        ("--lengths",): {"help": "motif lengths to try, in order", "default": "6,5,7,8-100"},
+        ("--keep-masking",): {"help": "mask found motifs before proceeding to the next lengths", "action": "store_true"},
+        ("--background", "--bg"): {"help": "background file (SAM/BAM or HMM)", "metavar": "B"},
+        ("--nmotifs",): {"help": "nmotifs for each iteration of MEME", "default": 10, "type": int},
+        ("--evt",): {"help": "evt for each iteration of MEME", "default": .1, "type": float},
+        ("--intermediate-dir",): {"help": "directory for intermediate MEME outputs", "default": None}
+    }
+)
+
+create_subparser(
+    subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
+    usage="{} kmerscanner [options] bam > dat".format(__file__),
+    rules={
+        ("bam",): {"help": "name of input SAM/BAM file"},
+        ("--motif-file",): {"help": "file with repeated motif sequences (output of `repeatfinder`)", "required": True, "default": "no default, required", "metavar": "M"},
+        ("--head-test",): {"help": "length of head to use for density filter (if specified)", "default": None, "type": int, "metavar": "H"},
+        ("--tail-test",): {"help": "length of tail to use for density filter (if specified)", "default": None, "type": int, "metavar": "T"},
+        ("-c", "--cutoff"): {"help": "use hard cutoff for density", "default": None, "type": float, "metavar": "C"},
+        ("-w", "--window-size"): {"help": "size of the rolling window", "default": 120, "type": int, "metavar": "W"},
+        ("-n", "--num-reads"): {"help": "expected number of reads in input (for progress display)", "default": None, "type": int, "metavar": "N"}
     }
 )
 
 create_subparser(
     subparsers, "densityplot", help="visualize densities of candidate reads",
-    usage="{} densityplot [options] dat > png".format(__file__),
+    usage="{} densityplot [options] dat > pdf".format(__file__),
     rules={
-        ("dat",): {
-            "help": "input density file"
-        },
-        ("-b", "--bin-size"): {
-            "help": "size of each bin in bp for visualization speedup",
-            "default": 100, "type": int, "metavar": "B"
-        },
-        ("--title",): {
-            "help": "figure title (defaults to input filename)"
-        }
+        ("dat",): {"help": "input density file"},
+        ("-z", "--gzipped") : {"help": "input is gzipped (must specify if any of -qfF present)", "action": "store_true"},
+        ("-b", "--bin-size"): {"help": "size of each bin in bp for visualization speedup", "default": 100, "type": int, "metavar": "B"},
+        ("-e", "--exploded"): {"help": "plot each read separately", "action": "store_true"},
+        ("--motif-order",): {"help": "order of motifs on non-exploded plot", "default": "CCCCAA|CCCTAA|TTGGGG|TTAGGG"},
+        ("--motif-colors",): {"help": "color of motifs on non-exploded plot", "default": None},
+        ("--motif-hatches",): {"help": "fill pattern of motifs on non-exploded plot", "default": None},
+        ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"},
+        ("--no-align",): {"help": "plot unaligned", "action": "store_true"}
     }
 )
 
-kwargs = dict(parser.parse_args()._get_kwargs())
-if kwargs["subparser"] == "kmerscanner":
-    kmerscanner.main(**kwargs)
-elif kwargs["subparser"] == "tailpuller":
-    tailpuller.main(**kwargs)
-elif kwargs["subparser"] == "tailchopper":
-    tailchopper.main(**kwargs)
-elif kwargs["subparser"] == "densityplot":
-    densityplot.main(**kwargs)
+create_subparser(
+    subparsers, "assembler", help="assemble haplotypes at ends of chromosomes",
+    usage="{} assembler [options] bam".format(__file__),
+    rules={
+        ("bam",): {"help": "input tailpuller file"},
+        ("-c", "--chromosomes"): {"help": "target chromosome(s) (if not specified, target all)", "default": None, "metavar": "C"},
+        ("-k", "--unimer-size"): {"help": "unimer size used for assembly", "default": 15, "type": int, "metavar": "K"},
+        ("-o", "--output-prefix"): {"help": "output prefix", "required": True, "metavar": "O", "default": "no default, required"}
+    }
+)
+
+try:
+    kwargs = dict(parser.parse_args()._get_kwargs())
+except SystemExit:
+    if (len(argv) > 1) and (argv[1] in subparsers.choices):
+        if ("-h" not in argv) and ("--help" not in argv):
+            exit(subparsers.choices[argv[1]].print_help() or 1)
+    exit(1)
+if kwargs["subparser"] in subparsers.choices:
+    getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
 else:
-    raise ValueError("A valid subparser (subcommand) must be specified")
+    exit(parser.print_help() or 1)
