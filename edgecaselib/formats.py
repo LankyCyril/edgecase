@@ -178,7 +178,10 @@ def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
     else:
         raw_densities = filter_and_read_tsv(dat, gzipped, samfilters)
     if not are_motifs_consistent(raw_densities):
-        raise IOError("Inconsistent number of motifs in DAT")
+        raise NotImplementedError(
+            "Inconsistent number of motifs in DAT; plotting of reads " +
+            "identified de novo with kmerscanner is not implemented"
+        )
     if each_once:
         raw_densities["length"] = raw_densities["density"].apply(
             lambda d: d.count(",")+1

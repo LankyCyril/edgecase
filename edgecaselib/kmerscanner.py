@@ -131,8 +131,17 @@ def interpret_arguments(head_test, tail_test, cutoff, motif_file):
         raise ValueError("Can only specify one of --head-test, --tail-test")
     elif (cutoff is not None) and (head_test is None) and (tail_test is None):
         raise ValueError("--cutoff has no effect without a head/tail test")
-    elif ((head_test is not None) or (tail_test is not None)) and (cutoff is None):
-        print("Warning: head/tail test has no effect without --cutoff", file=stderr)
+    elif (head_test is not None) or (tail_test is not None):
+        if cutoff is None:
+            message = "Warning: head/tail test has no effect without --cutoff"
+            print(message, file=stderr)
+    elif (head_test is None) and (tail_test is None) and (cutoff is None):
+        message = (
+            "Warning: no head/tail testing options selected; regardless of " +
+            "the number of jobs (-j/--jobs), this will likely be " +
+            "bottlenecked by disk writing speeds"
+        )
+        print(message, file=stderr)
     motif_data = read_csv(motif_file, sep="\t", escapechar="#")
     if "length" not in motif_data.columns:
         motif_data["length"] = motif_data["motif"].apply(lambda m: len(m))
