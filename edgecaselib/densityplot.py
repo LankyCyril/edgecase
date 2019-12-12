@@ -87,7 +87,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
     meta_ax.set(xlim=(0, max_mapq))
 
 
-def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_align, title, samfilters):
+def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, title, samfilters):
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(len(names), chrom, max_mapq)
@@ -98,15 +98,12 @@ def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, no_ali
         ]
         legend = "full" if (i==0) else False
         trace_data = plot_motif_densities(read_data, trace_ax, legend)
-        if no_align:
-            trace_ax.set(ylim=(-.2, 1.2), yticks=[], xticks=[])
-        else:
-            highlight_mapped_region(read_data, trace_data, name, trace_ax)
-            trace_ax.set(
-                xlim=(pos_range.min(), pos_range.max()),
-                ylim=(-.2, 1.2), yticks=[]
-            )
-            plot_read_metadata(read_data, max_mapq, meta_ax)
+        highlight_mapped_region(read_data, trace_data, name, trace_ax)
+        trace_ax.set(
+            xlim=(pos_range.min(), pos_range.max()),
+            ylim=(-.2, 1.2), yticks=[]
+        )
+        plot_read_metadata(read_data, max_mapq, meta_ax)
         plottable_flags = ecx.loc[ecx["rname"]==chrom, ["pos", "flag"]]
         for _, pos, flag in plottable_flags.itertuples():
             trace_ax.axvline(
@@ -128,7 +125,7 @@ def make_decorated_densities_iterator(densities):
     )
 
 
-def plot_exploded_densities(densities, ecx, no_align, title, samfilters, file=stdout.buffer):
+def plot_exploded_densities(densities, ecx, title, samfilters, file=stdout.buffer):
     """Plot binned densities as line plots, one read at a time"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
@@ -136,7 +133,7 @@ def plot_exploded_densities(densities, ecx, no_align, title, samfilters, file=st
         with PdfPages(file) as pdf:
             for chrom, binned_density_dataframe in decorated_densities_iterator:
                 page = chromosome_motif_plot(
-                    binned_density_dataframe, ecx, chrom, max_mapq, no_align,
+                    binned_density_dataframe, ecx, chrom, max_mapq,
                     title, samfilters
                 )
                 pdf.savefig(page, bbox_inches="tight")
@@ -302,7 +299,7 @@ def plot_densities(densities, ecx, title, m_clr, m_hch, target_anchor, is_q, fil
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
-def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title, dat, no_align):
+def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title, dat):
     """Parse and check arguments"""
     flags2set = lambda f: set(explain_sam_flags(interpret_flags(f)).split("|"))
     potential_target_anchors = {"tract_anchor", "ucsc_mask_anchor", "fork"}
@@ -313,8 +310,6 @@ def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title
                 print(message, file=stderr)
         target_anchor, is_q, m_clr, m_hch = None, None, None, None
     else:
-        if no_align:
-            raise NotImplementedError("--no-align without --exploded")
         if motif_colors:
             m_clr = motif_colors.split("|")
         else:
@@ -347,18 +342,18 @@ def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title
     return target_anchor, is_q, m_clr, m_hch, title
 
 
-def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, exploded, motif_colors, motif_hatches, no_align, title, file=stdout.buffer, **kwargs):
+def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, exploded, motif_colors, motif_hatches, title, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flags_any, flag_filter, min_quality]
     target_anchor, is_q, m_clr, m_hch, title = interpret_arguments(
         exploded, motif_colors, motif_hatches,
-        samfilters, title, dat, no_align
+        samfilters, title, dat
     )
     ecx = load_index(index)
-    densities = load_kmerscan(dat, gzipped, samfilters, bin_size, no_align)
+    densities = load_kmerscan(dat, gzipped, samfilters, bin_size)
     if exploded:
         plot_exploded_densities(
-            densities, ecx, no_align, title, samfilters, file
+            densities, ecx, title, samfilters, file
         )
     else:
         plot_densities(
