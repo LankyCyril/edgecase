@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from sys import argv
 from numba import njit
-from numpy import array, uint32, zeros, nan, isnan
+from numpy import array, uint32, zeros, nan, isnan, save
 from pysam import AlignmentFile
 from collections import defaultdict
 from os import path
@@ -46,7 +46,14 @@ def read_ld(sra, A, srb, B):
         _A, _B = A[srb-sra:], B
     elif sra > srb:
         _A, _B = A, B[sra-srb:]
-    return ld(_A, _B)
+    else:
+        _A, _B = A, B
+    minlen = min(len(_A), len(_B))
+    _A, _B = _A[:minlen], _B[:minlen]
+    if minlen > 0:
+        return ld(_A, _B) / minlen
+    else:
+        return 1
 
 
 def compute_pairwise_lds(entries, chrom="[unspecified chromosome]"):
@@ -63,7 +70,7 @@ def compute_pairwise_lds(entries, chrom="[unspecified chromosome]"):
                 else:
                     distance = read_ld(sra, A, srb, B)
                 pairwise_lds.loc[aname, bname] = distance
-    return pairwise_lds.astype(uint32)
+    return pairwise_lds
 
 
 def main(filename, f=0, F=0, out_dir="."):
@@ -75,7 +82,9 @@ def main(filename, f=0, F=0, out_dir="."):
             cm = clustermap(data=pairwise_lds, cmap="viridis_r", method="ward")
             cm.ax_heatmap.set(xticks=[], yticks=[])
             pdf = path.join(out_dir, chrom+".pdf")
-            cm.figure.savefig(pdf, bbox_inches="tight")
+            cm.fig.savefig(pdf, bbox_inches="tight")
+            npy = path.join(out_dir, chrom+".npy")
+            save(npy, cm.dendrogram_col.linkage)
             tsv = path.join(out_dir, chrom+".tsv")
             cm.data2d.to_csv(tsv, sep="\t")
     return 0

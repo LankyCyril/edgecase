@@ -46,6 +46,7 @@ dependencies:
   - libiconv=1.15=h516909a_1005
   - liblapack=3.8.0=10_openblas
   - liblapacke=3.8.0=10_openblas
+  - libllvm8=8.0.1=hc9558a2_0
   - libopenblas=0.3.6=h6e990d7_4
   - libpng=1.6.37=hed695b0_0
   - libssh2=1.8.2=h22169c7_2
@@ -54,11 +55,13 @@ dependencies:
   - libxcb=1.13=h14c3975_1002
   - libxml2=2.9.9=h13577e0_1
   - libxslt=1.1.32=hae48121_1003
+  - llvmlite=0.30.0=py36h8b12597_1
   - meme=5.0.5=py36pl526h19b89cf_0
   - mkl=2019.4=243
   - mpi=1.0=openmpi
   - ncurses=6.1=hf484d3e_1002
   - networkx=2.3=py_0
+  - numba=0.46.0=py36hb3f55d8_1
   - openblas=0.3.6=h6e990d7_4
   - openmpi=4.0.2=hd49bf07_1
   - openssl=1.1.1d=h516909a_0
