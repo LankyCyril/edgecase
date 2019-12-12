@@ -271,7 +271,7 @@ def add_legend(motif_order, m_clr, m_hch, ax, exploded, is_q):
             loc="upper left"
         else:
             loc="upper right"
-        ax.legend(handles=handles+background_handle, loc=loc, framealpha=1)
+        ax.legend(handles=handles+background_handle, loc=loc, framealpha=.9)
         ax.set(zorder=float("inf"))
 
 
@@ -291,6 +291,11 @@ def plot_densities(densities, ecx, title, m_clr, m_hch, target_anchor, is_q, fil
             bdf, ecx, chrom, title, m_clr, m_hch, target_anchor, is_q, ax=ax
         )
         ax.ticklabel_format(useOffset=False, style="plain")
+        read_count = len(bdf["name"].drop_duplicates())
+        desc_ax = ax.twinx()
+        for spine in ["top", "left", "right"]:
+            desc_ax.spines[spine].set_visible(False)
+        desc_ax.set(yticks=[], ylabel="{}rds".format(read_count))
         ax2chrom[ax] = chrom
     align_subplots(ax2chrom, ecx, target_anchor, is_q)
     add_legend(
@@ -343,7 +348,7 @@ def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title
         if len(m_clr) != len(m_hch):
             msg = "The numbers of motif colors and motif hatches do not match"
             raise ValueError(msg)
-        is_q, target_anchors = interpret_target(samfilters)
+        is_q, target_anchor = interpret_target(samfilters)
     if title is None:
         title = path.split(dat)[-1]
     return target_anchor, is_q, m_clr, m_hch, title
