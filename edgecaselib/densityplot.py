@@ -170,6 +170,7 @@ def get_motif_data(plottable_df, motif):
 
 
 def shorten_chrom_name(chrom):
+    """Shorten the chromosome name"""
     short_chrom_name_match = search(r'([Cc]hr)?[0-9XYM]+([pq]tel)?', chrom)
     if short_chrom_name_match:
         short_chrom_name = short_chrom_name_match.group()
@@ -299,10 +300,31 @@ def plot_densities(densities, ecx, title, m_clr, m_hch, target_anchor, is_q, fil
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
-def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title, dat):
-    """Parse and check arguments"""
+def interpret_target(samfilters):
+    """For non-exploded densityplots, infer which arm to plot and which anchor to center around"""
     flags2set = lambda f: set(explain_sam_flags(interpret_flags(f)).split("|"))
     potential_target_anchors = {"tract_anchor", "ucsc_mask_anchor", "fork"}
+    flags, _, flag_filter, _ = samfilters
+    if "is_q" in (flags2set(flags) - flags2set(flag_filter)):
+        is_q = True
+    elif "is_q" in (flags2set(flag_filter) - flags2set(flags)):
+        is_q = False
+    else:
+        raise NotImplementedError("non-exploded on both arms")
+    target_anchors = (
+        potential_target_anchors &
+        (flags2set(flags) - flags2set(flag_filter))
+    )
+    if len(target_anchors) == 1:
+        target_anchor = target_anchors.pop()
+    else:
+        error_message = "non-exploded without a single identifiable anchor"
+        raise NotImplementedError(error_message)
+    return is_q, target_anchor
+
+
+def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title, dat):
+    """Parse and check arguments"""
     if exploded:
         for motif_argument in motif_colors, motif_hatches:
             if motif_argument is not None:
@@ -321,22 +343,7 @@ def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title
         if len(m_clr) != len(m_hch):
             msg = "The numbers of motif colors and motif hatches do not match"
             raise ValueError(msg)
-        flags, _, flag_filter, _ = samfilters
-        if "is_q" in (flags2set(flags) - flags2set(flag_filter)):
-            is_q = True
-        elif "is_q" in (flags2set(flag_filter) - flags2set(flags)):
-            is_q = False
-        else:
-            raise NotImplementedError("non-exploded on both arms")
-        target_anchors = (
-            potential_target_anchors &
-            (flags2set(flags) - flags2set(flag_filter))
-        )
-        if len(target_anchors) == 1:
-            target_anchor = target_anchors.pop()
-        else:
-            error_message = "non-exploded without a single identifiable anchor"
-            raise NotImplementedError(error_message)
+        is_q, target_anchors = interpret_target(samfilters)
     if title is None:
         title = path.split(dat)[-1]
     return target_anchor, is_q, m_clr, m_hch, title
@@ -346,8 +353,7 @@ def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_si
     """Dispatch data to subroutines"""
     samfilters = [flags, flags_any, flag_filter, min_quality]
     target_anchor, is_q, m_clr, m_hch, title = interpret_arguments(
-        exploded, motif_colors, motif_hatches,
-        samfilters, title, dat
+        exploded, motif_colors, motif_hatches, samfilters, title, dat
     )
     ecx = load_index(index)
     densities = load_kmerscan(dat, gzipped, samfilters, bin_size)
