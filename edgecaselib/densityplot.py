@@ -15,6 +15,15 @@ from pandas import concat
 from re import search
 
 
+def simplify_axes(ax, keep=(), keep_scientific=False):
+    """Remove frame from axes, set tick formatting to plain"""
+    for spine in ["top", "left", "right", "bottom"]:
+        if spine not in keep:
+            ax.spines[spine].set_visible(False)
+    if not keep_scientific:
+        ax.ticklabel_format(useOffset=False, style="plain")
+
+
 def motif_subplots(nreads, chrom, max_mapq):
     """Prepare figure with subplots for each read"""
     page, axs = subplots(
@@ -24,9 +33,7 @@ def motif_subplots(nreads, chrom, max_mapq):
     )
     # remove subplot borders:
     for ax in axs.flatten():
-        for spine in ax.spines.values():
-            spine.set_visible(False)
-        ax.get_xaxis().get_major_formatter().set_scientific(False)
+        simplify_axes(ax)
     # remove xticks for all reads except bottom one:
     for ax in axs[:-1, 0]:
         ax.set(xticks=[])
@@ -34,10 +41,27 @@ def motif_subplots(nreads, chrom, max_mapq):
     axs[-1, 0].set(xlabel="Chromosome {}".format(chrom))
     meta_twiny = axs[0, 1].twiny()
     meta_twiny.set(title="MAPQ", xlim=(0, max_mapq))
-    for spine in meta_twiny.spines.values():
-        spine.set_visible(False)
+    simplify_axes(meta_twiny)
     axs[-1, 1].set(xticks=[])
     return page, axs
+
+
+def chromosome_subplots(nrows, zoomed_in=False):
+    if zoomed_in:
+        figsize=(16, nrows*3)
+    else:
+        figsize=(16, nrows)
+    if nrows < 3:
+        hspace = .15
+    else:
+        hspace = 1
+    figure, axs = subplots(
+        figsize=figsize, gridspec_kw={"hspace": hspace},
+        nrows=nrows, squeeze=False, frameon=False
+    )
+    for ax in axs[:, 0]:
+        simplify_axes(ax, keep={"bottom"})
+    return figure, axs
 
 
 def plot_motif_densities(read_data, trace_ax, legend=False):
@@ -181,7 +205,7 @@ def shorten_chrom_name(chrom):
     return short_chrom_name
 
 
-def plot_combined_density(binned_density_dataframe, ecx, chrom, title, m_clr, m_hch, target_anchor, is_q, ax):
+def plot_combined_density(binned_density_dataframe, ecx, title, m_clr, m_hch, target_anchor, is_q, display_chrom_name, ecx_chrom_name, ax):
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df, motif_order = stack_motif_densities(binned_density_dataframe)
     if len(motif_order) > len(m_clr):
@@ -192,7 +216,7 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, title, m_clr, m_
     for i in range(len(motif_order)+1):
         if i == len(motif_order):
             upper_motif_data = get_motif_data(plottable_df, motif_order[0])
-            upper_motif_data["density"], color, hatch = 1, "silver", "*"
+            upper_motif_data["density"], color, hatch = 1, "silver", "X"
         else:
             upper_motif_data = get_motif_data(plottable_df, motif_order[i])
             color, hatch = ordered_m_clr[i], ordered_m_hch[i]
@@ -212,22 +236,21 @@ def plot_combined_density(binned_density_dataframe, ecx, chrom, title, m_clr, m_
         linewidth=.5, alpha=.7, ax=ax
     )
     indexer = (
-        (ecx["rname"]==chrom) & (ecx["prime"]==(3 if is_q else 5)) &
+        (ecx["rname"]==ecx_chrom_name) & (ecx["prime"]==(3 if is_q else 5)) &
         (ecx["flag"]==interpret_flags(target_anchor))
     )
     plottable_flags = ecx.loc[indexer, ["pos", "flag"]]
     for _, pos, flag in plottable_flags.itertuples():
         ax.axvline(pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4)
-    short_chrom_name = shorten_chrom_name(chrom)
     ax.set(xlim=(
         plottable_df["position"].values.min(),
         plottable_df["position"].values.max()
     ))
-    ax.set(xlabel="", ylim=(0, 1), ylabel=short_chrom_name, yticks=[])
+    ax.set(xlabel="", ylim=(0, 1), ylabel=display_chrom_name, yticks=[])
     return motif_order, ordered_m_clr, ordered_m_hch
 
 
-def align_subplots(ax2chrom, ecx, target_anchor, is_q):
+def align_subplots(ax2chrom, ecx, target_anchor, is_q, zoomed_in, zoomed_in_offset=1000):
     """Modify xlim of related axes to make their scales match"""
     prime = 3 if is_q else 5
     anchor_positions, left_spans, right_spans = {}, {}, {}
@@ -246,8 +269,16 @@ def align_subplots(ax2chrom, ecx, target_anchor, is_q):
         else:
             error_msk = "{} not found on {} prime for {} in ECX"
             raise ValueError(error_msk.format(target_anchor, prime, chrom))
-    max_left_span = max(left_spans.values())
-    max_right_span = max(right_spans.values())
+    if zoomed_in:
+        if is_q:
+            max_left_span = zoomed_in_offset
+            max_right_span = max(right_spans.values())
+        else:
+            max_left_span = max(left_spans.values())
+            max_right_span = zoomed_in_offset
+    else:
+        max_left_span = max(left_spans.values())
+        max_right_span = max(right_spans.values())
     for ax, chrom in ax2chrom.items():
         ax.set(xlim=(
             anchor_positions[ax] - max_left_span,
@@ -265,7 +296,7 @@ def add_legend(motif_order, m_clr, m_hch, ax, exploded, is_q):
             for motif, color, hatch in zip(motif_order, m_clr, m_hch)
         ][::-1]
         background_handle = [
-            Patch(label="other", fc="silver", ec="black", hatch="*", alpha=.7)
+            Patch(label="other", fc="silver", ec="black", hatch="X", alpha=.7)
         ]
         if is_q:
             loc="upper left"
@@ -275,33 +306,37 @@ def add_legend(motif_order, m_clr, m_hch, ax, exploded, is_q):
         ax.set(zorder=float("inf"))
 
 
-def plot_densities(densities, ecx, title, m_clr, m_hch, target_anchor, is_q, file=stdout.buffer):
+def plot_densities(densities, ecx, title, m_clr, m_hch, target_anchor, is_q, zoomed_in, file=stdout.buffer):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
-    figure, axs = subplots(
-        figsize=(16, len(densities)), gridspec_kw={"hspace": 1},
-        nrows=len(densities), squeeze=False, frameon=False
-    )
+    figure, axs = chromosome_subplots(len(densities), zoomed_in)
     ax2chrom = {}
     for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:, 0]):
-        for spine in ["top", "left", "right"]:
-            ax.spines[spine].set_visible(False)
+        ecx_chrom_name, comment, *_ = chrom.split(":", 1) + [None]
+        if zoomed_in:
+            short_chrom_name = ecx_chrom_name
+        else:
+            short_chrom_name = shorten_chrom_name(ecx_chrom_name)
+        if comment:
+            display_chrom_name = short_chrom_name + "\n" + comment
+        else:
+            display_chrom_name = short_chrom_name
         motif_order, ordered_m_clr, ordered_m_hch = plot_combined_density(
-            bdf, ecx, chrom, title, m_clr, m_hch, target_anchor, is_q, ax=ax
+            bdf, ecx, title, m_clr, m_hch, target_anchor, is_q, ax=ax,
+            display_chrom_name=display_chrom_name, ecx_chrom_name=ecx_chrom_name
         )
-        ax.ticklabel_format(useOffset=False, style="plain")
         read_count = len(bdf["name"].drop_duplicates())
         desc_ax = ax.twinx()
-        for spine in ["top", "left", "right"]:
-            desc_ax.spines[spine].set_visible(False)
+        simplify_axes(desc_ax, keep={"bottom"})
         desc_ax.set(yticks=[], ylabel="{}rds".format(read_count))
-        ax2chrom[ax] = chrom
-    align_subplots(ax2chrom, ecx, target_anchor, is_q)
-    add_legend(
-        motif_order, ordered_m_clr, ordered_m_hch, axs[0, 0],
-        exploded=False, is_q=is_q
-    )
+        ax2chrom[ax] = ecx_chrom_name
+    align_subplots(ax2chrom, ecx, target_anchor, is_q, zoomed_in)
+    if not zoomed_in:
+        add_legend(
+            motif_order, ordered_m_clr, ordered_m_hch, axs[0, 0],
+            exploded=False, is_q=is_q
+        )
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
@@ -328,7 +363,7 @@ def interpret_target(samfilters):
     return is_q, target_anchor
 
 
-def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title, dat):
+def interpret_arguments(exploded, zoomed_in, motif_colors, motif_hatches, samfilters, title, dat):
     """Parse and check arguments"""
     if exploded:
         for motif_argument in motif_colors, motif_hatches:
@@ -336,6 +371,8 @@ def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title
                 message = "--motif-* with --exploded not fully implemented yet"
                 print(message, file=stderr)
         target_anchor, is_q, m_clr, m_hch = None, None, None, None
+        if zoomed_in:
+            raise NotImplementedError("--exploded with --zoomed-in")
     else:
         if motif_colors:
             m_clr = motif_colors.split("|")
@@ -354,11 +391,11 @@ def interpret_arguments(exploded, motif_colors, motif_hatches, samfilters, title
     return target_anchor, is_q, m_clr, m_hch, title
 
 
-def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, exploded, motif_colors, motif_hatches, title, file=stdout.buffer, **kwargs):
+def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, exploded, zoomed_in, motif_colors, motif_hatches, title, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flags_any, flag_filter, min_quality]
     target_anchor, is_q, m_clr, m_hch, title = interpret_arguments(
-        exploded, motif_colors, motif_hatches, samfilters, title, dat
+        exploded, zoomed_in, motif_colors, motif_hatches, samfilters, title, dat
     )
     ecx = load_index(index)
     densities = load_kmerscan(dat, gzipped, samfilters, bin_size)
@@ -368,5 +405,6 @@ def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_si
         )
     else:
         plot_densities(
-            densities, ecx, title, m_clr, m_hch, target_anchor, is_q, file
+            densities, ecx, title, m_clr, m_hch,
+            target_anchor, is_q, zoomed_in, file
         )
