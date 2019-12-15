@@ -47,6 +47,7 @@ def motif_subplots(nreads, chrom, max_mapq):
 
 
 def chromosome_subplots(nrows, zoomed_in=False):
+    """Prepare figure with subplots for each chromosome end"""
     if zoomed_in:
         figsize=(16, nrows*3)
     else:
@@ -64,7 +65,7 @@ def chromosome_subplots(nrows, zoomed_in=False):
     return figure, axs
 
 
-def plot_motif_densities(read_data, trace_ax, legend=False):
+def plot_read_motif_densities(read_data, trace_ax, legend=False):
     """Plot traces for motif densities of one read"""
     trace_data = read_data.iloc[:,9:].T
     trace_data.columns = read_data["motif"]
@@ -111,7 +112,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
     meta_ax.set(xlim=(0, max_mapq))
 
 
-def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, title, samfilters):
+def chromosome_exploded_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, title, samfilters):
     """Render figure with all motif densities of all reads mapping to one chromosome"""
     names = binned_density_dataframe["name"].drop_duplicates()
     page, axs = motif_subplots(len(names), chrom, max_mapq)
@@ -121,7 +122,7 @@ def chromosome_motif_plot(binned_density_dataframe, ecx, chrom, max_mapq, title,
             binned_density_dataframe["name"]==name
         ]
         legend = "full" if (i==0) else False
-        trace_data = plot_motif_densities(read_data, trace_ax, legend)
+        trace_data = plot_read_motif_densities(read_data, trace_ax, legend)
         highlight_mapped_region(read_data, trace_data, name, trace_ax)
         trace_ax.set(
             xlim=(pos_range.min(), pos_range.max()),
@@ -156,7 +157,7 @@ def plot_exploded_densities(densities, ecx, title, samfilters, file=stdout.buffe
     with rc_context({"figure.max_open_warning": len(densities)+2}):
         with PdfPages(file) as pdf:
             for chrom, binned_density_dataframe in decorated_densities_iterator:
-                page = chromosome_motif_plot(
+                page = chromosome_exploded_motif_plot(
                     binned_density_dataframe, ecx, chrom, max_mapq,
                     title, samfilters
                 )
