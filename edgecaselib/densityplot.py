@@ -7,6 +7,7 @@ from edgecaselib.util import natsorted_chromosomes
 from matplotlib.pyplot import subplots, rc_context, switch_backend
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle, Patch
+from numpy import clip
 from seaborn import lineplot
 from itertools import count
 from tqdm import tqdm
@@ -15,11 +16,13 @@ from pandas import concat
 from re import search
 
 
-def simplify_axes(ax, keep=(), keep_scientific=False):
+def simplify_axes(ax, keep=(), keep_scientific=False, bottom_to_zero=False):
     """Remove frame from axes, set tick formatting to plain"""
     for spine in ["top", "left", "right", "bottom"]:
-        if spine not in keep:
+        if (spine not in keep) or bottom_to_zero:
             ax.spines[spine].set_visible(False)
+    if bottom_to_zero:
+        ax.spines["bottom"].set_position("zero")
     if not keep_scientific:
         ax.ticklabel_format(useOffset=False, style="plain")
 
@@ -61,7 +64,7 @@ def chromosome_subplots(nrows, zoomed_in=False):
         nrows=nrows, squeeze=False, frameon=False
     )
     for ax in axs[:, 0]:
-        simplify_axes(ax, keep={"bottom"})
+        simplify_axes(ax, keep={"bottom"}, bottom_to_zero=zoomed_in)
     return figure, axs
 
 
@@ -206,7 +209,49 @@ def shorten_chrom_name(chrom):
     return short_chrom_name
 
 
-def plot_combined_density(binned_density_dataframe, ecx, title, m_clr, m_hch, target_anchor, is_q, display_chrom_name, ecx_chrom_name, ax):
+def fill_area(plottable_df, motif_order, i, ordered_m_clr, ordered_m_hch, ax):
+    """Fill areas on the area chart"""
+    if i == len(motif_order):
+        upper_motif_data = get_motif_data(plottable_df, motif_order[0])
+        upper_motif_data["density"], color, hatch = 1, "silver", "X"
+    else:
+        upper_motif_data = get_motif_data(plottable_df, motif_order[i])
+        color, hatch = ordered_m_clr[i], ordered_m_hch[i]
+    if i == 0:
+        lower_motif_data = upper_motif_data.copy()
+        lower_motif_data["density"] = 0
+    else:
+        lower_motif_data = get_motif_data(plottable_df, motif_order[i-1])
+    ax.fill_between(
+        x=upper_motif_data["position"],
+        y1=lower_motif_data["density"], y2=upper_motif_data["density"],
+        color=color, hatch=hatch, alpha=.7
+    )
+
+
+def coverage_plot(plottable_df, motif_count, ax):
+    """Plot read coverage under area chart"""
+    covered_positions = plottable_df.loc[
+        ~plottable_df["density"].isnull(), "position"
+    ]
+    coverage_df = covered_positions.value_counts() / motif_count
+    coverage_df = coverage_df.astype(int).to_frame().reset_index()
+    coverage_df.columns = ["position", "coverage"]
+    coverage_df = coverage_df.sort_values(by="position")
+    coverage_df["viz_coverage"] = -.01 * clip(
+        coverage_df["coverage"], a_min=1, a_max=50
+    )
+    ax.step(
+        x=coverage_df["position"], y=coverage_df["viz_coverage"],
+        where="pre", color="gray", alpha=.3
+    )
+    ax.fill_between(
+        x=coverage_df["position"], y1=0, y2=coverage_df["viz_coverage"],
+        step="pre", color="gray", alpha=.5
+    )
+
+
+def plot_combined_density(binned_density_dataframe, ecx, title, m_clr, m_hch, target_anchor, is_q, display_chrom_name, ecx_chrom_name, zoomed_in, ax):
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df, motif_order = stack_motif_densities(binned_density_dataframe)
     if len(motif_order) > len(m_clr):
@@ -215,39 +260,33 @@ def plot_combined_density(binned_density_dataframe, ecx, title, m_clr, m_hch, ta
         ordered_m_clr = m_clr[::-1][:len(motif_order)]
         ordered_m_hch = m_hch[::-1][:len(motif_order)]
     for i in range(len(motif_order)+1):
-        if i == len(motif_order):
-            upper_motif_data = get_motif_data(plottable_df, motif_order[0])
-            upper_motif_data["density"], color, hatch = 1, "silver", "X"
-        else:
-            upper_motif_data = get_motif_data(plottable_df, motif_order[i])
-            color, hatch = ordered_m_clr[i], ordered_m_hch[i]
-        if i == 0:
-            lower_motif_data = upper_motif_data.copy()
-            lower_motif_data["density"] = 0
-        else:
-            lower_motif_data = get_motif_data(plottable_df, motif_order[i-1])
-        ax.fill_between(
-            x=upper_motif_data["position"],
-            y1=lower_motif_data["density"], y2=upper_motif_data["density"],
-            color=color, hatch=hatch, alpha=.7
+        fill_area(
+            plottable_df, motif_order, i, ordered_m_clr, ordered_m_hch, ax
         )
     lineplot(
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
         palette={m: "black" for m in set(plottable_df["motif"])},
-        linewidth=.5, alpha=.7, ax=ax
+        linewidth=.5, alpha=.7, ax=ax, ci="sd"
     )
+    if zoomed_in:
+        coverage_plot(plottable_df, len(motif_order), ax)
+        axvline_start, ymin = .2, -.25
+    else:
+        axvline_start, ymin = 0, 0
     indexer = (
         (ecx["rname"]==ecx_chrom_name) & (ecx["prime"]==(3 if is_q else 5)) &
         (ecx["flag"]==interpret_flags(target_anchor))
     )
     plottable_flags = ecx.loc[indexer, ["pos", "flag"]]
     for _, pos, flag in plottable_flags.itertuples():
-        ax.axvline(pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4)
-    ax.set(xlim=(
-        plottable_df["position"].values.min(),
-        plottable_df["position"].values.max()
-    ))
-    ax.set(xlabel="", ylim=(0, 1), ylabel=display_chrom_name, yticks=[])
+        ax.axvline(
+            pos, axvline_start, 1, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4
+        )
+    position_values = plottable_df["position"].values
+    ax.set(
+        xlim=(position_values.min(), position_values.max()), xlabel="",
+        ylim=(ymin, 1), ylabel=display_chrom_name, yticks=[]
+    )
     return motif_order, ordered_m_clr, ordered_m_hch
 
 
@@ -325,11 +364,12 @@ def plot_densities(densities, ecx, title, m_clr, m_hch, target_anchor, is_q, zoo
             display_chrom_name = short_chrom_name
         motif_order, ordered_m_clr, ordered_m_hch = plot_combined_density(
             bdf, ecx, title, m_clr, m_hch, target_anchor, is_q, ax=ax,
-            display_chrom_name=display_chrom_name, ecx_chrom_name=ecx_chrom_name
+            zoomed_in=zoomed_in, display_chrom_name=display_chrom_name,
+            ecx_chrom_name=ecx_chrom_name
         )
         read_count = len(bdf["name"].drop_duplicates())
         desc_ax = ax.twinx()
-        simplify_axes(desc_ax, keep={"bottom"})
+        simplify_axes(desc_ax, keep={"bottom"}, bottom_to_zero=zoomed_in)
         desc_ax.set(yticks=[], ylabel="{}rds".format(read_count))
         ax2chrom[ax] = ecx_chrom_name
     align_subplots(ax2chrom, ecx, target_anchor, is_q, zoomed_in)
