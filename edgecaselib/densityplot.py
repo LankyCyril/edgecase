@@ -248,7 +248,7 @@ def coverage_plot(plottable_df, motif_count, ax, y_offset=.1):
     )
     ax.text(
         x=coverage_df["position"].max(), y=1+y_offset,
-        verticalalignment="center", s=" 0"
+        verticalalignment="center", s=" 1"
     )
     ax.text(
         x=coverage_df["position"].max(),
