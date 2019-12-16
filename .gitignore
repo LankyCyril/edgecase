@@ -6,3 +6,5 @@ tools
 jupyter
 publications/poster-2019/grigorev-poster.log
 publications/poster-2019/grigorev-poster.pdf
+publications/methods-paper/figures/*.aux
+publications/methods-paper/figures/*.log
