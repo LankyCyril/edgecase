@@ -116,11 +116,11 @@ create_subparser(
         ("-z", "--gzipped") : {"help": "input is gzipped (must specify if any of -qfF present)", "action": "store_true"},
         ("-b", "--bin-size"): {"help": "size of each bin in bp for visualization speedup", "default": 100, "type": int, "metavar": "B"},
         ("-e", "--exploded"): {"help": "plot each read separately", "action": "store_true"},
+        ("--zoomed-in",): {"help": "plot taller traces, cut off pre-anchor regions", "action": "store_true"},
         ("--motif-order",): {"help": "order of motifs on non-exploded plot", "default": "CCCCAA|CCCTAA|TTGGGG|TTAGGG"},
         ("--motif-colors",): {"help": "color of motifs on non-exploded plot", "default": None},
         ("--motif-hatches",): {"help": "fill pattern of motifs on non-exploded plot", "default": None},
-        ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"},
-        ("--no-align",): {"help": "plot unaligned", "action": "store_true"}
+        ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"}
     }
 )
 

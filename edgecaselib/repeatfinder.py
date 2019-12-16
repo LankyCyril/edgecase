@@ -85,7 +85,7 @@ def get_motifs_fisher(single_length_report):
     return fishers
 
 
-def analyze_repeats(full_report, adj="fdr_bh"):
+def analyze_repeats(full_report, adj="bonferroni"):
     """Analyze repeat enrichment for multiple lengths and apply multiple testing adjustment"""
     fishers = concat([
         get_motifs_fisher(

@@ -26,8 +26,8 @@ ALL_SAM_FLAGS = [
 ]
 
 DEFAULT_MOTIF_COLORS = [
-    "#88CCEE", "#DDCC77", "#CC6677", "#AA4499",
-    "#882255", "#332288", "#117733", "#44AA99"
+    "#117733", "#88CCEE", "#AA4499", "#DDCC77",
+    "#332288", "#882255", "#44AA99", "#CC6677"
 ]
 
 DEFAULT_MOTIF_HATCHES = [None] * len(DEFAULT_MOTIF_COLORS)
@@ -122,7 +122,7 @@ def binned(A, bins, func=mean):
     ])
 
 
-def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
+def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align=False):
     """Subset to densities of reads on `chrom`, bin densities, convert to dataframe"""
     indexer = (raw_densities["chrom"] == chrom)
     densities_subset = raw_densities[indexer].reset_index(drop=True)
@@ -170,7 +170,7 @@ def are_motifs_consistent(raw_densities):
         return True
 
 
-def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
+def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
     if not any(samfilters): # all zero / None
         print("Loading DAT...", file=stderr, flush=True)
