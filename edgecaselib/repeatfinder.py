@@ -33,17 +33,21 @@ def convert_input(bam, manager, tempdir, samfilters):
     return fasta
 
 
-def find_repeats(sequencefile, min_k, max_k, jellyfish, jobs, tempdir):
+def find_repeats(sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
     for k in tqdm(range(min_k, max_k+1), desc="Sweeping lengths"):
         db = path.join(tempdir, "{}.db".format(k))
-        # instead of looking for e.g. TTAGGG, look for TTAGGGTTAGGG,
-        # this implies repeat context and larger motifs like TTAGGGA do
-        # not confound it:
+        if no_context:
+            search_k = str(k)
+        else:
+            # instead of looking for e.g. TTAGGG, look for TTAGGGTTAGGG,
+            # this implies repeat context and larger motifs like TTAGGGA do
+            # not confound it:
+            search_k = str(k*2)
         check_output([
             jellyfish, "count", "-t", str(jobs), "-s", "2G", "-L", "0",
-            "-m", str(k*2), "-o", db, sequencefile
+            "-m", search_k, "-o", db, sequencefile
         ])
         tsv = path.join(tempdir, "{}.tsv".format(k))
         check_output([
@@ -51,10 +55,12 @@ def find_repeats(sequencefile, min_k, max_k, jellyfish, jobs, tempdir):
             "-o", tsv, db
         ])
         k_report = read_csv(tsv, sep="\t", names=["kmer", "count"])
-        # for downstream analyses, roll back to single motif:
-        doubles_indexer = k_report["kmer"].apply(lambda kmer:kmer[:k]==kmer[k:])
-        k_report = k_report[doubles_indexer]
-        k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
+        if not no_context: # for downstream analyses, roll back to single motif
+            doubles_indexer = k_report["kmer"].apply(
+                lambda kmer:kmer[:k]==kmer[k:]
+            )
+            k_report = k_report[doubles_indexer]
+            k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
         k_report["length"] = k
         per_k_reports.append(k_report)
     return concat(per_k_reports, axis=0)
@@ -118,7 +124,7 @@ def format_analysis(filtered_analysis, max_motifs):
     return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, jellyfish, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, no_context, jellyfish, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
@@ -128,7 +134,7 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
                 sequencefile, manager, tempdir, samfilters
             )
         full_report = find_repeats(
-            sequencefile, min_k, max_k, jellyfish, jobs, tempdir
+            sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdir
         )
     analysis = analyze_repeats(full_report)
     filtered_analysis = analysis[analysis["p_adjusted"]<max_p_adjusted]

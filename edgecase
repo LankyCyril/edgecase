@@ -73,6 +73,7 @@ create_subparser(
         ("-M", "--max-k"): {"help": "largest target repeat length", "default": 7, "type": int},
         ("-n", "--max-motifs"): {"help": "maximum number of motifs to report", "default": 8, "type": int},
         ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
+        ("--no-context",): {"help": "allow single interspersed instances of kmers", "action": "store_true"},
         ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"}
     }
 )
