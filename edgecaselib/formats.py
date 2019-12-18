@@ -32,9 +32,6 @@ DEFAULT_MOTIF_COLORS = [
 
 DEFAULT_MOTIF_HATCHES = [None] * len(DEFAULT_MOTIF_COLORS)
 
-MEME_HEADER_FMT = r'^MOTIF\s([A-Za-z]+)\sMEME-([0-9]+).*llr.*E-value\s*=\s*([0-9e.-]+)'
-MEME_REGEX_HEADER_FMT = r'Motif\s[A-Za-z]+\sMEME-([0-9]+)\sregular\sexpression'
-
 
 def split_hatch(hatches_pattern):
     """Split provided hatches pattern into individual ones"""
