@@ -20,7 +20,7 @@ DEFAULT_RULES = {
 }
 
 EXCLUDE_RULES = {
-    ("-x", "--index"): {"repeatfinder", "kmerscanner"}
+    ("-x", "--index"): {"levenshtein", "repeatfinder", "kmerscanner"}
 }
 
 
@@ -51,6 +51,15 @@ create_subparser(
     rules={
         ("bam",): {"help": "name of input BAM/SAM file"},
         ("-m", "--max-read-length"): {"help": "max read length to consider when selecting lookup regions", "default": None, "type": int, "metavar": "M"}
+    }
+)
+
+create_subparser(
+    subparsers, "levenshtein", help="cluster reads by edit distance",
+    usage="{} levenshtein [options] bam > tsv".format(__file__),
+    rules={
+        ("bam",): {"help": "name of input BAM/SAM file"},
+        ("-o", "--output-dir",): {"help": "output directory for clustermaps and per-haplotype SAM files", "default": None},
     }
 )
 
