@@ -61,6 +61,7 @@ def find_repeats(sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdi
             )
             k_report = k_report[doubles_indexer]
             k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
+        k_report["abundance"] = k_report["count"] / k_report["count"].sum()
         k_report["length"] = k
         per_k_reports.append(k_report)
     return concat(per_k_reports, axis=0)
@@ -105,7 +106,7 @@ def analyze_repeats(full_report, adj="bonferroni"):
     fishers = merge(
         fishers, motif_p[["motif", "p_adjusted"]], on="motif", how="outer"
     )
-    ktl = fishers[["count", "motif", "length", "p_adjusted"]]
+    ktl = fishers[["count", "abundance", "motif", "length", "p_adjusted"]]
     ktl_grouper = ["motif", "length", "p_adjusted"]
     return ktl.groupby(ktl_grouper, as_index=False).sum()
 
@@ -113,13 +114,13 @@ def analyze_repeats(full_report, adj="bonferroni"):
 def format_analysis(filtered_analysis, max_motifs):
     """Make dataframe prettier"""
     formatted_analysis = filtered_analysis.sort_values(
-        by=["count", "p_adjusted"], ascending=[False, True]
+        by=["abundance", "p_adjusted"], ascending=[False, True]
     )
     formatted_analysis = formatted_analysis[
-        ["motif", "length", "count", "p_adjusted"]
+        ["motif", "length", "count", "abundance", "p_adjusted"]
     ]
     formatted_analysis.columns = [
-        "#motif", "length", "count", "p_adjusted"
+        "#motif", "length", "count", "abundance", "p_adjusted"
     ]
     return formatted_analysis[:max_motifs]
 
