@@ -229,8 +229,8 @@ def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUST
         s=display_pvals(c1_pval, c2_pval)
     )
     cm.ax_heatmap.text(
-        x=0, y=0, va="center", ha="left", fontsize=20,
-        s=shorten_chrom_name(chrom)+"\n\n\n"
+        x=0, y=0, va="bottom", ha="left", fontsize=20,
+        s=shorten_chrom_name(chrom)+"\n"
     )
     filename = path.join(output_dir, chrom+".pdf")
     cm.fig.savefig(filename, bbox_inches="tight")
@@ -266,7 +266,7 @@ def warn_about_unsupported_hierarchy(chrom):
 
 
 def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
-    switch_backend("Agg")
+    switch_backend("pdf")
     hide_stats_warnings(True)
     msg = "the levenshtein subprogram is in development and very finicky!"
     print("WARNING:", msg, file=stderr)
