@@ -437,6 +437,7 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
         if zoomed_in:
             raise NotImplementedError("--palette with --zoomed-in")
         interpreted_palette = OrderedDict()
+        legend = not zoomed_in
         for palette_field in palette.split("|"):
             if palette_field.startswith("legend="):
                 if palette_field[7:].lower() == "true":
