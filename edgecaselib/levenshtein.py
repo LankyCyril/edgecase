@@ -1,4 +1,5 @@
 from sys import stdout, stderr
+from warnings import filterwarnings, resetwarnings
 from numba import njit
 from pysam import AlignmentFile
 from edgecaselib.formats import filter_bam
@@ -88,13 +89,17 @@ def calculate_chromosome_lds(chrom, entries):
 
 
 def generate_clustermap(lds, metric="euclidean", method="ward", cmap=CLUSTERMAP_CMAP, vmax=CLUSTERMAP_VMAX):
-    cm = clustermap(
-        data=lds, metric=metric, method=method,
-        cmap=cmap, vmin=0, vmax=vmax, figsize=CLUSTERMAP_FIGSIZE
-    )
-    cm.cax.set(visible=False)
-    cm.ax_heatmap.set(xticks=[], yticks=[])
-    return cm
+    try:
+        cm = clustermap(
+            data=lds, metric=metric, method=method,
+            cmap=cmap, vmin=0, vmax=vmax, figsize=CLUSTERMAP_FIGSIZE
+        )
+    except (ValueError, ModuleNotFoundError):
+        return None
+    else:
+        cm.cax.set(visible=False)
+        cm.ax_heatmap.set(xticks=[], yticks=[])
+        return cm
 
 
 def get_mwu_pvals(lds, c1_names, c2_names):
@@ -106,7 +111,7 @@ def get_mwu_pvals(lds, c1_names, c2_names):
     return c1_pval, c2_pval
 
 
-def get_major_clusters(lds, linkage):
+def get_clusters(lds, linkage):
     """Find two major clusters; so far, only works if there is not more than one outlier read"""
     labels = fcluster(linkage, 2, criterion="maxclust")
     uniq, counts = unique(labels, return_counts=True)
@@ -228,18 +233,37 @@ def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUST
 
 
 def batch_generate_pdfs(cms, report, output_dir):
-    for _, report_entry in report.iterrows():
-        chrom = report_entry["#chrom"]
-        generate_pdf(
-            cms[chrom], report_entry["cluster1_p_adjusted"],
-            report_entry["cluster2_p_adjusted"],
-            report_entry["silhouette_score"],
-            output_dir, chrom
+    if output_dir:
+        for _, report_entry in report.iterrows():
+            chrom = report_entry["#chrom"]
+            if chrom in cms:
+                generate_pdf(
+                    cms[chrom], report_entry["cluster1_p_adjusted"],
+                    report_entry["cluster2_p_adjusted"],
+                    report_entry["silhouette_score"],
+                    output_dir, chrom
+                )
+
+
+def hide_stats_warnings(state=True):
+    if state:
+        filterwarnings("ignore", message="invalid value encountered")
+        filterwarnings(
+            "ignore",
+            message="looks suspiciously like an uncondensed distance matrix"
         )
+    else:
+        resetwarnings()
+
+
+def warn_about_unsupported_hierarchy(chrom):
+    msg = "({}): not implemented: complex clustering hierarchy or too few reads"
+    print("Warning", msg.format(chrom), file=stderr)
 
 
 def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
     switch_backend("Agg")
+    hide_stats_warnings(True)
     msg = "the levenshtein subprogram is in development and very finicky!"
     print("WARNING:", msg, file=stderr)
     samfilters = [flags, flags_any, flag_filter, min_quality]
@@ -249,23 +273,27 @@ def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_q
     for chrom, entries in bam_dict.items():
         lds = calculate_chromosome_lds(chrom, entries)
         cm = generate_clustermap(lds)
-        c1_names, c2_names, c1_pval, c2_pval, silh_score = get_major_clusters(
-            lds, cm.dendrogram_row.linkage
-        )
-        cms[chrom] = cm
-        if not isnan(silh_score):
-            if (output_dir is not None) and (kmerscanner_file is not None):
-                generate_kmerscanner_file(
-                    kmerscanner_file, set(c1_names), set(c2_names),
-                    output_dir, chrom
-                )
+        if cm is None:
+            c1_names, c2_names = [], []
+            c1_pval, c2_pval, silh_score = nan, nan, nan
+            warn_about_unsupported_hierarchy(chrom)
         else:
-            msg = "complex hierarchy in clustering or too few reads"
-            print("Warning: not implemented:", msg, file=stderr)
+            c1_names, c2_names, c1_pval, c2_pval, silh_score = get_clusters(
+                lds, cm.dendrogram_row.linkage
+            )
+            cms[chrom] = cm
+            if not isnan(silh_score):
+                if (output_dir is not None) and (kmerscanner_file is not None):
+                    generate_kmerscanner_file(
+                        kmerscanner_file, set(c1_names), set(c2_names),
+                        output_dir, chrom
+                    )
+            else:
+                warn_about_unsupported_hierarchy(chrom)
         report_rows.append([
             chrom, len(c1_names), len(c2_names), silh_score, c1_pval, c2_pval
         ])
     report = generate_report(report_rows)
-    if output_dir:
-        batch_generate_pdfs(cms, report, output_dir)
-    print(report.to_csv(sep="\t", index=False))
+    batch_generate_pdfs(cms, report, output_dir)
+    print(report.to_csv(sep="\t", index=False, na_rep="NA"))
+    hide_stats_warnings(False)
