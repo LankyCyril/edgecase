@@ -156,6 +156,41 @@ def display_pvals(c1_pval, c2_pval):
     )
 
 
+def generate_kmerscanner_file(kmerscanner_file, c1_names, c2_names, output_dir, chrom):
+    kmerscanner_dat = read_csv(kmerscanner_file, sep="\t")
+    kmerscanner_dat_hap1 = kmerscanner_dat[
+        kmerscanner_dat["#name"].isin(c1_names)
+    ].copy()
+    kmerscanner_dat_hap1["chrom"] = kmerscanner_dat_hap1["chrom"].apply(
+        lambda s: s + ":haplotype 1"
+    )
+    kmerscanner_dat_hap2 = kmerscanner_dat[
+        kmerscanner_dat["#name"].isin(c2_names)
+    ].copy()
+    kmerscanner_dat_hap2["chrom"] = kmerscanner_dat_hap2["chrom"].apply(
+        lambda s: s + ":haplotype 2"
+    )
+    haplo_dat = concat(
+        [kmerscanner_dat_hap1, kmerscanner_dat_hap2], axis=0
+    )
+    haplo_dat.to_csv(path.join(output_dir, chrom+".dat"), sep="\t", index=False)
+
+
+def generate_report(report_rows, adj="bonferroni"):
+    report = DataFrame(
+        data=report_rows,
+        columns=[
+            "#chrom", "cluster1_size", "cluster2_size", "silhouette_score",
+            "cluster1_pvalue", "cluster2_pvalue"
+        ]
+    )
+    pvals = report[["cluster1_pvalue", "cluster2_pvalue"]].values.flatten()
+    p_adjusted = multipletests(pvals, method=adj)[1].reshape(-1, 2)
+    report["cluster1_p_adjusted"] = p_adjusted[:,0]
+    report["cluster2_p_adjusted"] = p_adjusted[:,1]
+    return report
+
+
 def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUSTERMAP_CMAP, vmax=CLUSTERMAP_VMAX):
     cm.ax_col_dendrogram.clear()
     cm.ax_col_dendrogram.imshow(
@@ -192,57 +227,32 @@ def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUST
     cm.fig.savefig(filename, bbox_inches="tight")
 
 
-def generate_kmerscanner_file(kmerscanner_file, c1_names, c2_names, output_dir, chrom):
-    kmerscanner_dat = read_csv(kmerscanner_file, sep="\t")
-    kmerscanner_dat_hap1 = kmerscanner_dat[
-        kmerscanner_dat["#name"].isin(c1_names)
-    ].copy()
-    kmerscanner_dat_hap1["chrom"] = kmerscanner_dat_hap1["chrom"].apply(
-        lambda s: s + ":haplotype 1"
-    )
-    kmerscanner_dat_hap2 = kmerscanner_dat[
-        kmerscanner_dat["#name"].isin(c2_names)
-    ].copy()
-    kmerscanner_dat_hap2["chrom"] = kmerscanner_dat_hap2["chrom"].apply(
-        lambda s: s + ":haplotype 2"
-    )
-    haplo_dat = concat(
-        [kmerscanner_dat_hap1, kmerscanner_dat_hap2], axis=0
-    )
-    haplo_dat.to_csv(path.join(output_dir, chrom+".dat"), sep="\t", index=False)
-
-
-def generate_report(report_rows, adj="bonferroni"):
-    report = DataFrame(
-        data=report_rows,
-        columns=[
-            "#chrom", "cluster1_size", "cluster2_size", "silhouette_score",
-            "cluster1_pvalue", "cluster2_pvalue"
-        ]
-    )
-    pvals = report[["cluster1_pvalue", "cluster2_pvalue"]].values.flatten()
-    p_adjusted = multipletests(pvals, method=adj)[1].reshape(-1, 2)
-    report["cluster1_p_adjusted"] = p_adjusted[:,0]
-    report["cluster2_p_adjusted"] = p_adjusted[:,1]
-    return report
+def batch_generate_pdfs(cms, report, output_dir):
+    for _, report_entry in report.iterrows():
+        chrom = report_entry["#chrom"]
+        generate_pdf(
+            cms[chrom], report_entry["cluster1_p_adjusted"],
+            report_entry["cluster2_p_adjusted"],
+            report_entry["silhouette_score"],
+            output_dir, chrom
+        )
 
 
 def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
     switch_backend("Agg")
-    msg = "WARNING: this subprogram is in development and very finicky!"
-    print(msg, file=stderr)
+    msg = "the levenshtein subprogram is in development and very finicky!"
+    print("WARNING:", msg, file=stderr)
     samfilters = [flags, flags_any, flag_filter, min_quality]
     with AlignmentFile(bam) as alignment:
         bam_dict = load_bam_as_dict(alignment, samfilters)
-    report_rows = []
+    cms, report_rows = {}, []
     for chrom, entries in bam_dict.items():
         lds = calculate_chromosome_lds(chrom, entries)
         cm = generate_clustermap(lds)
         c1_names, c2_names, c1_pval, c2_pval, silh_score = get_major_clusters(
             lds, cm.dendrogram_row.linkage
         )
-        if output_dir:
-            generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom)
+        cms[chrom] = cm
         if not isnan(silh_score):
             if (output_dir is not None) and (kmerscanner_file is not None):
                 generate_kmerscanner_file(
@@ -250,9 +260,12 @@ def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_q
                     output_dir, chrom
                 )
         else:
-            msg = "Warning: not implemented: complex hierarchy in clustering"
-            print(msg, file=stderr)
+            msg = "complex hierarchy in clustering or too few reads"
+            print("Warning: not implemented:", msg, file=stderr)
         report_rows.append([
             chrom, len(c1_names), len(c2_names), silh_score, c1_pval, c2_pval
         ])
-    print(generate_report(report_rows).to_csv(sep="\t", index=False))
+    report = generate_report(report_rows)
+    if output_dir:
+        batch_generate_pdfs(cms, report, output_dir)
+    print(report.to_csv(sep="\t", index=False))
