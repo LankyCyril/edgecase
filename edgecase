@@ -101,7 +101,7 @@ create_subparser(
         ("-b", "--bin-size"): {"help": "size of each bin in bp for visualization speedup", "default": 100, "type": int, "metavar": "B"},
         ("-e", "--exploded"): {"help": "plot each read separately", "action": "store_true"},
         ("--zoomed-in",): {"help": "plot taller traces, cut off pre-anchor regions", "action": "store_true"},
-        ("--motif-colors",): {"help": "color of motifs on non-exploded plot", "default": None},
+        ("--palette",): {"help": "custom palette for plotting motifs", "default": None},
         ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"}
     }
 )
