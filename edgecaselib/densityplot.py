@@ -274,7 +274,7 @@ def plot_combined_density(binned_density_dataframe, ecx, title, m_clr, target_an
     lineplot(
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
         palette={m: "black" for m in set(plottable_df["motif"])},
-        linewidth=.5, alpha=.7, ax=ax
+        linewidth=.5, alpha=.7, ax=ax, ci="sd"
     )
     if zoomed_in:
         ymax = coverage_plot(plottable_df, len(motif_order), ax)
