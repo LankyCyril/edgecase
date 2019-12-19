@@ -164,9 +164,14 @@ def plot_exploded_densities(densities, ecx, title, samfilters, file=stdout.buffe
 
 def stack_motif_densities(binned_density_dataframe):
     """Prepare densities for plotting the stacked area chart; return normal order but stack from bottom"""
-    motif_order = binned_density_dataframe[["motif", "abundance"]] \
-        .drop_duplicates().sort_values(by="abundance") \
-        ["motif"].drop_duplicates().values
+    if "abundance" in binned_density_dataframe.columns:
+        motif_order = binned_density_dataframe[["motif", "abundance"]] \
+            .drop_duplicates().sort_values(by="abundance") \
+            ["motif"].drop_duplicates().values
+    else:
+        motif_order = binned_density_dataframe[["motif", "total_count"]] \
+            .drop_duplicates().sort_values(by="total_count") \
+            ["motif"].drop_duplicates().values
     skinny_bdf = binned_density_dataframe[
         ["name", "motif"] + list(binned_density_dataframe.columns[9:])
     ]
@@ -434,8 +439,8 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     if palette is None:
         legend = not zoomed_in
     else:
-        if zoomed_in:
-            raise NotImplementedError("--palette with --zoomed-in")
+        if exploded:
+            raise NotImplementedError("--palette with --exploded")
         interpreted_palette = OrderedDict()
         legend = not zoomed_in
         for palette_field in palette.split("|"):
