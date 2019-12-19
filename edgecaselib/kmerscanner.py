@@ -13,7 +13,7 @@ from pandas import read_csv
 
 
 DAT_HEADER = [
-    "#name", "flag", "chrom", "pos", "mapq", "motif", "total_count",
+    "#name", "flag", "chrom", "pos", "mapq", "motif", "abundance",
     "clip_5prime", "clip_3prime", "density"
 ]
 
@@ -149,18 +149,18 @@ def interpret_arguments(head_test, tail_test, cutoff, motif_file):
     motif_patterns = OrderedDict([
         [motif, get_circular_pattern(motif)] for motif in motif_data["motif"]
     ])
-    if "count" in motif_data.columns:
-        total_counts = dict(zip(
-            motif_data["motif"], motif_data["count"]
+    if "abundance" in motif_data.columns:
+        total_abundance = dict(zip(
+            motif_data["motif"], motif_data["abundance"]
         ))
     else:
-        total_counts = {m: nan for m in motif_data["motif"]}
-    return motif_patterns, total_counts
+        total_abundance = {m: nan for m in motif_data["motif"]}
+    return motif_patterns, total_abundance
 
 
 def main(bam, flags, flags_any, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
-    motif_patterns, total_counts = interpret_arguments(
+    motif_patterns, total_abundance = interpret_arguments(
         head_test, tail_test, cutoff, motif_file
     )
     print(*DAT_HEADER, sep="\t", file=file)
@@ -180,7 +180,7 @@ def main(bam, flags, flags_any, flag_filter, min_quality, motif_file, head_test,
                     meta_fields = [
                         entry.query_name, entry.flag, entry.reference_name,
                         entry.reference_start, entry.mapping_quality,
-                        motif, total_counts[motif],
+                        motif, total_abundance[motif],
                         get_cigar_clip_length(entry, 5),
                         get_cigar_clip_length(entry, 3)
                     ]
