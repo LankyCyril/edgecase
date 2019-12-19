@@ -178,7 +178,10 @@ def generate_kmerscanner_file(kmerscanner_file, c1_names, c2_names, output_dir, 
     haplo_dat = concat(
         [kmerscanner_dat_hap1, kmerscanner_dat_hap2], axis=0
     )
-    haplo_dat.to_csv(path.join(output_dir, chrom+".dat"), sep="\t", index=False)
+    haplo_dat.to_csv(
+        path.join(output_dir, chrom+".dat.gz"), compression="gzip",
+        sep="\t", index=False
+    )
 
 
 def generate_report(report_rows, adj="bonferroni"):
