@@ -3,14 +3,13 @@ from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
 from edgecaselib.formats import DEFAULT_MOTIF_COLORS, DEFAULT_MOTIF_HATCHES
 from edgecaselib.formats import split_hatch
-from edgecaselib.util import natsorted_chromosomes
+from edgecaselib.util import natsorted_chromosomes, progressbar
 from matplotlib.pyplot import subplots, rc_context, switch_backend
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle, Patch
 from numpy import clip
 from seaborn import lineplot
 from itertools import count
-from tqdm import tqdm
 from os import path
 from pandas import concat
 from re import search
@@ -143,7 +142,7 @@ def make_decorated_densities_iterator(densities):
     sorted_densities_iterator = (
         (chrom, densities[chrom]) for chrom in sorted_chromosomes
     )
-    return tqdm(
+    return progressbar(
         sorted_densities_iterator, total=len(densities),
         desc="Plotting", unit="chromosome"
     )
@@ -248,7 +247,7 @@ def coverage_plot(plottable_df, motif_count, ax, y_offset=.1):
     )
     ax.text(
         x=coverage_df["position"].max(), y=1+y_offset,
-        verticalalignment="center", s=" 0"
+        verticalalignment="center", s=" 1"
     )
     ax.text(
         x=coverage_df["position"].max(),

@@ -1,10 +1,9 @@
-from sys import stdout, stderr
+from sys import stdout
 from tempfile import TemporaryDirectory
 from pysam import AlignmentFile, FastxFile
 from os import path
-from edgecaselib.util import get_executable
+from edgecaselib.util import get_executable, progressbar
 from edgecaselib.formats import filter_bam
-from tqdm import tqdm
 from subprocess import check_output
 from pandas import read_csv, concat, merge
 from numpy import unique
@@ -33,17 +32,24 @@ def convert_input(bam, manager, tempdir, samfilters):
     return fasta
 
 
-def find_repeats(sequencefile, min_k, max_k, jellyfish, jobs, tempdir):
+def find_repeats(sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
-    for k in tqdm(range(min_k, max_k+1), desc="Sweeping lengths"):
+    k_iterator = progressbar(
+        range(min_k, max_k+1), desc="Sweeping lengths", unit="k"
+    )
+    for k in k_iterator:
         db = path.join(tempdir, "{}.db".format(k))
-        # instead of looking for e.g. TTAGGG, look for TTAGGGTTAGGG,
-        # this implies repeat context and larger motifs like TTAGGGA do
-        # not confound it:
+        if no_context:
+            search_k = str(k)
+        else:
+            # instead of looking for e.g. TTAGGG, look for TTAGGGTTAGGG,
+            # this implies repeat context and larger motifs like TTAGGGA do
+            # not confound it:
+            search_k = str(k*2)
         check_output([
             jellyfish, "count", "-t", str(jobs), "-s", "2G", "-L", "0",
-            "-m", str(k*2), "-o", db, sequencefile
+            "-m", search_k, "-o", db, sequencefile
         ])
         tsv = path.join(tempdir, "{}.tsv".format(k))
         check_output([
@@ -51,10 +57,13 @@ def find_repeats(sequencefile, min_k, max_k, jellyfish, jobs, tempdir):
             "-o", tsv, db
         ])
         k_report = read_csv(tsv, sep="\t", names=["kmer", "count"])
-        # for downstream analyses, roll back to single motif:
-        doubles_indexer = k_report["kmer"].apply(lambda kmer:kmer[:k]==kmer[k:])
-        k_report = k_report[doubles_indexer]
-        k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
+        if not no_context: # for downstream analyses, roll back to single motif
+            doubles_indexer = k_report["kmer"].apply(
+                lambda kmer:kmer[:k]==kmer[k:]
+            )
+            k_report = k_report[doubles_indexer]
+            k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
+        k_report["abundance"] = k_report["count"] / k_report["count"].sum()
         k_report["length"] = k
         per_k_reports.append(k_report)
     return concat(per_k_reports, axis=0)
@@ -72,8 +81,6 @@ def get_motifs_fisher(single_length_report):
         raise ValueError("`get_motifs_fisher`: multiple lengths found")
     else:
         k = lengths[0]
-    message = "\rCalculating enrichment for k={}... ".format(lengths[0])
-    print(message, end="", file=stderr, flush=True)
     total_count = single_length_report["count"].sum()
     N = 4**k
     median_count = single_length_report["count"].median()
@@ -91,7 +98,10 @@ def analyze_repeats(full_report, adj="bonferroni"):
         get_motifs_fisher(
             full_report[full_report["length"]==length]
         )
-        for length in unique(full_report["length"].values)
+        for length in progressbar(
+            unique(full_report["length"].values), unit="k",
+            desc="Calculating enrichment"
+        )
     ])
     fishers["motif"] = fishers["kmer"].apply(lowest_alpha_inversion)
     motif_p = fishers[["motif", "p"]].groupby("motif", as_index=False).max()
@@ -99,7 +109,7 @@ def analyze_repeats(full_report, adj="bonferroni"):
     fishers = merge(
         fishers, motif_p[["motif", "p_adjusted"]], on="motif", how="outer"
     )
-    ktl = fishers[["count", "motif", "length", "p_adjusted"]]
+    ktl = fishers[["count", "abundance", "motif", "length", "p_adjusted"]]
     ktl_grouper = ["motif", "length", "p_adjusted"]
     return ktl.groupby(ktl_grouper, as_index=False).sum()
 
@@ -107,18 +117,18 @@ def analyze_repeats(full_report, adj="bonferroni"):
 def format_analysis(filtered_analysis, max_motifs):
     """Make dataframe prettier"""
     formatted_analysis = filtered_analysis.sort_values(
-        by=["count", "p_adjusted"], ascending=[False, True]
+        by=["abundance", "p_adjusted"], ascending=[False, True]
     )
     formatted_analysis = formatted_analysis[
-        ["motif", "length", "count", "p_adjusted"]
+        ["motif", "length", "count", "abundance", "p_adjusted"]
     ]
     formatted_analysis.columns = [
-        "#motif", "length", "count", "p_adjusted"
+        "#motif", "length", "count", "abundance", "p_adjusted"
     ]
     return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, jellyfish, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, no_context, jellyfish, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
@@ -128,10 +138,9 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
                 sequencefile, manager, tempdir, samfilters
             )
         full_report = find_repeats(
-            sequencefile, min_k, max_k, jellyfish, jobs, tempdir
+            sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdir
         )
     analysis = analyze_repeats(full_report)
     filtered_analysis = analysis[analysis["p_adjusted"]<max_p_adjusted]
     formatted_analysis = format_analysis(filtered_analysis, max_motifs)
     formatted_analysis.to_csv(file, sep="\t", index=False)
-    print("Done", file=stderr, flush=True)

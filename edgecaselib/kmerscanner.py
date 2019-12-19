@@ -7,7 +7,7 @@ from edgecaselib.tailchopper import get_cigar_clip_length
 from pysam import AlignmentFile
 from types import SimpleNamespace
 from functools import partial
-from tqdm import tqdm
+from edgecaselib.util import progressbar
 from collections import OrderedDict
 from pandas import read_csv
 
@@ -119,7 +119,7 @@ def pattern_scanner(entry_iterator, samfilters, motif_patterns, cutoff, window_s
         )
         # iterate pairs (entry.query_name, density_array), same as calculate_density_of_patterns():
         desc = "Calculating density"
-        yield from tqdm(
+        yield from progressbar(
             read_density_iterator, desc=desc,
             unit="read", total=num_reads
         )

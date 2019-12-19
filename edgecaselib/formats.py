@@ -7,7 +7,7 @@ from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
 from tempfile import TemporaryDirectory
 from os import path
-from tqdm import tqdm
+from edgecaselib.util import progressbar
 from functools import reduce
 from operator import __or__
 
@@ -31,9 +31,6 @@ DEFAULT_MOTIF_COLORS = [
 ]
 
 DEFAULT_MOTIF_HATCHES = [None] * len(DEFAULT_MOTIF_COLORS)
-
-MEME_HEADER_FMT = r'^MOTIF\s([A-Za-z]+)\sMEME-([0-9]+).*llr.*E-value\s*=\s*([0-9e.-]+)'
-MEME_REGEX_HEADER_FMT = r'Motif\s[A-Za-z]+\sMEME-([0-9]+)\sregular\sexpression'
 
 
 def split_hatch(hatches_pattern):
@@ -94,7 +91,7 @@ def filter_and_read_tsv(dat, gzipped, samfilters):
         with TemporaryDirectory() as tempdir:
             datflt_name = path.join(tempdir, "dat.gz")
             with gzopen(datflt_name, mode="wt") as datflt:
-                decorated_line_iterator = tqdm(
+                decorated_line_iterator = progressbar(
                     dat_handle, desc="Filtering", unit=" lines"
                 )
                 for line in decorated_line_iterator:
@@ -192,7 +189,7 @@ def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=
         raw_densities = merge(groups, raw_densities).drop(columns="length")
     if no_align:
         raw_densities["chrom"] = "None"
-    chromosome_iterator = tqdm(
+    chromosome_iterator = progressbar(
         raw_densities["chrom"].drop_duplicates(), desc="Interpreting data",
         unit="chromosome"
     )
@@ -252,4 +249,4 @@ def filter_bam(alignment, samfilters, desc=None):
     if desc is None:
         return filtered_iterator
     else:
-        return tqdm(filtered_iterator, desc=desc, unit="read")
+        return progressbar(filtered_iterator, desc=desc, unit="read")
