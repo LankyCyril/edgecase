@@ -6,7 +6,7 @@ from numpy import zeros, array, uint32, uint8, concatenate, nan, isnan, unique
 from numpy import linspace, vstack
 from collections import defaultdict
 from tqdm import tqdm
-from pandas import DataFrame
+from pandas import DataFrame, read_csv, concat
 from matplotlib.pyplot import switch_backend
 from seaborn import clustermap
 from scipy.cluster.hierarchy import fcluster
@@ -190,7 +190,27 @@ def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUST
     cm.fig.savefig(filename, bbox_inches="tight")
 
 
-def main(bam, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
+def generate_kmerscanner_file(kmerscanner_file, c1_names, c2_names, output_dir, chrom):
+    kmerscanner_dat = read_csv(kmerscanner_file, sep="\t")
+    kmerscanner_dat_hap1 = kmerscanner_dat[
+        kmerscanner_dat["#name"].isin(c1_names)
+    ].copy()
+    kmerscanner_dat_hap1["chrom"] = kmerscanner_dat_hap1["chrom"].apply(
+        lambda s: s + ":haplotype 1"
+    )
+    kmerscanner_dat_hap2 = kmerscanner_dat[
+        kmerscanner_dat["#name"].isin(c2_names)
+    ].copy()
+    kmerscanner_dat_hap2["chrom"] = kmerscanner_dat_hap2["chrom"].apply(
+        lambda s: s + ":haplotype 2"
+    )
+    haplo_dat = concat(
+        [kmerscanner_dat_hap1, kmerscanner_dat_hap2], axis=0
+    )
+    haplo_dat.to_csv(path.join(output_dir, chrom+".dat"), sep="\t", index=False)
+
+
+def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
     switch_backend("Agg")
     #samfilters = [flags, flags_any, flag_filter, min_quality]
     #with AlignmentFile(bam) as alignment:
@@ -209,7 +229,11 @@ def main(bam, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, fi
         if output_dir:
             generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom)
         if not isnan(silh_score):
-            print(c1_names, c2_names, c1_pval, c2_pval, silh_score)
+            if (output_dir is not None) and (kmerscanner_file is not None):
+                generate_kmerscanner_file(
+                    kmerscanner_file, set(c1_names), set(c2_names),
+                    output_dir, chrom
+                )
         else:
             msg = "Warning: not implemented: complex hierarchy in clustering"
             print(msg, file=stderr)

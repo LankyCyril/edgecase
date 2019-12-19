@@ -59,6 +59,7 @@ create_subparser(
     usage="{} levenshtein [options] bam > tsv".format(__file__),
     rules={
         ("bam",): {"help": "name of input BAM/SAM file"},
+        ("--kmerscanner-file",): {"help": "kmerscanner file (optional, for use with --output-dir", "default": None},
         ("-o", "--output-dir",): {"help": "output directory for clustermaps and per-haplotype SAM files", "default": None},
     }
 )
