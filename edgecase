@@ -103,7 +103,6 @@ create_subparser(
         ("--zoomed-in",): {"help": "plot taller traces, cut off pre-anchor regions", "action": "store_true"},
         ("--motif-order",): {"help": "order of motifs on non-exploded plot", "default": "CCCCAA|CCCTAA|TTGGGG|TTAGGG"},
         ("--motif-colors",): {"help": "color of motifs on non-exploded plot", "default": None},
-        ("--motif-hatches",): {"help": "fill pattern of motifs on non-exploded plot", "default": None},
         ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"}
     }
 )
