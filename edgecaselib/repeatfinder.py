@@ -23,16 +23,24 @@ def interpret_args(fmt, jellyfish):
 
 
 def convert_input(bam, manager, tempdir, samfilters):
-    """Convert BAM to fasta for MEME"""
+    """Convert BAM to fasta; count bases"""
     fasta = path.join(tempdir, "input.fa")
+    base_count = 0
     with manager(bam) as alignment, open(fasta, mode="wt") as fasta_handle:
         for entry in filter_bam(alignment, samfilters, "SAM/BAM -> FASTA"):
             entry_str = ">{}\n{}".format(entry.qname, entry.query_sequence)
+            base_count += len(entry.query_sequence)
             print(entry_str, file=fasta_handle)
-    return fasta
+    return fasta, base_count
 
 
-def find_repeats(sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdir):
+def count_fastx_bases(sequencefile):
+    """Count bases in FASTX file"""
+    with FastxFile(sequencefile) as fastx:
+        return sum(len(entry.sequence) for entry in fastx)
+
+
+def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
     k_iterator = progressbar(
@@ -63,7 +71,7 @@ def find_repeats(sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdi
             )
             k_report = k_report[doubles_indexer]
             k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
-        k_report["abundance"] = k_report["count"] / k_report["count"].sum()
+        k_report["abundance"] = k_report["count"] / base_count
         k_report["length"] = k
         per_k_reports.append(k_report)
     return concat(per_k_reports, axis=0)
@@ -134,11 +142,14 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
     with TemporaryDirectory() as tempdir:
         if manager == AlignmentFile: # will need to convert SAM to fastx
             samfilters = [flags, flags_any, flag_filter, min_quality]
-            sequencefile = convert_input(
+            sequencefile, base_count = convert_input(
                 sequencefile, manager, tempdir, samfilters
             )
+        else:
+            base_count = count_fastx_bases(sequencefile)
         full_report = find_repeats(
-            sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdir
+            sequencefile, min_k, max_k, base_count,
+            no_context, jellyfish, jobs, tempdir
         )
     analysis = analyze_repeats(full_report)
     filtered_analysis = analysis[analysis["p_adjusted"]<max_p_adjusted]
