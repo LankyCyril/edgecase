@@ -149,7 +149,7 @@ def format_pval(pval):
 
 
 def display_pvals(c1_pval, c2_pval):
-    return "$p_1$= {}, $p_2$= {}".format(
+    return "$p_1$={}, $p_2$={}".format(
         format_pval(c1_pval), format_pval(c2_pval)
     )
 
@@ -167,7 +167,7 @@ def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUST
         zorder=float("inf")
     )
     cm.ax_col_dendrogram.text(
-        x=-572, y=.8, va="center", ha="left", fontsize=19, s="Distance: 0"
+        x=-672, y=.8, va="center", ha="left", fontsize=19, s="Distance:  0"
     )
     cm.ax_col_dendrogram.text(
         x=272, y=.8, va="center", ha="left", fontsize=19, s="0.25+"
@@ -175,16 +175,16 @@ def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUST
     cm.ax_col_dendrogram.set_axis_off()
     silh_text = "N/A" if isnan(silh_score) else "{:.3f}".format(silh_score)
     cm.ax_col_dendrogram.text(
-        x=-572, y=3, va="top", ha="left", fontsize=19,
-        s="Silhouette score: "+silh_text
+        x=-672, y=3, va="top", ha="left", fontsize=19,
+        s="Silhouette score:  "+silh_text
     )
     cm.ax_col_dendrogram.text(
-        x=-572, y=6.6, va="top", ha="left", fontsize=19,
+        x=-672, y=6.6, va="top", ha="left", fontsize=19,
         s=display_pvals(c1_pval, c2_pval)
     )
     cm.ax_heatmap.text(
         x=0, y=0, va="center", ha="left", fontsize=22,
-        s=shorten_chrom_name(chrom)+"\n\n\n"
+        s=shorten_chrom_name(chrom)+"\n\n"
     )
     filename = path.join(output_dir, chrom+".pdf")
     cm.fig.savefig(filename, bbox_inches="tight")
