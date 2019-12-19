@@ -52,7 +52,7 @@ def chromosome_subplots(nrows, zoomed_in=False):
         figsize=(16, nrows*3)
         hspace = .25
     else:
-        figsize=(16, nrows)
+        figsize=(16, nrows*1.3)
         hspace = 1
     figure, axs = subplots(
         figsize=figsize, gridspec_kw={"hspace": hspace},
