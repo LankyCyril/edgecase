@@ -17,6 +17,7 @@ dependencies:
   - dbus=1.13.6=he372182_0
   - decorator=4.4.1=py_0
   - expat=2.2.5=he1b5a44_1003
+  - fastcluster=1.1.25=py36hb3f55d8_1000
   - fontconfig=2.13.1=he4413a7_1000
   - freetype=2.10.0=he983fc9_0
   - gettext=0.19.8.1=hc5be6a0_1002
