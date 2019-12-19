@@ -3,6 +3,8 @@ from regex import compile
 from re import split, search, IGNORECASE
 from shutil import which
 from os import path, access, X_OK
+from functools import partial
+from tqdm import tqdm
 
 
 MAINCHROMS_ENSEMBL = {str(i) for i in range(1, 23)} | {"X", "Y"}
@@ -13,6 +15,14 @@ ALPHABET = list("ACGT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
 MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}
 MOTIF_COMPLEMENT_PATTERN = compile(r'|'.join(MOTIF_COMPLEMENTS.keys()))
+
+
+progressbar = partial(
+    tqdm, bar_format=(
+        "{desc}{percentage:3.0f}% ({n_fmt}/{total_fmt}), " +
+        "{elapsed}<{remaining}, {rate_fmt}"
+    )
+)
 
 
 def validate_motif(motif):

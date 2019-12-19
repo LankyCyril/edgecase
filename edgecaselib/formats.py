@@ -7,7 +7,7 @@ from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
 from tempfile import TemporaryDirectory
 from os import path
-from tqdm import tqdm
+from edgecaselib.util import progressbar
 from functools import reduce
 from operator import __or__
 
@@ -91,7 +91,7 @@ def filter_and_read_tsv(dat, gzipped, samfilters):
         with TemporaryDirectory() as tempdir:
             datflt_name = path.join(tempdir, "dat.gz")
             with gzopen(datflt_name, mode="wt") as datflt:
-                decorated_line_iterator = tqdm(
+                decorated_line_iterator = progressbar(
                     dat_handle, desc="Filtering", unit=" lines"
                 )
                 for line in decorated_line_iterator:
@@ -189,7 +189,7 @@ def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=
         raw_densities = merge(groups, raw_densities).drop(columns="length")
     if no_align:
         raw_densities["chrom"] = "None"
-    chromosome_iterator = tqdm(
+    chromosome_iterator = progressbar(
         raw_densities["chrom"].drop_duplicates(), desc="Interpreting data",
         unit="chromosome"
     )
@@ -249,4 +249,4 @@ def filter_bam(alignment, samfilters, desc=None):
     if desc is None:
         return filtered_iterator
     else:
-        return tqdm(filtered_iterator, desc=desc, unit="read")
+        return progressbar(filtered_iterator, desc=desc, unit="read")

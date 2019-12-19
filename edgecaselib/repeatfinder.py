@@ -1,10 +1,9 @@
-from sys import stdout, stderr
+from sys import stdout
 from tempfile import TemporaryDirectory
 from pysam import AlignmentFile, FastxFile
 from os import path
-from edgecaselib.util import get_executable
+from edgecaselib.util import get_executable, progressbar
 from edgecaselib.formats import filter_bam
-from tqdm import tqdm
 from subprocess import check_output
 from pandas import read_csv, concat, merge
 from numpy import unique
@@ -36,7 +35,10 @@ def convert_input(bam, manager, tempdir, samfilters):
 def find_repeats(sequencefile, min_k, max_k, no_context, jellyfish, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
-    for k in tqdm(range(min_k, max_k+1), desc="Sweeping lengths"):
+    k_iterator = progressbar(
+        range(min_k, max_k+1), desc="Sweeping lengths", unit="k"
+    )
+    for k in k_iterator:
         db = path.join(tempdir, "{}.db".format(k))
         if no_context:
             search_k = str(k)
@@ -79,8 +81,6 @@ def get_motifs_fisher(single_length_report):
         raise ValueError("`get_motifs_fisher`: multiple lengths found")
     else:
         k = lengths[0]
-    message = "\rCalculating enrichment for k={}... ".format(lengths[0])
-    print(message, end="", file=stderr, flush=True)
     total_count = single_length_report["count"].sum()
     N = 4**k
     median_count = single_length_report["count"].median()
@@ -98,7 +98,10 @@ def analyze_repeats(full_report, adj="bonferroni"):
         get_motifs_fisher(
             full_report[full_report["length"]==length]
         )
-        for length in unique(full_report["length"].values)
+        for length in progressbar(
+            unique(full_report["length"].values), unit="k",
+            desc="Calculating enrichment"
+        )
     ])
     fishers["motif"] = fishers["kmer"].apply(lowest_alpha_inversion)
     motif_p = fishers[["motif", "p"]].groupby("motif", as_index=False).max()
@@ -141,4 +144,3 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
     filtered_analysis = analysis[analysis["p_adjusted"]<max_p_adjusted]
     formatted_analysis = format_analysis(filtered_analysis, max_motifs)
     formatted_analysis.to_csv(file, sep="\t", index=False)
-    print("Done", file=stderr, flush=True)

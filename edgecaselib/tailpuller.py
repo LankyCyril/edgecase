@@ -4,7 +4,7 @@ from pysam import AlignmentFile
 from functools import reduce
 from operator import __or__
 from copy import deepcopy
-from tqdm import tqdm
+from edgecaselib.util import progressbar
 from itertools import chain
 from numpy import isnan
 
@@ -93,7 +93,7 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, max_read_length
     with AlignmentFile(bam) as bam_data:
         reflens = dict(zip(bam_data.references, bam_data.lengths))
         print(str(bam_data.header).rstrip("\n"), file=file)
-        decorated_bam_iterator = tqdm(
+        decorated_bam_iterator = progressbar(
             ecxfd, total=len(ecxfd), desc="Pulling", unit="chromosome"
         )
         for chrom in decorated_bam_iterator:
