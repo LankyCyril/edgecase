@@ -6,7 +6,7 @@ from edgecaselib.formats import filter_bam
 from numpy import zeros, array, uint32, uint8, concatenate, nan, isnan, unique
 from numpy import linspace, vstack
 from collections import defaultdict
-from tqdm import tqdm
+from edgecaselib.util import progressbar
 from pandas import DataFrame, read_csv, concat
 from matplotlib.pyplot import switch_backend
 from seaborn import clustermap
@@ -76,7 +76,8 @@ def calculate_chromosome_lds(chrom, entries):
     lds = DataFrame(
         data=nan, columns=sorted(entries.keys()), index=sorted(entries.keys())
     )
-    for aname, (sra, A) in tqdm(entries.items(), desc=chrom, unit="read"):
+    read_iterator = progressbar(entries.items(), desc=chrom, unit="read")
+    for aname, (sra, A) in read_iterator:
         for bname, (srb, B) in entries.items():
             if aname == bname:
                 distance = 0
