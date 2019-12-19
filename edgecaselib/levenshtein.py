@@ -14,10 +14,12 @@ from sklearn.metrics import silhouette_score
 from scipy.stats import mannwhitneyu
 from os import path
 from edgecaselib.densityplot import shorten_chrom_name
+from statsmodels.stats.multitest import multipletests
 
 
 CLUSTERMAP_FIGSIZE = (10, 10)
 CLUSTERMAP_CMAP = "viridis_r"
+CLUSTERMAP_VMAX = .15
 
 
 def load_bam_as_dict(alignment, samfilters):
@@ -85,10 +87,10 @@ def calculate_chromosome_lds(chrom, entries):
     return lds.fillna(1)
 
 
-def generate_clustermap(lds, metric="euclidean", method="ward", cmap=CLUSTERMAP_CMAP, vmax=.25):
+def generate_clustermap(lds, metric="euclidean", method="ward", cmap=CLUSTERMAP_CMAP, vmax=CLUSTERMAP_VMAX):
     cm = clustermap(
         data=lds, metric=metric, method=method,
-        cmap=cmap, vmin=0, vmax=.25, figsize=CLUSTERMAP_FIGSIZE
+        cmap=cmap, vmin=0, vmax=vmax, figsize=CLUSTERMAP_FIGSIZE
     )
     cm.cax.set(visible=False)
     cm.ax_heatmap.set(xticks=[], yticks=[])
@@ -154,7 +156,7 @@ def display_pvals(c1_pval, c2_pval):
     )
 
 
-def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUSTERMAP_CMAP):
+def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUSTERMAP_CMAP, vmax=CLUSTERMAP_VMAX):
     cm.ax_col_dendrogram.clear()
     cm.ax_col_dendrogram.imshow(
         vstack([linspace(0, 1, 256)]*2), aspect="auto", cmap=cmap
@@ -170,13 +172,13 @@ def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUST
         x=-672, y=.8, va="center", ha="left", fontsize=19, s="Distance:  0"
     )
     cm.ax_col_dendrogram.text(
-        x=272, y=.8, va="center", ha="left", fontsize=19, s="0.25+"
+        x=272, y=.8, va="center", ha="left", fontsize=19, s="{}+".format(vmax)
     )
     cm.ax_col_dendrogram.set_axis_off()
     silh_text = "N/A" if isnan(silh_score) else "{:.3f}".format(silh_score)
     cm.ax_col_dendrogram.text(
         x=-672, y=3, va="top", ha="left", fontsize=19,
-        s="Silhouette score:  "+silh_text
+        s="Silhouette score: "+silh_text
     )
     cm.ax_col_dendrogram.text(
         x=-672, y=6.6, va="top", ha="left", fontsize=19,
@@ -210,18 +212,31 @@ def generate_kmerscanner_file(kmerscanner_file, c1_names, c2_names, output_dir, 
     haplo_dat.to_csv(path.join(output_dir, chrom+".dat"), sep="\t", index=False)
 
 
+def generate_report(report_rows, adj="bonferroni"):
+    report = DataFrame(
+        data=report_rows,
+        columns=[
+            "#chrom", "cluster1_size", "cluster2_size", "silhouette_score",
+            "cluster1_pvalue", "cluster2_pvalue"
+        ]
+    )
+    pvals = report[["cluster1_pvalue", "cluster2_pvalue"]].values.flatten()
+    p_adjusted = multipletests(pvals, method=adj)[1].reshape(-1, 2)
+    report["cluster1_p_adjusted"] = p_adjusted[:,0]
+    report["cluster2_p_adjusted"] = p_adjusted[:,1]
+    return report
+
+
 def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
     switch_backend("Agg")
-    #samfilters = [flags, flags_any, flag_filter, min_quality]
-    #with AlignmentFile(bam) as alignment:
-    #    bam_dict = load_bam_as_dict(alignment, samfilters)
-    #for chrom, entries in bam_dict.items():
-    #    lds = calculate_chromosome_lds(chrom, entries)
-    from pickle import load
-    with open("chr22.pkl", mode="rb") as pkl:
-        lds = load(pkl)
-        chrom = "chr22"
-    if True:
+    msg = "WARNING: this subprogram is in development and very finicky!"
+    print(msg, file=stderr)
+    samfilters = [flags, flags_any, flag_filter, min_quality]
+    with AlignmentFile(bam) as alignment:
+        bam_dict = load_bam_as_dict(alignment, samfilters)
+    report_rows = []
+    for chrom, entries in bam_dict.items():
+        lds = calculate_chromosome_lds(chrom, entries)
         cm = generate_clustermap(lds)
         c1_names, c2_names, c1_pval, c2_pval, silh_score = get_major_clusters(
             lds, cm.dendrogram_row.linkage
@@ -237,4 +252,7 @@ def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_q
         else:
             msg = "Warning: not implemented: complex hierarchy in clustering"
             print(msg, file=stderr)
-        #break
+        report_rows.append([
+            chrom, len(c1_names), len(c2_names), silh_score, c1_pval, c2_pval
+        ])
+    print(generate_report(report_rows).to_csv(sep="\t", index=False))
