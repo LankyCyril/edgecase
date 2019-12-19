@@ -3,6 +3,7 @@ from numba import njit
 from pysam import AlignmentFile
 from edgecaselib.formats import filter_bam
 from numpy import zeros, array, uint32, uint8, concatenate, nan, isnan, unique
+from numpy import linspace, vstack
 from collections import defaultdict
 from tqdm import tqdm
 from pandas import DataFrame
@@ -11,9 +12,12 @@ from seaborn import clustermap
 from scipy.cluster.hierarchy import fcluster
 from sklearn.metrics import silhouette_score
 from scipy.stats import mannwhitneyu
+from os import path
+from edgecaselib.densityplot import shorten_chrom_name
 
 
 CLUSTERMAP_FIGSIZE = (10, 10)
+CLUSTERMAP_CMAP = "viridis_r"
 
 
 def load_bam_as_dict(alignment, samfilters):
@@ -81,7 +85,7 @@ def calculate_chromosome_lds(chrom, entries):
     return lds.fillna(1)
 
 
-def generate_clustermap(lds, metric="euclidean", method="ward", cmap="viridis_r", vmax=.25):
+def generate_clustermap(lds, metric="euclidean", method="ward", cmap=CLUSTERMAP_CMAP, vmax=.25):
     cm = clustermap(
         data=lds, metric=metric, method=method,
         cmap=cmap, vmin=0, vmax=.25, figsize=CLUSTERMAP_FIGSIZE
@@ -135,6 +139,57 @@ def get_major_clusters(lds, linkage):
         return c1_names, c2_names, c1_pval, c2_pval, silh_score
 
 
+def format_pval(pval):
+    if isnan(pval):
+        return "N/A"
+    elif pval >= .00001:
+        return "{:.5f}".format(pval)
+    else:
+        return "{:.1e}".format(pval)
+
+
+def display_pvals(c1_pval, c2_pval):
+    return "$p_1$= {}, $p_2$= {}".format(
+        format_pval(c1_pval), format_pval(c2_pval)
+    )
+
+
+def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUSTERMAP_CMAP):
+    cm.ax_col_dendrogram.clear()
+    cm.ax_col_dendrogram.imshow(
+        vstack([linspace(0, 1, 256)]*2), aspect="auto", cmap=cmap
+    )
+    gp = cm.ax_col_dendrogram.get_position()
+    cm.ax_col_dendrogram.set(
+        position=[
+            gp.x0*.25+gp.x1*.75, gp.y0*.55+gp.y1*.45, gp.x1*.1-gp.x0*.1, .015
+        ],
+        zorder=float("inf")
+    )
+    cm.ax_col_dendrogram.text(
+        x=-572, y=.8, va="center", ha="left", fontsize=19, s="Distance: 0"
+    )
+    cm.ax_col_dendrogram.text(
+        x=272, y=.8, va="center", ha="left", fontsize=19, s="0.25+"
+    )
+    cm.ax_col_dendrogram.set_axis_off()
+    silh_text = "N/A" if isnan(silh_score) else "{:.3f}".format(silh_score)
+    cm.ax_col_dendrogram.text(
+        x=-572, y=3, va="top", ha="left", fontsize=19,
+        s="Silhouette score: "+silh_text
+    )
+    cm.ax_col_dendrogram.text(
+        x=-572, y=6.6, va="top", ha="left", fontsize=19,
+        s=display_pvals(c1_pval, c2_pval)
+    )
+    cm.ax_heatmap.text(
+        x=0, y=0, va="center", ha="left", fontsize=22,
+        s=shorten_chrom_name(chrom)+"\n\n\n"
+    )
+    filename = path.join(output_dir, chrom+".pdf")
+    cm.fig.savefig(filename, bbox_inches="tight")
+
+
 def main(bam, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
     switch_backend("Agg")
     #samfilters = [flags, flags_any, flag_filter, min_quality]
@@ -145,16 +200,17 @@ def main(bam, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, fi
     from pickle import load
     with open("chr22.pkl", mode="rb") as pkl:
         lds = load(pkl)
+        chrom = "chr22"
     if True:
         cm = generate_clustermap(lds)
         c1_names, c2_names, c1_pval, c2_pval, silh_score = get_major_clusters(
             lds, cm.dendrogram_row.linkage
         )
+        if output_dir:
+            generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom)
         if not isnan(silh_score):
             print(c1_names, c2_names, c1_pval, c2_pval, silh_score)
         else:
             msg = "Warning: not implemented: complex hierarchy in clustering"
             print(msg, file=stderr)
-        #pval_text = "N/A" if isnan(pval) else "{}".format(pval)
-        #silh_text = "N/A" if isnan(silh_score) else "{:.3f}".format(silh_score)
         #break
