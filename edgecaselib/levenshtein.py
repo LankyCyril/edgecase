@@ -225,8 +225,8 @@ def generate_pdf(cm, c1_pval, c2_pval, silh_score, output_dir, chrom, cmap=CLUST
         s=display_pvals(c1_pval, c2_pval)
     )
     cm.ax_heatmap.text(
-        x=0, y=0, va="center", ha="left", fontsize=22,
-        s=shorten_chrom_name(chrom)+"\n\n"
+        x=0, y=0, va="center", ha="left", fontsize=20,
+        s=shorten_chrom_name(chrom)+"\n\n\n"
     )
     filename = path.join(output_dir, chrom+".pdf")
     cm.fig.savefig(filename, bbox_inches="tight")
