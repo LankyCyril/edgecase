@@ -30,8 +30,6 @@ DEFAULT_MOTIF_COLORS = [
     "#332288", "#882255", "#44AA99", "#CC6677"
 ]
 
-DEFAULT_MOTIF_HATCHES = [None] * len(DEFAULT_MOTIF_COLORS)
-
 
 def split_hatch(hatches_pattern):
     """Split provided hatches pattern into individual ones"""
