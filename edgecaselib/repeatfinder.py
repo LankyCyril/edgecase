@@ -122,6 +122,39 @@ def analyze_repeats(full_report, adj="bonferroni"):
     return ktl.groupby(ktl_grouper, as_index=False).sum()
 
 
+def coerce_and_filter_report(analysis, max_p_adjusted):
+    """Collapse functionally synonymous entries like TATATA and TATA"""
+    motif_mapper, mapped_motifs = {}, set()
+    for motif in analysis.sort_values(by="length")["motif"]:
+        length_indexer = analysis["length"]>len(motif)
+        for larger_motif in analysis.loc[length_indexer, "motif"]:
+            if (larger_motif not in mapped_motifs) and (motif in larger_motif):
+                if motif*len(larger_motif) == larger_motif*len(motif):
+                    if motif not in motif_mapper:
+                        motif_mapper[motif] = {motif}
+                    motif_mapper[motif].add(larger_motif)
+                    mapped_motifs.add(larger_motif)
+    synonyms_to_keep = set()
+    for synonyms in motif_mapper.values():
+        synonym_data = analysis[
+            analysis["motif"].isin(synonyms) &
+            (analysis["p_adjusted"]<max_p_adjusted)
+        ]
+        if len(synonym_data):
+            synonyms_to_keep.add(
+                synonym_data.sort_values(
+                    by="abundance", ascending=False
+                ).iloc[0, 0]
+            )
+    synonyms_to_remove = (
+        set.union(set(), *motif_mapper.values()) - synonyms_to_keep
+    )
+    return analysis[
+        (~analysis["motif"].isin(synonyms_to_remove)) &
+        (analysis["p_adjusted"]<max_p_adjusted)
+    ]
+
+
 def format_analysis(filtered_analysis, max_motifs):
     """Make dataframe prettier"""
     formatted_analysis = filtered_analysis.sort_values(
@@ -152,6 +185,6 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
             no_context, jellyfish, jobs, tempdir
         )
     analysis = analyze_repeats(full_report)
-    filtered_analysis = analysis[analysis["p_adjusted"]<max_p_adjusted]
+    filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
     formatted_analysis = format_analysis(filtered_analysis, max_motifs)
     formatted_analysis.to_csv(file, sep="\t", index=False)
