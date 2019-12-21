@@ -16,6 +16,8 @@ from scipy.stats import mannwhitneyu
 from os import path
 from edgecaselib.densityplot import shorten_chrom_name
 from statsmodels.stats.multitest import multipletests
+from glob import glob
+from re import search
 
 
 CLUSTERMAP_FIGSIZE = (10, 10)
@@ -183,7 +185,7 @@ def generate_kmerscanner_file(kmerscanner_file, c1_names, c2_names, output_dir, 
             path.join(output_dir, chrom+".dat.gz"), compression="gzip",
             sep="\t", index=False
         )
-    else:
+    elif kmerscanner_file is not None:
         warn_about_unsupported_hierarchy(chrom)
 
 
@@ -244,22 +246,40 @@ def hide_stats_warnings(state=True):
             "ignore",
             message="looks suspiciously like an uncondensed distance matrix"
         )
+        msg = "the levenshtein subprogram is in development and very finicky!"
+        print("WARNING:", msg, file=stderr)
     else:
         resetwarnings()
 
 
-def main(bam, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
+def process_levenshtein_input(sequencedata, samfilters, output_dir):
+    """Iterate over chromosomes and return pairwise levenshtein distances for reads mapped to them"""
+    if path.isfile(sequencedata):
+        with AlignmentFile(sequencedata) as alignment:
+            bam_dict = load_bam_as_dict(alignment, samfilters)
+        for chrom, entries in bam_dict.items():
+            lds = calculate_chromosome_lds(chrom, entries)
+            save_lds(lds, output_dir, chrom)
+            yield chrom, lds
+    elif path.isdir(sequencedata):
+        for tsv in glob(path.join(sequencedata, "*-matrix.tsv")):
+            chrom_matcher = search(r'([^/]+)-matrix\.tsv', tsv)
+            if chrom_matcher:
+                yield (
+                    chrom_matcher.group(1), read_csv(tsv, sep="\t", index_col=0)
+                )
+    else:
+        raise IOError("Unknown type of input")
+
+
+def main(sequencedata, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
     switch_backend("pdf")
     hide_stats_warnings(True)
-    msg = "the levenshtein subprogram is in development and very finicky!"
-    print("WARNING:", msg, file=stderr)
-    samfilters = [flags, flags_any, flag_filter, min_quality]
-    with AlignmentFile(bam) as alignment:
-        bam_dict = load_bam_as_dict(alignment, samfilters)
     report_rows = []
-    for chrom, entries in bam_dict.items():
-        lds = calculate_chromosome_lds(chrom, entries)
-        save_lds(lds, output_dir, chrom)
+    input_iterator = process_levenshtein_input(
+        sequencedata, [flags, flags_any, flag_filter, min_quality], output_dir
+    )
+    for chrom, lds in input_iterator:
         cm = generate_clustermap(lds)
         if cm is None:
             c1_names, c2_names = [], []

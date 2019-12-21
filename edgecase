@@ -55,9 +55,9 @@ create_subparser(
 
 create_subparser(
     subparsers, "levenshtein", help="cluster reads by edit distance",
-    usage="{} levenshtein [options] bam > tsv".format(__file__),
+    usage="{} levenshtein [options] sequencedata > tsv".format(__file__),
     rules={
-        ("bam",): {"help": "name of input BAM/SAM file"},
+        ("sequencedata",): {"help": "name of input BAM/SAM file or directory with precomputed distances"},
         ("--kmerscanner-file",): {"help": "kmerscanner file (optional, for use with --output-dir", "default": None},
         ("-o", "--output-dir",): {"help": "output directory for clustermaps and per-haplotype SAM files", "default": None},
     }
