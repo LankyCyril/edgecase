@@ -11,7 +11,6 @@ def WideHelpFormatter(prog):
 
 
 DEFAULT_RULES = {
-    ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
     ("-x", "--index"): {"help": "location of the reference .ecx index", "required": True, "metavar": "X", "default": "no default, required"},
     ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
     ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
@@ -84,7 +83,8 @@ create_subparser(
         ("-n", "--max-motifs"): {"help": "maximum number of motifs to report", "default": 10000, "type": int},
         ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
         ("--no-context",): {"help": "allow single interspersed instances of kmers", "action": "store_true"},
-        ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"}
+        ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"},
+        ("-j", "--jobs"): {"help": "number of jellyfish jobs (parallel threads)", "default": 1, "type": int, "metavar": "J"},
     }
 )
 
@@ -93,6 +93,7 @@ create_subparser(
     usage="{} kmerscanner [options] bam > dat".format(__file__),
     rules={
         ("bam",): {"help": "name of input SAM/BAM file"},
+        ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
         ("--motif-file",): {"help": "file with repeated motif sequences (output of `repeatfinder`)", "required": True, "default": "no default, required", "metavar": "M"},
         ("--head-test",): {"help": "length of head to use for density filter (if specified)", "default": None, "type": int, "metavar": "H"},
         ("--tail-test",): {"help": "length of tail to use for density filter (if specified)", "default": None, "type": int, "metavar": "T"},
@@ -121,6 +122,7 @@ create_subparser(
     usage="{} assembler [options] bam".format(__file__),
     rules={
         ("bam",): {"help": "input tailpuller file"},
+        ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
         ("-c", "--chromosomes"): {"help": "target chromosome(s) (if not specified, target all)", "default": None, "metavar": "C"},
         ("-k", "--unimer-size"): {"help": "unimer size used for assembly", "default": 15, "type": int, "metavar": "K"},
         ("-o", "--output-prefix"): {"help": "output prefix", "required": True, "metavar": "O", "default": "no default, required"}
