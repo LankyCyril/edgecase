@@ -59,6 +59,7 @@ create_subparser(
     rules={
         ("sequencedata",): {"help": "name of input BAM/SAM file or directory with precomputed distances"},
         ("--kmerscanner-file",): {"help": "kmerscanner file (optional, for use with --output-dir", "default": None},
+        ("--min-cluster-size",): {"help": "minimum cluster size to consider", "default": 5, "type": int},
         ("-o", "--output-dir",): {"help": "output directory for clustermaps and per-haplotype SAM files", "default": None},
     }
 )
