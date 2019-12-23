@@ -1,4 +1,5 @@
 from sys import stderr
+from collections import OrderedDict
 from contextlib import contextmanager, ExitStack
 from itertools import chain
 from numpy import linspace, array, mean, concatenate, fromstring, full, vstack
@@ -29,6 +30,12 @@ DEFAULT_MOTIF_COLORS = [
     "#117733", "#88CCEE", "#AA4499", "#DDCC77",
     "#332288", "#882255", "#44AA99", "#CC6677"
 ]
+
+PAPER_PALETTE = OrderedDict([
+    ("TTAGGG", "#117733"), ("TTGGGG", "#AA4499"), ("TGAGGG", "#DDCC77"),
+    ("TTAGGGG", "#332288"), ("TAGGG", "#882255"), ("TTTAGGG", "#44AA99"),
+    ("TTAGGTTAGGG", "#CC6677")
+])
 
 
 def split_hatch(hatches_pattern):

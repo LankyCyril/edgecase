@@ -1,7 +1,7 @@
 from sys import stdout
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
-from edgecaselib.formats import DEFAULT_MOTIF_COLORS
+from edgecaselib.formats import DEFAULT_MOTIF_COLORS, PAPER_PALETTE
 from collections import OrderedDict
 from edgecaselib.util import natsorted_chromosomes, progressbar
 from matplotlib.pyplot import subplots, rc_context, switch_backend
@@ -438,6 +438,9 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     """Parse and check arguments"""
     if palette is None:
         legend = not zoomed_in
+    elif palette in {"paper|legend=False", "paper|legend=True", "paper"}:
+        legend = "False" not in palette
+        palette = PAPER_PALETTE
     else:
         if exploded:
             raise NotImplementedError("--palette with --exploded")
@@ -463,13 +466,10 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     if exploded:
         if zoomed_in:
             raise NotImplementedError("--exploded with --zoomed-in")
-        else:
-            target_anchor, is_q = None, None
+        target_anchor, is_q = None, None
     else:
         is_q, target_anchor = interpret_target(samfilters)
-    if title is None:
-        title = path.split(dat)[-1]
-    return target_anchor, is_q, palette, legend, title
+    return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
 def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, exploded, zoomed_in, palette, title, file=stdout.buffer, **kwargs):
