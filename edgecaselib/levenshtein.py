@@ -7,9 +7,10 @@ from numpy import zeros, array, uint32, uint8, log, nan, pi, isnan, allclose
 from numpy import linspace, vstack, concatenate, unique, tile, triu
 from collections import defaultdict
 from edgecaselib.util import progressbar
-from pandas import DataFrame, read_csv, merge
+from pandas import Series, DataFrame, read_csv, merge
 from matplotlib.pyplot import switch_backend
-from seaborn import clustermap, heatmap
+from matplotlib.patches import Rectangle
+from seaborn import clustermap
 from scipy.cluster.hierarchy import fcluster
 from sklearn.metrics import silhouette_score
 from scipy.stats import mannwhitneyu
@@ -172,7 +173,7 @@ def get_clusters(lds, linkage, min_cluster_size):
                 for label in labels[k]
             ])
     if len(bic2k) == 0:
-        return None, nan, nan, nan, None
+        return None, nan, nan, nan
     else:
         best_k = bic2k[max(bic2k)]
         best_silh, best_labels = k2silh[best_k], labels[best_k]
@@ -186,7 +187,7 @@ def get_clusters(lds, linkage, min_cluster_size):
         ingroup_visual_indexer = (ingroup_axis == ingroup_axis.T)
         pval = get_mwu_pval(lds, ingroup_visual_indexer)
         used_k = best_labels[~isnan(best_labels)].max()
-        return best_labels, used_k, best_silh, pval, ingroup_visual_indexer
+        return best_labels, used_k, best_silh, pval
 
 
 def warn_about_unsupported_hierarchy(chrom):
@@ -224,50 +225,67 @@ def generate_report(report_rows, adj="bonferroni"):
     return report
 
 
-def apply_mask(cm, ingroup_visual_indexer):
-    """Draw semi-transparent mask over out-of-cluster pairings"""
-    mask = DataFrame(data=1, index=cm.data.index, columns=cm.data.columns)
-    mask = mask.mask(ingroup_visual_indexer).loc[
-        cm.data2d.index, cm.data2d.columns
-    ]
-    heatmap(data=mask, cmap="Greys_r", alpha=.5, cbar=None, ax=cm.ax_heatmap)
-    cm.ax_heatmap.set(xticks=[], yticks=[])
+def draw_square(start, end, ax):
+    """Draw fancy frame from (start, start) to (end, end)"""
+    xy = (start, start)
+    width = end - start + 1
+    ax.add_patch(
+        Rectangle(xy, width, width, fill=False, lw=5, ec="white", clip_on=False)
+    )
+    ax.add_patch(
+        Rectangle(xy, width, width, fill=False, lw=1, ec="black", clip_on=False)
+    )
 
 
-def generate_pdf(cm, silh_score, ingroup_visual_indexer, output_dir, chrom, cmap=CLUSTERMAP_CMAP, vmax=CLUSTERMAP_VMAX):
+def apply_mask(cm, labels):
+    """Draw rectangles around within-cluster pairings"""
+    labeled_names = Series(index=cm.data.index, data=labels)
+    ordered_labeled_names = labeled_names.loc[cm.data2d.index].to_frame(
+        name="label"
+    )
+    ordered_labeled_names["position"] = range(len(ordered_labeled_names))
+    labels_groupby = ordered_labeled_names.groupby("label")
+    starts, ends = (
+        labels_groupby.min().iloc[:,0],
+        labels_groupby.max().iloc[:,0]
+    )
+    for start, end in zip(starts, ends):
+        draw_square(start, end, cm.ax_heatmap)
+
+
+def generate_pdf(cm, silh_score, labels, output_dir, chrom, cmap=CLUSTERMAP_CMAP, vmax=CLUSTERMAP_VMAX):
     """Annotate clustermap figure and save to file"""
-    if output_dir:
-        cm.ax_col_dendrogram.clear()
-        cm.ax_col_dendrogram.imshow(
-            vstack([linspace(0, 1, 256)]*2), aspect="auto", cmap=cmap
-        )
-        gp = cm.ax_col_dendrogram.get_position()
-        cm.ax_col_dendrogram.set(
-            position=[
-                gp.x0*.25+gp.x1*.75, gp.y0*.5+gp.y1*.46, gp.x1*.1-gp.x0*.1, .015
-            ],
-            zorder=float("inf")
-        )
-        cm.ax_col_dendrogram.text(
-            x=-672, y=.8, va="center", ha="left", fontsize=19,
-            s="Distance:  0"
-        )
-        cm.ax_col_dendrogram.text(
-            x=272, y=.8, va="center", ha="left", fontsize=19,
-            s="{}+".format(vmax)
-        )
-        cm.ax_col_dendrogram.set_axis_off()
-        silh_text = "N/A" if isnan(silh_score) else "{:.3f}".format(silh_score)
-        cm.ax_col_dendrogram.text(
-            x=-672, y=3, va="top", ha="left", fontsize=19,
-            s="Silhouette score: "+silh_text
-        )
-        cm.ax_col_dendrogram.text(
-            x=-672, y=-4.9, va="top", ha="left", fontsize=19, s=chrom
-        )
-        apply_mask(cm, ingroup_visual_indexer)
-        filename = path.join(output_dir, chrom+".pdf")
-        cm.fig.savefig(filename, bbox_inches="tight")
+    cm.ax_col_dendrogram.clear()
+    cm.ax_col_dendrogram.imshow(
+        vstack([linspace(0, 1, 256)]*2), aspect="auto", cmap=cmap
+    )
+    gp = cm.ax_col_dendrogram.get_position()
+    cm.ax_col_dendrogram.set(
+        position=[
+            gp.x0*.25+gp.x1*.75, gp.y0*.5+gp.y1*.46, gp.x1*.1-gp.x0*.1, .015
+        ],
+        zorder=float("inf")
+    )
+    cm.ax_col_dendrogram.text(
+        x=-672, y=.8, va="center", ha="left", fontsize=19,
+        s="Distance:  0"
+    )
+    cm.ax_col_dendrogram.text(
+        x=272, y=.8, va="center", ha="left", fontsize=19,
+        s="{}+".format(vmax)
+    )
+    cm.ax_col_dendrogram.set_axis_off()
+    silh_text = "N/A" if isnan(silh_score) else "{:.3f}".format(silh_score)
+    cm.ax_col_dendrogram.text(
+        x=-672, y=3, va="top", ha="left", fontsize=19,
+        s="Silhouette score: "+silh_text
+    )
+    cm.ax_col_dendrogram.text(
+        x=-672, y=-4.9, va="top", ha="left", fontsize=19, s=chrom
+    )
+    apply_mask(cm, labels)
+    filename = path.join(output_dir, chrom+".pdf")
+    cm.fig.savefig(filename, bbox_inches="tight")
 
 
 def hide_stats_warnings(state=True):
@@ -278,8 +296,13 @@ def hide_stats_warnings(state=True):
             "ignore",
             message="looks suspiciously like an uncondensed distance matrix"
         )
-        msg = "the levenshtein subprogram is in development and very finicky!"
-        print("WARNING:", msg, file=stderr)
+        msg1 = "the levenshtein subprogram is in development!"
+        msg2 = (
+            "pairwise distance computation is O(n^2) " +
+            "and not suited for large scale experiments"
+        )
+        print("WARNING:", msg1, file=stderr)
+        print("WARNING:", msg2, file=stderr)
     else:
         resetwarnings()
 
@@ -323,18 +346,14 @@ def main(sequencedata, min_cluster_size, kmerscanner_file, output_dir, flags, fl
     )
     for chrom, lds in input_iterator:
         cm = generate_clustermap(lds)
-        if cm is None:
-            k, silh_score, pval = nan, nan, nan
-            warn_about_unsupported_hierarchy(chrom)
-        else:
-            labels, k, silh_score, pval, ingroup_visual_indexer = get_clusters(
+        if cm is not None:
+            labels, k, silh_score, pval = get_clusters(
                 lds, cm.dendrogram_row.linkage, min_cluster_size
             )
             if labels is not None:
                 if output_dir:
                     generate_pdf(
-                        cm, silh_score, ingroup_visual_indexer,
-                        output_dir, chrom
+                        cm, silh_score, labels, output_dir, chrom
                     )
                     if kmerscanner_file:
                         generate_kmerscanner_file(
@@ -343,6 +362,9 @@ def main(sequencedata, min_cluster_size, kmerscanner_file, output_dir, flags, fl
                         )
             else:
                 warn_about_unsupported_hierarchy(chrom)
+        else:
+            k, silh_score, pval = nan, nan, nan
+            warn_about_unsupported_hierarchy(chrom)
         report_rows.append([chrom, k, silh_score, pval])
     report = generate_report(report_rows)
     print(report.to_csv(sep="\t", index=False, na_rep="NA"))
