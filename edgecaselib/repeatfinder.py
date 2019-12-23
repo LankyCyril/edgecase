@@ -115,10 +115,11 @@ def analyze_repeats(full_report, adj="bonferroni"):
     motif_p = fishers[["motif", "p"]].groupby("motif", as_index=False).max()
     motif_p["p_adjusted"] = multipletests(motif_p["p"], method=adj)[1]
     fishers = merge(
-        fishers, motif_p[["motif", "p_adjusted"]], on="motif", how="outer"
+        fishers.drop(columns="p"), motif_p[["motif", "p", "p_adjusted"]],
+        on="motif", how="outer"
     )
-    ktl = fishers[["count", "abundance", "motif", "length", "p_adjusted"]]
-    ktl_grouper = ["motif", "length", "p_adjusted"]
+    ktl = fishers[["count", "abundance", "motif", "length", "p", "p_adjusted"]]
+    ktl_grouper = ["motif", "length", "p", "p_adjusted"]
     return ktl.groupby(ktl_grouper, as_index=False).sum()
 
 
@@ -161,12 +162,15 @@ def format_analysis(filtered_analysis, max_motifs):
         by=["abundance", "p_adjusted"], ascending=[False, True]
     )
     formatted_analysis = formatted_analysis[
-        ["motif", "length", "count", "abundance", "p_adjusted"]
+        ["motif", "length", "count", "abundance", "p", "p_adjusted"]
     ]
     formatted_analysis.columns = [
-        "#motif", "length", "count", "abundance", "p_adjusted"
+        "#motif", "length", "count", "abundance", "p", "p_adjusted"
     ]
-    return formatted_analysis[:max_motifs]
+    if max_motifs is None:
+        return formatted_analysis
+    else:
+        return formatted_analysis[:max_motifs]
 
 
 def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, no_context, jellyfish, jobs=1, file=stdout, **kwargs):
