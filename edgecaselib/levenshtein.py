@@ -173,7 +173,7 @@ def get_clusters(lds, linkage, min_cluster_size):
                 for label in labels[k]
             ])
     if len(bic2k) == 0:
-        return None, nan, nan, nan
+        return None, 0, nan, nan
     else:
         best_k = bic2k[max(bic2k)]
         best_silh, best_labels = k2silh[best_k], labels[best_k]
@@ -221,6 +221,7 @@ def generate_report(report_rows, adj="bonferroni"):
         data=report_rows,
         columns=["#chrom", "cluster_count", "silhouette_score", "p"]
     )
+    report["cluster_count"] = report["cluster_count"].astype(int)
     report["p_adjusted"] = multipletests(report["p"], method=adj)[1]
     return report
 
@@ -363,7 +364,7 @@ def main(sequencedata, min_cluster_size, kmerscanner_file, output_dir, flags, fl
             else:
                 warn_about_unsupported_hierarchy(chrom)
         else:
-            k, silh_score, pval = nan, nan, nan
+            k, silh_score, pval = 0, nan, nan
             warn_about_unsupported_hierarchy(chrom)
         report_rows.append([chrom, k, silh_score, pval])
     report = generate_report(report_rows)
