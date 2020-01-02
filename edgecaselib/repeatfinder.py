@@ -82,6 +82,28 @@ def lowest_alpha_inversion(kmer):
     return min(kmer[i:]+kmer[:i] for i in range(len(kmer)))
 
 
+def custom_alpha_inversion(motif):
+    """Get inversion of motif that looks closest to canonical (e.g., for AGGGTTC will return TTCAGGG)"""
+    a, c, g, t = [motif.count(letter) for letter in "ACGT"]
+    is_g = (g > c) or ((g == c) and (t > a))
+    if is_g:
+        if t > 0:
+            i = motif.find("T")
+        else:
+            i = motif.find("G")
+    elif (not is_g) and (t == a):
+        i = -1
+    else:
+        if c > 0:
+            i = motif.find("C")
+        else:
+            i = motif.find("A")
+    if i == -1:
+        return min(motif[i:]+motif[:i] for i in range(len(motif)))
+    else:
+        return motif[i:] + motif[:i]
+
+
 def get_motifs_fisher(single_length_report):
     """Analyze repeat enrichment given the same motif length"""
     lengths = unique(single_length_report["length"].values)
@@ -170,6 +192,9 @@ def coerce_to_monomer(motif):
 
 def format_analysis(filtered_analysis, max_motifs):
     """Make dataframe prettier"""
+    filtered_analysis["motif"] = filtered_analysis["motif"].apply(
+        custom_alpha_inversion
+    )
     filtered_analysis["monomer"] = filtered_analysis["motif"].apply(
         coerce_to_monomer
     )
