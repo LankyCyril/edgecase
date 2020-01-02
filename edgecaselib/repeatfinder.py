@@ -153,19 +153,34 @@ def coerce_and_filter_report(analysis, max_p_adjusted):
     return analysis[
         (~analysis["motif"].isin(synonyms_to_remove)) &
         (analysis["p_adjusted"]<max_p_adjusted)
-    ]
+    ].copy()
+
+
+def coerce_to_monomer(motif):
+    """Coerce motif to monomer, e.g. TATA -> TA, CAT -> CAT; this can be used to find functionally synonymous entries too"""
+    n = len(motif)
+    for i in range(1, int(n/2)+1):
+        q, r = divmod(n, i)
+        if r == 0:
+            if motif[:i]*q == motif:
+                return motif[:i]
+    else:
+        return motif
 
 
 def format_analysis(filtered_analysis, max_motifs):
     """Make dataframe prettier"""
+    filtered_analysis["monomer"] = filtered_analysis["motif"].apply(
+        coerce_to_monomer
+    )
     formatted_analysis = filtered_analysis.sort_values(
         by=["abundance", "p_adjusted"], ascending=[False, True]
     )
     formatted_analysis = formatted_analysis[
-        ["motif", "length", "count", "abundance", "p", "p_adjusted"]
+        ["monomer", "motif", "length", "count", "abundance", "p", "p_adjusted"]
     ]
     formatted_analysis.columns = [
-        "#motif", "length", "count", "abundance", "p", "p_adjusted"
+        "#monomer", "motif", "length", "count", "abundance", "p", "p_adjusted"
     ]
     if max_motifs is None:
         return formatted_analysis
