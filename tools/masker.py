@@ -61,6 +61,10 @@ def main(filename, motif_description, action="mask", f=49152, F=3840, minlen=22)
         if action == "cut":
             for chunk in cut_chunks(entry.seq, positions_to_mask, minlen):
                 print(">{}\n{}".format(next(cid), chunk))
+        elif action == "measure":
+            positions_to_keep = set(range(len(entry.seq)+1)) - positions_to_mask
+            for chunk in cut_chunks(entry.seq, positions_to_keep, minlen):
+                print(len(chunk))
         elif action == "mask":
             raise NotImplementedError("`action` 'mask'")
         elif action == "count":
