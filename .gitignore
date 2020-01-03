@@ -1,10 +1,9 @@
+__pycache__
 .snakemake
+.ipynb_checkpoints
 data
-sandbox
-edgecaselib/__pycache__
 tools
+sandbox
 jupyter
-publications/poster-2019/grigorev-poster.log
-publications/poster-2019/grigorev-poster.pdf
-publications/methods-paper/figures/*.aux
-publications/methods-paper/figures/*.log
+*.log
+*.aux

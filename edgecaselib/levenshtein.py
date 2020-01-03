@@ -10,6 +10,7 @@ from edgecaselib.util import progressbar
 from pandas import Series, DataFrame, read_csv, merge
 from matplotlib.pyplot import switch_backend
 from matplotlib.patches import Rectangle
+from matplotlib import __version__ as matplotlib_version
 from seaborn import clustermap
 from scipy.cluster.hierarchy import fcluster
 from sklearn.metrics import silhouette_score
@@ -165,13 +166,14 @@ def get_clusters(lds, linkage, min_cluster_size):
     for k in range(2, len(lds)):
         labels[k] = fcluster(linkage, k, criterion="maxclust")
         label_counts = dict(zip(*unique(labels[k], return_counts=True)))
-        if sorted(label_counts.values())[-2] >= min_cluster_size:
-            bic2k[information_criterion(lds, labels[k], "BIC")] = k
-            k2silh[k] = silhouette_score(lds, labels[k])
-            labels[k] = array([
-                label if (label_counts[label]>=min_cluster_size) else nan
-                for label in labels[k]
-            ])
+        if len(label_counts) > 1:
+            if sorted(label_counts.values())[-2] >= min_cluster_size:
+                bic2k[information_criterion(lds, labels[k], "BIC")] = k
+                k2silh[k] = silhouette_score(lds, labels[k])
+                labels[k] = array([
+                    label if (label_counts[label]>=min_cluster_size) else nan
+                    for label in labels[k]
+                ])
     if len(bic2k) == 0:
         return None, 0, nan, nan
     else:
@@ -268,12 +270,10 @@ def generate_pdf(cm, silh_score, labels, output_dir, chrom, cmap=CLUSTERMAP_CMAP
         zorder=float("inf")
     )
     cm.ax_col_dendrogram.text(
-        x=-672, y=.8, va="center", ha="left", fontsize=19,
-        s="Distance:  0"
+        x=-672, y=.8, va="center", ha="left", fontsize=19, s="Distance:  0"
     )
     cm.ax_col_dendrogram.text(
-        x=272, y=.8, va="center", ha="left", fontsize=19,
-        s="{}+".format(vmax)
+        x=272, y=.8, va="center", ha="left", fontsize=19, s="{}+".format(vmax)
     )
     cm.ax_col_dendrogram.set_axis_off()
     silh_text = "N/A" if isnan(silh_score) else "{:.3f}".format(silh_score)
@@ -284,6 +284,9 @@ def generate_pdf(cm, silh_score, labels, output_dir, chrom, cmap=CLUSTERMAP_CMAP
     cm.ax_col_dendrogram.text(
         x=-672, y=-4.9, va="top", ha="left", fontsize=19, s=chrom
     )
+    if matplotlib_version == "3.1.1": # stackoverflow.com/a/58165593
+        bottom, top = cm.ax_heatmap.get_ylim()
+        cm.ax_heatmap.set_ylim(bottom + .5, top - .5)
     apply_mask(cm, labels)
     filename = path.join(output_dir, chrom+".pdf")
     cm.fig.savefig(filename, bbox_inches="tight")

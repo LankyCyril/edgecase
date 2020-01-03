@@ -80,11 +80,12 @@ create_subparser(
         ("sequencefile",): {"help": "name of input sam/bam/fasta/fastq file"},
         ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
         ("-m", "--min-k"): {"help": "smallest target repeat length", "default": 4, "type": int},
-        ("-M", "--max-k"): {"help": "largest target repeat length", "default": 7, "type": int},
+        ("-M", "--max-k"): {"help": "largest target repeat length", "default": 16, "type": int},
         ("-n", "--max-motifs"): {"help": "maximum number of motifs to report", "default": None, "type": int},
         ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
         ("--no-context",): {"help": "allow single interspersed instances of kmers", "action": "store_true"},
         ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"},
+        ("-s", "--jellyfish-hash-size"): {"help": "jellyfish initial hash size", "default": "2G"},
         ("-j", "--jobs"): {"help": "number of jellyfish jobs (parallel threads)", "default": 1, "type": int, "metavar": "J"},
     }
 )
@@ -99,7 +100,7 @@ create_subparser(
         ("--head-test",): {"help": "length of head to use for density filter (if specified)", "default": None, "type": int, "metavar": "H"},
         ("--tail-test",): {"help": "length of tail to use for density filter (if specified)", "default": None, "type": int, "metavar": "T"},
         ("-c", "--cutoff"): {"help": "use hard cutoff for density", "default": None, "type": float, "metavar": "C"},
-        ("-w", "--window-size"): {"help": "size of the rolling window", "default": 120, "type": int, "metavar": "W"},
+        ("-w", "--window-size"): {"help": "size of the rolling window", "default": 100, "type": int, "metavar": "W"},
         ("-n", "--num-reads"): {"help": "expected number of reads in input (for progress display)", "default": None, "type": int, "metavar": "N"}
     }
 )
@@ -115,18 +116,6 @@ create_subparser(
         ("--zoomed-in",): {"help": "plot taller traces, cut off pre-anchor regions", "action": "store_true"},
         ("--palette",): {"help": "custom palette for plotting motifs", "default": None},
         ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"}
-    }
-)
-
-create_subparser(
-    subparsers, "assembler", help="assemble haplotypes at ends of chromosomes",
-    usage="{} assembler [options] bam".format(__file__),
-    rules={
-        ("bam",): {"help": "input tailpuller file"},
-        ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
-        ("-c", "--chromosomes"): {"help": "target chromosome(s) (if not specified, target all)", "default": None, "metavar": "C"},
-        ("-k", "--unimer-size"): {"help": "unimer size used for assembly", "default": 15, "type": int, "metavar": "K"},
-        ("-o", "--output-prefix"): {"help": "output prefix", "required": True, "metavar": "O", "default": "no default, required"}
     }
 )
 
