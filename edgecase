@@ -11,7 +11,6 @@ def WideHelpFormatter(prog):
 
 
 DEFAULT_RULES = {
-    ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
     ("-x", "--index"): {"help": "location of the reference .ecx index", "required": True, "metavar": "X", "default": "no default, required"},
     ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
     ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
@@ -20,7 +19,7 @@ DEFAULT_RULES = {
 }
 
 EXCLUDE_RULES = {
-    ("-x", "--index"): {"meme", "repeatfinder", "kmerscanner"}
+    ("-x", "--index"): {"levenshtein", "repeatfinder", "kmerscanner"}
 }
 
 
@@ -55,6 +54,17 @@ create_subparser(
 )
 
 create_subparser(
+    subparsers, "levenshtein", help="cluster reads by edit distance",
+    usage="{} levenshtein [options] sequencedata > tsv".format(__file__),
+    rules={
+        ("sequencedata",): {"help": "name of input BAM/SAM file or directory with precomputed distances"},
+        ("--kmerscanner-file",): {"help": "kmerscanner file (optional, for use with --output-dir", "default": None},
+        ("--min-cluster-size",): {"help": "minimum cluster size to consider", "default": 5, "type": int},
+        ("-o", "--output-dir",): {"help": "output directory for clustermaps and per-haplotype SAM files", "default": None},
+    }
+)
+
+create_subparser(
     subparsers, "tailchopper", help="get overhanging heads/tails of reads",
     usage="{} tailchopper [options] bam > fasta".format(__file__),
     rules={
@@ -71,26 +81,11 @@ create_subparser(
         ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
         ("-m", "--min-k"): {"help": "smallest target repeat length", "default": 4, "type": int},
         ("-M", "--max-k"): {"help": "largest target repeat length", "default": 7, "type": int},
-        ("-n", "--max-motifs"): {"help": "maximum number of motifs to report", "default": 8, "type": int},
+        ("-n", "--max-motifs"): {"help": "maximum number of motifs to report", "default": None, "type": int},
         ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
-        ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"}
-    }
-)
-
-create_subparser(
-    subparsers, "meme", help="discover motifs in candidate reads",
-    usage="{} meme [options] readfile > tsv".format(__file__),
-    rules={
-        ("readfile",): {"help": "name of input sam/bam/fasta/fastq file"},
-        ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
-        ("--fasta-get-markov",): {"help": "fasta-get-markov binary (unless in $PATH)"},
-        ("--meme",): {"help": "meme binary (unless in $PATH)"},
-        ("--lengths",): {"help": "motif lengths to try, in order", "default": "6,5,7,8-100"},
-        ("--keep-masking",): {"help": "mask found motifs before proceeding to the next lengths", "action": "store_true"},
-        ("--background", "--bg"): {"help": "background file (SAM/BAM or HMM)", "metavar": "B"},
-        ("--nmotifs",): {"help": "nmotifs for each iteration of MEME", "default": 10, "type": int},
-        ("--evt",): {"help": "evt for each iteration of MEME", "default": .1, "type": float},
-        ("--intermediate-dir",): {"help": "directory for intermediate MEME outputs", "default": None}
+        ("--no-context",): {"help": "allow single interspersed instances of kmers", "action": "store_true"},
+        ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"},
+        ("-j", "--jobs"): {"help": "number of jellyfish jobs (parallel threads)", "default": 1, "type": int, "metavar": "J"},
     }
 )
 
@@ -99,6 +94,7 @@ create_subparser(
     usage="{} kmerscanner [options] bam > dat".format(__file__),
     rules={
         ("bam",): {"help": "name of input SAM/BAM file"},
+        ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
         ("--motif-file",): {"help": "file with repeated motif sequences (output of `repeatfinder`)", "required": True, "default": "no default, required", "metavar": "M"},
         ("--head-test",): {"help": "length of head to use for density filter (if specified)", "default": None, "type": int, "metavar": "H"},
         ("--tail-test",): {"help": "length of tail to use for density filter (if specified)", "default": None, "type": int, "metavar": "T"},
@@ -117,9 +113,7 @@ create_subparser(
         ("-b", "--bin-size"): {"help": "size of each bin in bp for visualization speedup", "default": 100, "type": int, "metavar": "B"},
         ("-e", "--exploded"): {"help": "plot each read separately", "action": "store_true"},
         ("--zoomed-in",): {"help": "plot taller traces, cut off pre-anchor regions", "action": "store_true"},
-        ("--motif-order",): {"help": "order of motifs on non-exploded plot", "default": "CCCCAA|CCCTAA|TTGGGG|TTAGGG"},
-        ("--motif-colors",): {"help": "color of motifs on non-exploded plot", "default": None},
-        ("--motif-hatches",): {"help": "fill pattern of motifs on non-exploded plot", "default": None},
+        ("--palette",): {"help": "custom palette for plotting motifs", "default": None},
         ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"}
     }
 )
@@ -129,6 +123,7 @@ create_subparser(
     usage="{} assembler [options] bam".format(__file__),
     rules={
         ("bam",): {"help": "input tailpuller file"},
+        ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
         ("-c", "--chromosomes"): {"help": "target chromosome(s) (if not specified, target all)", "default": None, "metavar": "C"},
         ("-k", "--unimer-size"): {"help": "unimer size used for assembly", "default": 15, "type": int, "metavar": "K"},
         ("-o", "--output-prefix"): {"help": "output prefix", "required": True, "metavar": "O", "default": "no default, required"}
