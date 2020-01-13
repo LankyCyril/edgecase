@@ -37,7 +37,10 @@ def convert_input(bam, manager, tempdir, samfilters):
 def count_fastx_bases(sequencefile):
     """Count bases in FASTX file"""
     with FastxFile(sequencefile) as fastx:
-        return sum(len(entry.sequence) for entry in fastx)
+        return sum(
+            len(entry.sequence) for entry
+            in progressbar(fastx, desc="Counting input bases", unit="read")
+        )
 
 
 def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, jobs, tempdir):
