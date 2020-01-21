@@ -43,7 +43,7 @@ def count_fastx_bases(sequencefile):
         )
 
 
-def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, jobs, tempdir):
+def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, jellyfish_hash_size, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
     k_iterator = progressbar(
@@ -59,8 +59,8 @@ def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, 
             # not confound it:
             search_k = str(k*2)
         check_output([
-            jellyfish, "count", "-t", str(jobs), "-s", "2G", "-L", "0",
-            "-m", search_k, "-o", db, sequencefile
+            jellyfish, "count", "-t", str(jobs), "-s", jellyfish_hash_size,
+            "-L", "0", "-m", search_k, "-o", db, sequencefile
         ])
         tsv = path.join(tempdir, "{}.tsv".format(k))
         check_output([
@@ -216,7 +216,7 @@ def format_analysis(filtered_analysis, max_motifs):
         return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, no_context, jellyfish, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, no_context, jellyfish, jellyfish_hash_size, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
@@ -229,7 +229,7 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
             base_count = count_fastx_bases(sequencefile)
         full_report = find_repeats(
             sequencefile, min_k, max_k, base_count,
-            no_context, jellyfish, jobs, tempdir
+            no_context, jellyfish, jellyfish_hash_size, jobs, tempdir
         )
     analysis = analyze_repeats(full_report)
     filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
