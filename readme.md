@@ -1,10 +1,11 @@
 edgeCase
 ========
 
-edgeCase is a framework for extraction and interpretation of telomeric reads
+*edgeCase* is a framework for extraction and interpretation of telomeric reads
 from long-read single-molecule whole genome sequencing datasets.
 
-![densityplot_sample](assets/densityplot-exploded.png?raw=true "densityplot example")
+![densityplot_sample](assets/densityplot-haplotypes.png?raw=true "densityplot example")
+
 
 ## Installation
 
@@ -31,10 +32,58 @@ $ pip install pandas matplotlib seaborn tqdm regex pysam
 $ ./edgecase
 ```
 
-## Overview
 
-edgeCase is a small toolchain that takes a set of aligned reads as the initial
-input and describes its telomeric content.
+## Input data and formats
+
+### The extended reference genome and BAM files
+
+*edgeCase* works with SAM/BAM files aligned to a reference that is annotated
+with known subtelomeric regions and uses reads anchored to the outermost ends
+of subtelomeres (5' on the *p* arm, 3' on the *q* arm). For a BAM file
+*dataset.bam* aligned to *ref.fa*, it needs several files:
+
+```
+dataset.bam.bai: a BAI index; create with "samtools index dataset.bam"
+ref.fa.fai:      a FAI index; create with "samtools faidx ref.fa"
+ref.fa.ecx:      an index containing annotations of subtelomere-telomere boundareis
+```
+
+*ref.fa.ecx*, a.k.a. the edgeCase indeX, describes anchors of interest in the
+reference genome; the format is based on the BED format. Usable "flag" values
+*have* to be among 4096 (hard mask), 8192 (fork), 16384 (telomeric tract). Two
+examples of ECX files can be found in the "assets/" subdirectory.
+
+### Custom SAM flags
+
+*edgeCase* extends the zoo of SAM flags with four of its own. The full table of
+flag names:  
+(also see https://broadinstitute.github.io/picard/explain-flags.html)
+
+name               | value | hex value | comment
+-------------------|-------|-----------|----------------------------------------------
+paired             | 1     | 0x0001    | SAM specification flag
+mapped_proper_pair | 2     | 0x0002    | SAM specification flag
+unmapped           | 4     | 0x0004    | SAM specification flag
+mate_unmapped      | 8     | 0x0008    | SAM specification flag
+rev                | 16    | 0x0010    | SAM specification flag
+mate_rev           | 32    | 0x0020    | SAM specification flag
+1stmate            | 64    | 0x0040    | SAM specification flag
+2ndmate            | 128   | 0x0080    | SAM specification flag
+secondary          | 256   | 0x0100    | SAM specification flag
+qcfail             | 512   | 0x0200    | SAM specification flag
+pcrdup             | 1024  | 0x0400    | SAM specification flag
+supp               | 2048  | 0x0800    | SAM specification flag
+ucsc_mask_anchor   | 4096  | 0x1000    | edgeCase-specific flag; added during pipeline
+fork               | 8192  | 0x2000    | edgeCase-specific flag; added during pipeline
+tract_anchor       | 16384 | 0x4000    | edgeCase-specific flag; added during pipeline
+is_q               | 32768 | 0x8000    | edgeCase-specific flag; added during pipeline
+
+*Note:* All edgeCase routines that allow flag filtering recognize both the
+numeric flag format (such as 3844) and the "human-readable" format such as "rev"
+or "is_q|paired". Combinations are also understood, for example, "3844|is_q".
+
+
+## edgeCase routines:
 
 ```{sh}
 usage: ./edgecase [-h] [-j J] {tailpuller,tailchopper,kmerscanner,densityplot,assembler} ...
@@ -66,13 +115,6 @@ optional arguments:
   -m M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
 ```
 
-The input files are:
-* ECX: a.k.a. the edgeCase indeX, describing anchors of interest in the
-reference genome; the format is based on the BED format. Usable 'flag' values
-*have* to be among 4096 (hard mask), 8192 (fork), 16384 (telomeric tract). Two
-examples of ECX files can be found in the `assets/` subdirectory.
-* BAM: reads aligned to the reference genome. Has to have a .bai index.
-
 Outputs a subset SAM file that contains only the reads that overhang anchors
 defined in the ECX. If the read overhangs the mask anchor, the 4096 SAM flag is
 added; for forks, 8192 is added; for telomeric tracts, 16384.  
@@ -85,34 +127,6 @@ Suggestions:
 * pipe the output through `samtools view -bh -` to compress on the fly;
 * supplying `--max-read-length` drastically improves wall time if reads are
 significantly shorter than chromosomes.
-
-Bells and whistles:
-* **All** edgeCase routines that allow flag filtering (tailpuller, tailchopper,
-densityplot) recognize both the numeric flag format (such as 3844) and the
-"human-readable" format such as "rev" or "is_q|paired". Combinations are also
-understood, for example, "3844|rev".
-
-The full table of flag names (also see
-https://broadinstitute.github.io/picard/explain-flags.html):
-
-name               | value | comment
--------------------|-------|---------------------------
-paired             | 1     |
-mapped_proper_pair | 2     |
-unmapped           | 4     |
-mate_unmapped      | 8     |
-rev                | 16    |
-mate_rev           | 32    |
-1stmate            | 64    |
-2ndmate            | 128   |
-secondary          | 256   |
-qcfail             | 512   |
-pcrdup             | 1024  |
-supp               | 2048  |
-ucsc_mask_anchor   | 4096  | available after tailpuller
-fork               | 8192  | available after tailpuller
-tract_anchor       | 16384 | available after tailpuller
-is_q               | 32768 | available after tailpuller
 
 ### ./edgecase tailchopper [options] bam > fasta
 
