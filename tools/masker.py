@@ -14,7 +14,7 @@ def get_motifs_pattern(motif_description):
     if path.isfile(motif_description):
         with open(motif_description, mode="rt") as motif_handle:
             return r'|'.join({
-                get_circular_motif(line.split()[1]*2)
+                get_circular_motif(line.split()[0]*2)
                 for line in motif_handle if line[0] != "#"
             })
     else:

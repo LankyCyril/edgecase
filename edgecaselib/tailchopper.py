@@ -21,18 +21,22 @@ def get_cigar_clip_length(entry, prime):
         )
 
 
-def update_aligned_segment(entry, map_pos, start=None, end=None):
+def update_aligned_segment(entry, map_pos, unalign=True, start=None, end=None):
     """Update sequence, cigar, quality string in-place"""
     if (end is not None) and (start is not None) and (end < start):
         start, end = end, start
     qualities_substring = entry.query_qualities[start:end]
     entry.query_sequence = entry.query_sequence[start:end]
-    if entry.query_sequence:
-        entry.cigarstring = str(len(entry.query_sequence)) + "S"
+    if unalign:
+        entry.flag |= 4
+        entry.cigarstring, entry.tags = None, []
     else:
-        entry.cigarstring = None
-    if map_pos is not None:
-        entry.reference_start += map_pos
+        if entry.query_sequence:
+            entry.cigarstring = str(len(entry.query_sequence)) + "S"
+        else:
+            entry.cigarstring = None
+        if map_pos is not None:
+            entry.reference_start += map_pos
     entry.query_qualities = qualities_substring
 
 
@@ -147,6 +151,7 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1,
     with AlignmentFile(bam) as alignment:
         print(str(alignment.header).rstrip("\n"), file=file)
         samfilters = [flags, flags_any, flag_filter, min_quality]
+        n_skipped = 0
         for entry in filter_bam(alignment, samfilters):
             if entry.query_sequence:
                 chopped_entry, error = chopper(
@@ -155,7 +160,8 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1,
                 if chopped_entry.query_sequence:
                     print(chopped_entry.to_string(), file=file)
                 else:
-                    error_message = "Skipping {} ({})".format(
-                        entry.query_name, error or "Zero length chop"
-                    )
-                    print(error_message, file=stderr)
+                    n_skipped += 1
+    if n_skipped:
+        print(n_skipped, "reads skipped", file=stderr)
+    print("WARNING: legacy mapping positions (POS) retained;", file=stderr)
+    print("         do not use POS for analyses!", file=stderr)

@@ -15,32 +15,34 @@ from operator import __or__
 
 FLAG_COLORS = {
     0x1000: "gray",
-    0x2000: "red",
-    0x4000: "green"
+    0x2000: "blueviolet",
+    0x4000: "red"
 }
 
 ALL_SAM_FLAGS = [
-    "paired", "mapped_proper_pair", "unmapped", "mate_unmapped",
-    "rev", "mate_rev", "1stmate", "2ndmate", "secondary",
-    "qcfail", "pcrdup", "supp",
+    "paired", "mapped_proper_pair", "unmapped", "mate_unmapped", "rev",
+    "mate_rev", "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
     "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
 DEFAULT_MOTIF_COLORS = [
-    "#117733", "#88CCEE", "#AA4499", "#DDCC77",
-    "#332288", "#882255", "#44AA99", "#CC6677"
+    "#117733", "#88CCEE", "#AA4499", "#DDCC77", "#332288", "#882255",
+    "#44AA99", "#CC6677", "#EEEEEE"
 ]
 
+BGCOLOR = "#BBBBCA"
+
 PAPER_PALETTE = OrderedDict([
-    ("TTAGGG", "#117733"), ("TTGGGG", "#AA4499"), ("TGAGGG", "#DDCC77"),
-    ("TTAGGGG", "#332288"), ("TAGGG", "#882255"), ("TTTAGGG", "#44AA99"),
-    ("TTAGGTTAGGG", "#CC6677")
+    ("TTAGGG", "#117733"), ("TTGGGG", "#AA4499"), ("TTAGGGG", "#332288"),
+    ("TGAGGG", "#DDCC77"), ("TCAGGG", "#44AA99"), ("TTAGGGTTAGGGG", "#EEEEEE"),
+    ("CGCGG", "#88CCEE"),
 ])
 
-
-def split_hatch(hatches_pattern):
-    """Split provided hatches pattern into individual ones"""
-    return [h if h != "None" else None for h in hatches_pattern.split("|")]
+PAPER_PALETTE_RC = OrderedDict([
+    ("CCCTAA", "#117733"), ("CCCCAA", "#AA4499"), ("CCCCTAA", "#332288"),
+    ("CCCTCA", "#DDCC77"), ("CCCTGA", "#44AA99"), ("CCCCTAACCCTAA", "#EEEEEE"),
+    ("CCGCG", "#88CCEE")
+])
 
 
 def explain_sam_flags(flag, sep="|"):

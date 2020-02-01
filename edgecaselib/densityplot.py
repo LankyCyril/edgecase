@@ -1,18 +1,21 @@
 from sys import stdout
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
-from edgecaselib.formats import DEFAULT_MOTIF_COLORS, PAPER_PALETTE
+from edgecaselib.formats import DEFAULT_MOTIF_COLORS, PAPER_PALETTE, BGCOLOR
 from collections import OrderedDict
-from edgecaselib.util import natsorted_chromosomes, progressbar
+from edgecaselib.util import natsorted_chromosomes, progressbar, motif_revcomp
 from matplotlib.pyplot import subplots, rc_context, switch_backend
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle, Patch
 from numpy import clip
 from seaborn import lineplot
 from itertools import count
-from os import path
+from os import path, getenv
 from pandas import concat
 from re import search
+
+
+DENSITYPLOT_FIGWIDTH = 17
 
 
 def simplify_axes(ax, keep=(), keep_scientific=False):
@@ -28,7 +31,7 @@ def motif_subplots(nreads, chrom, max_mapq):
     """Prepare figure with subplots for each read"""
     page, axs = subplots(
         ncols=2, nrows=nreads, squeeze=False,
-        figsize=(16, nreads*2/3), sharey=True, frameon=False,
+        figsize=(DENSITYPLOT_FIGWIDTH, nreads*2/3), sharey=True, frameon=False,
         gridspec_kw={"hspace": 0, "wspace": 0, "width_ratios": (15, 1)}
     )
     # remove subplot borders:
@@ -49,11 +52,11 @@ def motif_subplots(nreads, chrom, max_mapq):
 def chromosome_subplots(nrows, zoomed_in=False):
     """Prepare figure with subplots for each chromosome end"""
     if zoomed_in:
-        figsize=(16, nrows*3)
-        hspace = .25
+        figsize=(DENSITYPLOT_FIGWIDTH*.6, nrows*3*.65)
+        hspace = .35
     else:
-        figsize=(16, nrows*1.3)
-        hspace = 1
+        figsize=(DENSITYPLOT_FIGWIDTH*.7, nrows*1.5*.7)
+        hspace = .7
     figure, axs = subplots(
         figsize=figsize, gridspec_kw={"hspace": hspace},
         nrows=nrows, squeeze=False, frameon=False
@@ -214,7 +217,7 @@ def fill_area(plottable_df, i, updated_palette, ax):
     reversed_motif_order = list(updated_palette.keys())[::-1]
     if i == len(reversed_motif_order):
         upper_motif_data = get_motif_data(plottable_df, reversed_motif_order[0])
-        upper_motif_data["density"], color, hatch = 1, "silver", "X"
+        upper_motif_data["density"], color, hatch = 1, BGCOLOR, None
     else:
         motif = reversed_motif_order[i]
         color = updated_palette[motif]
@@ -234,7 +237,7 @@ def fill_area(plottable_df, i, updated_palette, ax):
     )
 
 
-def coverage_plot(plottable_df, motif_count, ax, y_offset=.1):
+def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.1):
     """Plot read coverage under area chart"""
     covered_positions = plottable_df.loc[
         ~plottable_df["density"].isnull(), "position"
@@ -250,19 +253,20 @@ def coverage_plot(plottable_df, motif_count, ax, y_offset=.1):
         [coverage_df["position"].min(), coverage_df["position"].max()],
         [coverage_df["viz_coverage"].max()]*2, ls="--", color="gray"
     )
+    if is_q:
+        x, ha = coverage_df["position"].max(), "left"
+        ticks_mask, reads_label = " {}", "\n\nreads"
+    else:
+        x, ha = coverage_df["position"].min(), "right"
+        ticks_mask, reads_label = "{} ", "reads\n\n"
     ax.text(
-        x=coverage_df["position"].max(), y=coverage_df["viz_coverage"].max(),
-        verticalalignment="center",
-        s=" {}".format(coverage_df["coverage"].max())
+        x=x, y=coverage_df["viz_coverage"].max(), va="center", ha=ha,
+        s=ticks_mask.format(coverage_df["coverage"].max())
     )
+    ax.text(x=x, y=1+y_offset, va="center", ha=ha, s=ticks_mask.format(1))
     ax.text(
-        x=coverage_df["position"].max(), y=1+y_offset,
-        verticalalignment="center", s=" 1"
-    )
-    ax.text(
-        x=coverage_df["position"].max(),
-        y=.5*(1+y_offset+coverage_df["viz_coverage"].max()),
-        verticalalignment="center", rotation=90, s="\n\nreads"
+        x=x, y=.5*(1+y_offset+coverage_df["viz_coverage"].max()),
+        va="center", ha=ha, rotation=90, s=reads_label
     )
     ax.fill_between(
         x=coverage_df["position"], y1=1+y_offset,
@@ -308,8 +312,12 @@ def plot_combined_density(binned_density_dataframe, ecx, title, palette, target_
         palette={m: "black" for m in set(plottable_df["motif"])},
         linewidth=.5, alpha=.7, ax=ax
     )
+    lineplot(
+        x=plottable_df["position"].drop_duplicates().sort_values(), y=1,
+        legend=False, color="black", linewidth=1, alpha=1, ax=ax
+    )
     if zoomed_in:
-        ymax = coverage_plot(plottable_df, len(motif_order), ax)
+        ymax = coverage_plot(plottable_df, len(motif_order), is_q, ax)
     else:
         ymax = 1
     indexer = (
@@ -325,7 +333,7 @@ def plot_combined_density(binned_density_dataframe, ecx, title, palette, target_
     return updated_palette
 
 
-def align_subplots(ax2chrom, ecx, target_anchor, is_q, zoomed_in, zoomed_in_offset=1000):
+def align_subplots(ax2chrom, ecx, target_anchor, is_q, unit_adjustment=1e6):
     """Modify xlim of related axes to make their scales match"""
     prime = 3 if is_q else 5
     anchor_positions, left_spans, right_spans = {}, {}, {}
@@ -344,21 +352,28 @@ def align_subplots(ax2chrom, ecx, target_anchor, is_q, zoomed_in, zoomed_in_offs
         else:
             error_msk = "{} not found on {} prime for {} in ECX"
             raise ValueError(error_msk.format(target_anchor, prime, chrom))
-    if zoomed_in:
-        if is_q:
-            max_left_span = zoomed_in_offset
-            max_right_span = max(right_spans.values())
-        else:
-            max_left_span = max(left_spans.values())
-            max_right_span = zoomed_in_offset
+    max_left_span = str(getenv("PAPER_LEFT_SPAN"))
+    if max_left_span.isdigit():
+        max_left_span = int(max_left_span)
     else:
         max_left_span = max(left_spans.values())
+    max_right_span = str(getenv("PAPER_RIGHT_SPAN"))
+    if max_right_span.isdigit():
+        max_right_span = int(max_right_span)
+    else:
         max_right_span = max(right_spans.values())
     for ax, chrom in ax2chrom.items():
         ax.set(xlim=(
             anchor_positions[ax] - max_left_span,
             anchor_positions[ax] + max_right_span
         ))
+        if unit_adjustment:
+            ax.set(
+                xticklabels=[
+                    "{:.3f}".format(int(xt) / unit_adjustment)
+                    for xt in ax.get_xticks().tolist()
+                ]
+            )
 
 
 def add_legend(updated_palette, ax, exploded, is_q):
@@ -371,7 +386,7 @@ def add_legend(updated_palette, ax, exploded, is_q):
             for motif, color in reversed(updated_palette.items())
         ][::-1]
         background_handle = [
-            Patch(label="other", fc="silver", ec="black", hatch="X", alpha=.7)
+            Patch(label="other", fc=BGCOLOR, ec="black", hatch=None, alpha=.7)
         ]
         if is_q:
             loc="upper left"
@@ -381,7 +396,33 @@ def add_legend(updated_palette, ax, exploded, is_q):
         ax.set(zorder=float("inf"))
 
 
-def plot_densities(densities, ecx, title, palette, target_anchor, is_q, zoomed_in, file=stdout.buffer):
+def plot_density_scale(ax):
+    bar_position = 1 + .002 * DENSITYPLOT_FIGWIDTH
+    tick_width = .0003 * DENSITYPLOT_FIGWIDTH
+    xtrace = [
+        bar_position+tick_width, bar_position,
+        bar_position, bar_position+tick_width
+    ]
+    ax.plot(
+        xtrace, [1, 1, 0, 0],
+        color="black", linewidth=1,
+        transform=ax.transAxes, clip_on=False
+    )
+    ax.text(
+        x=bar_position+tick_width, y=1, transform=ax.transAxes,
+        s=" 100%", ha="left", va="center"
+    )
+    ax.text(
+        x=bar_position+tick_width, y=0, transform=ax.transAxes,
+        s=" 0%", ha="left", va="center"
+    )
+    ax.text(
+        x=bar_position-tick_width, y=.5, transform=ax.transAxes, rotation=90,
+        s="density", ha="right", va="center"
+    )
+
+
+def plot_densities(densities, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, file=stdout.buffer):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
@@ -403,11 +444,12 @@ def plot_densities(densities, ecx, title, palette, target_anchor, is_q, zoomed_i
             ecx_chrom_name=ecx_chrom_name
         )
         ax2chrom[ax] = ecx_chrom_name
-    align_subplots(ax2chrom, ecx, target_anchor, is_q, zoomed_in)
-    if not zoomed_in:
+    align_subplots(ax2chrom, ecx, target_anchor, is_q)
+    if legend:
         add_legend(
             updated_palette, axs[0, 0], exploded=False, is_q=is_q
         )
+        plot_density_scale(axs[0, 0])
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
@@ -434,13 +476,32 @@ def interpret_target(samfilters):
     return is_q, target_anchor
 
 
+def generate_paper_palette(paper_palette, is_q):
+    """Return paper_palette, reverse complement motifs if is_q is False"""
+    if is_q is True:
+        return paper_palette
+    elif is_q is False:
+        palette = OrderedDict()
+        for motif, color in paper_palette.items():
+            palette[motif_revcomp(motif)] = color
+        return palette
+    else:
+        raise NotImplementedError("--palette 'paper' for unknown arm")
+
+
 def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     """Parse and check arguments"""
+    if exploded:
+        if zoomed_in:
+            raise NotImplementedError("--exploded with --zoomed-in")
+        target_anchor, is_q = None, None
+    else:
+        is_q, target_anchor = interpret_target(samfilters)
     if palette is None:
         legend = not zoomed_in
     elif palette in {"paper|legend=False", "paper|legend=True", "paper"}:
         legend = "False" not in palette
-        palette = PAPER_PALETTE
+        palette = generate_paper_palette(PAPER_PALETTE, is_q)
     else:
         if exploded:
             raise NotImplementedError("--palette with --exploded")
@@ -463,12 +524,6 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
             palette = interpreted_palette
         else:
             palette = None
-    if exploded:
-        if zoomed_in:
-            raise NotImplementedError("--exploded with --zoomed-in")
-        target_anchor, is_q = None, None
-    else:
-        is_q, target_anchor = interpret_target(samfilters)
     return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
@@ -486,5 +541,6 @@ def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_si
         )
     else:
         plot_densities(
-            densities, ecx, title, palette, target_anchor, is_q, zoomed_in, file
+            densities, ecx, title, palette, legend, target_anchor,
+            is_q, zoomed_in, file
         )
