@@ -58,7 +58,7 @@ create_subparser(
     usage="{} levenshtein [options] sequencedata > tsv".format(__file__),
     rules={
         ("sequencedata",): {"help": "name of input BAM/SAM file or directory with precomputed distances"},
-        ("--kmerscanner-file",): {"help": "kmerscanner file (optional, for use with --output-dir", "default": None},
+        ("--kmerscanner-file",): {"help": "kmerscanner file (optional, for use with --output-dir)", "default": None},
         ("--min-cluster-size",): {"help": "minimum cluster size to consider", "default": 5, "type": int},
         ("-o", "--output-dir",): {"help": "output directory for clustermaps and per-haplotype SAM files", "default": None},
     }
@@ -66,7 +66,7 @@ create_subparser(
 
 create_subparser(
     subparsers, "tailchopper", help="get overhanging heads/tails of reads",
-    usage="{} tailchopper [options] bam > fasta".format(__file__),
+    usage="{} tailchopper [options] bam > sam".format(__file__),
     rules={
         ("bam",): {"help": "name of input BAM/SAM file"},
         ("-t", "--target"): {"help": "either an ECX flag (cut relative to reference) or 'cigar'", "default": "tract_anchor", "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}}
@@ -77,7 +77,7 @@ create_subparser(
     subparsers, "repeatfinder", help="discover enriched repeats in candidate sequences",
     usage="{} repeatfinder [options] sequencefile > tsv".format(__file__),
     rules={
-        ("sequencefile",): {"help": "name of input sam/bam/fasta/fastq file"},
+        ("sequencefile",): {"help": "name of input SAM/BAM/FASTA/FASTQ file"},
         ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
         ("-m", "--min-k"): {"help": "smallest target repeat length", "default": 4, "type": int},
         ("-M", "--max-k"): {"help": "largest target repeat length", "default": 16, "type": int},
