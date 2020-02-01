@@ -1,8 +1,8 @@
 edgeCase
 ========
 
-edgeCase is a small toolchain that takes a set of aligned reads as the initial
-input and describes its telomeric content.
+edgeCase is a framework for extraction and interpretation of telomeric reads
+from long-read single-molecule whole genome sequencing datasets.
 
 ![densityplot_sample](assets/densityplot-exploded.png?raw=true "densityplot example")
 
@@ -11,7 +11,7 @@ input and describes its telomeric content.
 This tool is in active development, so it is not pip-installable yet.
 The installation options are:
 
-### With Conda:
+#### With Conda (preferred):
 
 ```{sh}
 $ git clone https://github.com/LankyCyril/edgecase
@@ -21,12 +21,13 @@ $ conda activate edgecase
 $ ./edgecase
 ```
 
-### By manually installing dependencies:
+#### By manually installing dependencies:
 
 ```{sh}
 $ git clone https://github.com/LankyCyril/edgecase
 $ cd edgecase
-$ pip install numpy pandas matplotlib seaborn networkx tqdm regex pysam
+$ pip install numpy scipy scikit-learn statsmodels numba
+$ pip install pandas matplotlib seaborn tqdm regex pysam
 $ ./edgecase
 ```
 
