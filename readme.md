@@ -261,7 +261,7 @@ clusters (haplotypes) on each arm where more than one such cluster is
 detected.
 
 **NB**: this is an experimental module, and the maximum number of outliers is
-hard-coded as 1. This worked for the datasets analyzed in the BiorXiv preprint,
+hard-coded as 1. This worked for the datasets analyzed in the bioRxiv preprint,
 but the number of outliers may have to be adjusted for other datasets.  
 **NB**: this algorithm scales quadratically with the number of input reads and
 is computationally infeasible for large datasets.
@@ -294,7 +294,7 @@ by candidate reads, binning the values by windows of *--bin-size*.
 The value of *--palette* can be either none (in which case the maximum of nine
 motifs can be plotted with default colors), "paper" or "paper|legend=False" (in
 which case motifs known from research can be plotted with custom colors,
-matching the colors in the figures in the BiorXiv preprint), or a chained
+matching the colors in the figures in the bioRxiv preprint), or a chained
 key-value sequence of "motif=color" and "legend=boolean", for example:
 "TTAGGG=green|TGAGGG=#D01000|legend=True".  
 Options *--exploded* and *--title* are deprecated.
