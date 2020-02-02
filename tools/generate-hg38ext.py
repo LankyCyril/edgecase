@@ -4,7 +4,9 @@ from re import compile
 from tempfile import TemporaryDirectory
 from os import path
 from urllib.request import urlretrieve
-from pysam import FastxFile
+from contextlib import contextmanager
+from binascii import hexlify
+from gzip import open as gzopen
 from tqdm import tqdm
 from itertools import chain
 from textwrap import fill
@@ -29,17 +31,18 @@ CSHLP_SUPPFN = "Supplemental_FileS1.txt"
 HG38_URL = "/".join([NCBI_FTP_DIR, HG38_RELEASE, HG38_VERSION, HG38_FASTAGZ])
 STONG2014_URL = "/".join([CSHLP_URLDIR, CSHLP_DOIDIR, CSHLP_SUPPFN])
 
-STONG_INFIX = "_1-500K_1_12_12"
+STONG_INFIX = "500K_1_12_12"
 STONG2014_SUBHAP_MASKS = {
-    "1qtel{}", "2qtel{}", "3ptel{}", "4ptel{}", "5qtel{}", "6qtel{}", "9qtel{}",
-    "10qtel{}", "14qtel{}", "16qtel{}", "17ptel{}", "17qtel{}v2", "18qtel{}",
-    "19ptel{}",
+    "1qtel_1-{}", "2qtel_1-{}", "3ptel_1-{}", "4ptel_1-{}", "5qtel_1-{}",
+    "6qtel_1-{}", "9qtel_1-{}", "10qtel_1-{}", "14qtel_1-{}", "16qtel_1-{}",
+    "17ptel_1_{}", "17qtel_1-{}v2", "18qtel_1-{}", "19ptel_1-{}"
 }
 
 REVCOMP_POSTFIX = "_rc"
 TO_REVCOMP_MASKS = {
-    "1qtel{}", "2qtel{}", "5qtel{}", "6qtel{}", "9qtel{}", "10qtel{}",
-    "14qtel{}", "16qtel{}", "17qtel{}v2", "18qtel{}", "chrUn_KI270745v1",
+    "1qtel_1-{}", "2qtel_1-{}", "5qtel_1-{}", "6qtel_1-{}", "9qtel_1-{}",
+    "10qtel_1-{}", "14qtel_1-{}", "16qtel_1-{}", "17qtel_1-{}v2", "18qtel_1-{}",
+    "chrUn_KI270745v1"
 }
 
 ALPHABET = list("AaCcNnnNgGtT")
@@ -72,17 +75,40 @@ def download_assemblies(workdir):
         yield local_fn
 
 
+@contextmanager
+def open_fasta(filename):
+    """Open FASTA with 'open' if plaintext, 'gzip.open' if gzipped"""
+    with open(filename, mode="rb") as bytes_handle:
+        is_gzipped = (hexlify(bytes_handle.read(2)) == b"1f8b")
+    if is_gzipped:
+        yield gzopen(filename, mode="rt")
+    else:
+        yield open(filename, mode="rt")
+
+
 def parser_iterator(filename, to_revcomp, desc="Parsing", entry_filter=lambda e:True):
     """Parse FASTA and iterate over converted entries"""
-    with FastxFile(filename) as fasta:
-        for entry in tqdm(fasta, desc=desc, unit="contig"):
-            if entry_filter(entry):
-                if entry.name in to_revcomp:
-                    name = entry.name + REVCOMP_POSTFIX
-                    sequence = revcomp(entry.sequence)
+    entry_accepted, entry_needs_revcomp, lines_to_revcomp = False, False, []
+    with open_fasta(filename) as fasta:
+        for line in tqdm(map(str.strip, fasta), desc=desc, unit="line"):
+            if line.startswith(">"):
+                if lines_to_revcomp: # generated from previous entry
+                    previous_entry_sequence = revcomp("".join(lines_to_revcomp))
+                    yield fill(previous_entry_sequence)
+                    lines_to_revcomp = []
+                name = line[1:].split()[0]
+                entry_accepted = entry_filter(name)
+                entry_needs_revcomp = (name in to_revcomp)
+                if entry_accepted:
+                    if entry_needs_revcomp:
+                        yield ">" + name + REVCOMP_POSTFIX
+                    else:
+                        yield ">" + name
+            elif entry_accepted:
+                if entry_needs_revcomp:
+                    lines_to_revcomp.append(line)
                 else:
-                    name, sequence = entry.name, entry.sequence
-                yield name, fill(sequence)
+                    yield line
 
 
 def generate_hg38ext(hg38, stong2014):
@@ -92,11 +118,10 @@ def generate_hg38ext(hg38, stong2014):
     hg38_iterator = parser_iterator(hg38, to_revcomp, desc="Parsing reference")
     stong2014_iterator = parser_iterator(
         stong2014, to_revcomp, desc="Parsing subtelomeres",
-        entry_filter=lambda e: (e.name in subhaps)
+        entry_filter=lambda name: (name in subhaps)
     )
-    for name, sequence_lines in chain(hg38_iterator, stong2014_iterator):
-        print(">" + name)
-        print(sequence_lines)
+    for line in chain(hg38_iterator, stong2014_iterator):
+        print(line)
     return 0
 
 
