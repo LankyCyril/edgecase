@@ -49,7 +49,13 @@ ref.fa.ecx:      an index containing annotations of subtelomere-telomere boundar
 *ref.fa.ecx*, a.k.a. the edgeCase indeX, describes anchors of interest in the
 reference genome; the format is based on the BED format. Usable "flag" values
 *have* to be among 4096 (hard mask), 8192 (fork), 16384 (telomeric tract). Two
-examples of ECX files can be found in the "assets/" subdirectory.
+examples of ECX files can be found in the "assets" subdirectory.
+
+Specifically, as described in the bioRxiv preprint, the human reference can be
+constructed from the hg38/GRCh38 reference genome and subtelomeric assemblies
+published by [Stong et al., 2014](https://dx.doi.org/10.1101%2Fgr.166983.113).
+To generate this reference, which we call "extended", or *hg38ext*, run
+`tools/generate-hg38ext.py --remote > hg38ext.fa`.
 
 
 ### Custom SAM flags
