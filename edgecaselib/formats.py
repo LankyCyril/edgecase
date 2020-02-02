@@ -1,28 +1,48 @@
 from sys import stderr
+from collections import OrderedDict
 from contextlib import contextmanager, ExitStack
 from itertools import chain
-from numpy import linspace, array, mean, nan, concatenate, fromstring, full, vstack
+from numpy import linspace, array, mean, concatenate, fromstring, full, vstack
+from numpy import nan, unique
 from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
 from tempfile import TemporaryDirectory
 from os import path
-from tqdm import tqdm
+from edgecaselib.util import progressbar
 from functools import reduce
 from operator import __or__
 
 
 FLAG_COLORS = {
     0x1000: "gray",
-    0x2000: "red",
-    0x4000: "green"
+    0x2000: "blueviolet",
+    0x4000: "red"
 }
 
 ALL_SAM_FLAGS = [
-    "paired", "mapped_proper_pair", "unmapped", "mate_unmapped",
-    "rev", "mate_rev", "1stmate", "2ndmate", "secondary",
-    "qcfail", "pcrdup", "supp",
+    "paired", "mapped_proper_pair", "unmapped", "mate_unmapped", "rev",
+    "mate_rev", "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
     "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
 ]
+
+DEFAULT_MOTIF_COLORS = [
+    "#117733", "#88CCEE", "#AA4499", "#DDCC77", "#332288", "#882255",
+    "#44AA99", "#CC6677", "#EEEEEE"
+]
+
+BGCOLOR = "#BBBBCA"
+
+PAPER_PALETTE = OrderedDict([
+    ("TTAGGG", "#117733"), ("TTGGGG", "#AA4499"), ("TTAGGGG", "#332288"),
+    ("TGAGGG", "#DDCC77"), ("TCAGGG", "#44AA99"), ("TTAGGGTTAGGGG", "#EEEEEE"),
+    ("CGCGG", "#88CCEE"),
+])
+
+PAPER_PALETTE_RC = OrderedDict([
+    ("CCCTAA", "#117733"), ("CCCCAA", "#AA4499"), ("CCCCTAA", "#332288"),
+    ("CCCTCA", "#DDCC77"), ("CCCTGA", "#44AA99"), ("CCCCTAACCCTAA", "#EEEEEE"),
+    ("CCGCG", "#88CCEE")
+])
 
 
 def explain_sam_flags(flag, sep="|"):
@@ -78,8 +98,8 @@ def filter_and_read_tsv(dat, gzipped, samfilters):
         with TemporaryDirectory() as tempdir:
             datflt_name = path.join(tempdir, "dat.gz")
             with gzopen(datflt_name, mode="wt") as datflt:
-                decorated_line_iterator = tqdm(
-                    dat_handle, desc="Filtering", unit=" records"
+                decorated_line_iterator = progressbar(
+                    dat_handle, desc="Filtering", unit=" lines"
                 )
                 for line in decorated_line_iterator:
                     if line[0] == "#":
@@ -106,7 +126,7 @@ def binned(A, bins, func=mean):
     ])
 
 
-def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
+def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align=False):
     """Subset to densities of reads on `chrom`, bin densities, convert to dataframe"""
     indexer = (raw_densities["chrom"] == chrom)
     densities_subset = raw_densities[indexer].reset_index(drop=True)
@@ -144,13 +164,28 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
     )
 
 
-def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
+def are_motifs_consistent(raw_densities):
+    checker = raw_densities[["chrom", "motif"]].drop_duplicates()
+    if len(unique(checker["chrom"].value_counts().values)) != 1:
+        return False
+    elif len(unique(checker["motif"].value_counts().values)) != 1:
+        return False
+    else:
+        return True
+
+
+def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
     if not any(samfilters): # all zero / None
         print("Loading DAT...", file=stderr, flush=True)
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
         raw_densities = filter_and_read_tsv(dat, gzipped, samfilters)
+    if not are_motifs_consistent(raw_densities):
+        raise NotImplementedError(
+            "Inconsistent number of motifs in DAT; plotting of reads " +
+            "identified de novo with kmerscanner is not implemented"
+        )
     if each_once:
         raw_densities["length"] = raw_densities["density"].apply(
             lambda d: d.count(",")+1
@@ -161,7 +196,7 @@ def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
         raw_densities = merge(groups, raw_densities).drop(columns="length")
     if no_align:
         raw_densities["chrom"] = "None"
-    chromosome_iterator = tqdm(
+    chromosome_iterator = progressbar(
         raw_densities["chrom"].drop_duplicates(), desc="Interpreting data",
         unit="chromosome"
     )
@@ -178,7 +213,11 @@ def load_index(index_filename, as_filter_dict=False):
     if not path.isfile(index_filename):
         raise FileNotFoundError(index_filename)
     else:
-        ecx = read_csv(index_filename, sep="\t", skiprows=1, escapechar="#")
+        ecx = read_csv(
+            index_filename, sep="\t", skiprows=1,
+            escapechar="#", na_values="-"
+        )
+        ecx = ecx[ecx["blacklist"].isnull()]
         if as_filter_dict:
             slim_ecx = ecx[["rname", "pos", "flag", "prime"]]
             rnames = set(slim_ecx["rname"])
@@ -217,4 +256,4 @@ def filter_bam(alignment, samfilters, desc=None):
     if desc is None:
         return filtered_iterator
     else:
-        return tqdm(filtered_iterator, desc=desc, unit="read")
+        return progressbar(filtered_iterator, desc=desc, unit="read")

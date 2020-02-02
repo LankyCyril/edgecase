@@ -1,6 +1,10 @@
 from sys import stderr
 from regex import compile
-from re import split
+from re import split, search, IGNORECASE
+from shutil import which
+from os import path, access, X_OK
+from functools import partial
+from tqdm import tqdm
 
 
 MAINCHROMS_ENSEMBL = {str(i) for i in range(1, 23)} | {"X", "Y"}
@@ -11,6 +15,19 @@ ALPHABET = list("ACGT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
 MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}
 MOTIF_COMPLEMENT_PATTERN = compile(r'|'.join(MOTIF_COMPLEMENTS.keys()))
+
+
+progressbar = partial(
+    tqdm, bar_format=(
+        "{desc}{percentage:3.0f}% ({n_fmt}/{total_fmt}), " +
+        "{elapsed}<{remaining}, {rate_fmt}"
+    )
+)
+
+
+def validate_motif(motif):
+    """Make sure motif conforms to what we've implemented"""
+    return (search(r'^[ACGT\[\]\.]*$', motif, flags=IGNORECASE) is not None)
 
 
 def motif_revcomp(motif, ignorecase=True):
@@ -47,3 +64,20 @@ def natsorted_chromosomes(chromosomes):
         print("Warning: " + msg, file=stderr)
         print("The error was: '{}'".format(e), file=stderr)
         return sorted(chromosomes)
+
+
+def get_executable(exe_name, suggested_binary, fail_if_none=True):
+    """Wrapper to find executable"""
+    if suggested_binary is None:
+        binary = which(exe_name)
+        if (binary is None) and fail_if_none:
+            raise OSError("{} not found".format(exe_name))
+        else:
+            return binary
+    else:
+        if path.isfile(suggested_binary) and access(suggested_binary, X_OK):
+            return suggested_binary
+        elif fail_if_none:
+            raise OSError("{} not accessible".format(suggested_binary))
+        else:
+            return None
