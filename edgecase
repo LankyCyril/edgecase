@@ -127,8 +127,6 @@ except SystemExit:
             exit(subparsers.choices[argv[1]].print_help() or 1)
     exit(1)
 if kwargs["subparser"] in subparsers.choices:
-    if kwargs["subparser"] == "assembler":
-        raise NotImplementedError("assembler module in development")
     getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
 else:
     exit(parser.print_help() or 1)
