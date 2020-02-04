@@ -21,9 +21,7 @@ from glob import glob
 from re import search
 
 
-__doc__ = """
-edgeCase levenshtein
-====================
+__doc__ = """edgeCase levenshtein: clustering of telomeric reads by distance
 
 Usage: {0} levenshtein [-m integer] [-o dirname] [--kmerscanner-file filename]
        {1}             [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]

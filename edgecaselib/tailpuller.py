@@ -9,9 +9,7 @@ from itertools import chain
 from numpy import isnan, inf
 
 
-__doc__ = """
-edgeCase tailpuller
-===================
+__doc__ = """edgeCase tailpuller: selection of candidate telomeric reads
 
 Usage: {0} tailpuller -x filename [-f flagspec] [-g flagspec] [-F flagspec]
        {1}            [-q integer] [-m integer] <bam>

@@ -15,9 +15,7 @@ from pandas import concat
 from re import search
 
 
-__doc__ = """
-edgeCase densityplot
-====================
+__doc__ = """edgeCase densityplot: visualization of motif densities
 
 Usage: {0} densityplot -x filename [-b integer] [-e] [--zoomed-in]
        {1}             [--palette palettespec] [--title string]

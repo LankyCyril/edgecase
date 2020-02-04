@@ -6,19 +6,17 @@ from re import sub, search
 import edgecaselib
 
 
-__doc__ = """
-edgeCase
-========
+__doc__ = """edgeCase: a telomere analysis pipeline
 
 Usage: {0} [-h | --help]
        {0} <command> [<args>...]
 
 Commmands (<command>):
     tailpuller     select overhanging reads
+    levenshtein    cluster reads by edit distance
     tailchopper    get overhanging heads/tails of reads
     repeatfinder   discover enriched repeats in candidate sequences
     kmerscanner    perform scan of known kmers/motifs
-    levenshtein    cluster reads by edit distance
     densityplot    visualize densities of candidate motifs
 """
 

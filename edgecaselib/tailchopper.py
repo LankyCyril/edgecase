@@ -4,9 +4,7 @@ from re import search, split
 from edgecaselib.formats import load_index, filter_bam, interpret_flags
 
 
-__doc__ = """
-edgeCase tailchopper
-====================
+__doc__ = """edgeCase tailchopper: selection of overhanging heads/tails of reads
 
 Usage: {0} tailchopper -x filename [-t targetspec] [-f flagspec] [-g flagspec]
        {1}             [-F flagspec] [-q integer] <bam>

@@ -12,9 +12,7 @@ from collections import OrderedDict
 from pandas import read_csv
 
 
-__doc__ = """
-edgeCase kmerscanner
-====================
+__doc__ = """edgeCase kmerscanner: calculation of motif densities
 
 Usage: {0} kmerscanner --motif-file filename [-w integer] [-n integer]
        {1}             [-j integer]
