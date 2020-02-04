@@ -1,13 +1,13 @@
-name: edgecase
+name: edgecase-paper
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
   - defaults
   - r
-  - biocore
 dependencies:
   - _libgcc_mutex=0.1=main
   - bcftools=1.9=ha228f0b_4
+  - bioawk=1.0=h84994c4_4
   - blas=2.10=openblas
   - bzip2=1.0.8=h516909a_0
   - ca-certificates=2019.11.28=hecc5488_0
@@ -15,7 +15,7 @@ dependencies:
   - curl=7.65.2=hf8cf82a_0
   - cycler=0.10.0=py_1
   - dbus=1.13.6=he372182_0
-  - decorator=4.4.1=py_0
+  - decorator=4.4.0=py_0
   - expat=2.2.5=he1b5a44_1003
   - fastcluster=1.1.25=py36hb3f55d8_1000
   - fontconfig=2.13.1=he4413a7_1000
@@ -55,6 +55,7 @@ dependencies:
   - libxcb=1.13=h14c3975_1002
   - libxml2=2.9.9=h13577e0_1
   - llvmlite=0.30.0=py36h8b12597_1
+  - minimap2=2.17=h8b12597_1
   - mkl=2019.4=243
   - ncurses=6.1=hf484d3e_1002
   - networkx=2.3=py_0

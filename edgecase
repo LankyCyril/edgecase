@@ -1,104 +1,132 @@
 #!/usr/bin/env python3
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from edgecaselib import kmerscanner, tailpuller, tailchopper
+from itertools import chain
+from sys import argv
+import edgecaselib
 
 
 def WideHelpFormatter(prog):
     """Supply formatter class to ArgumentParser with wider fields than default"""
-    return ArgumentDefaultsHelpFormatter(prog, max_help_position=50, width=150)
+    return ArgumentDefaultsHelpFormatter(prog, max_help_position=30, width=150)
 
 
-def create_subparser(subparsers, name, help, usage, rules):
+DEFAULT_RULES = {
+    ("-x", "--index"): {"help": "location of the reference .ecx index", "required": True, "metavar": "X", "default": "no default, required"},
+    ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
+    ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
+    ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
+    ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"}
+}
+
+EXCLUDE_RULES = {
+    ("-x", "--index"): {"levenshtein", "repeatfinder", "kmerscanner"}
+}
+
+
+def create_subparser(subparsers, subparser_name, help, usage, rules):
     """Wrapper for easily creating subparsers and pushing into parent parser"""
     _subparser = subparsers.add_parser(
-        name, help=help, usage=usage, formatter_class=WideHelpFormatter
+        subparser_name, help=help, usage=usage,
+        formatter_class=WideHelpFormatter
     )
-    for rule_args, rule_kwargs in rules.items():
-        _subparser.add_argument(*rule_args, **rule_kwargs)
+    for rule_args, rule_kwargs in chain(DEFAULT_RULES.items(), rules.items()):
+        if subparser_name not in EXCLUDE_RULES.get(rule_args, set()):
+            if ("metavar" in rule_kwargs) or ("action" in rule_kwargs):
+                _subparser.add_argument(*rule_args, **rule_kwargs)
+            elif rule_args[0][0] != "-":
+                _subparser.add_argument(
+                    *rule_args, metavar=rule_args[0], **rule_kwargs
+                )
+            else:
+                _subparser.add_argument(*rule_args, metavar="?", **rule_kwargs)
 
 
 parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
-parser.add_argument(
-    "-j", "--jobs", help="number of jobs to run in parallel",
-    default=1, type=int, metavar="J"
-)
-subparsers = parser.add_subparsers(help="subcommands", dest="subparser")
-
-create_subparser(
-    subparsers, "kmerscanner", help="perform kmer scan",
-    usage="{} [-j J] kmerscanner [options] fastqs > txt".format(__file__),
-    rules={
-        ("fastqs",): {
-            "help": "name(s) of input FASTQ file(s)",
-            "nargs": "+"
-        },
-        ("--kmer",): {
-            "help": "target kmer sequence",
-            "default": "TTAGGG", "metavar": "M"
-        },
-        ("--head-test",): {
-            "help": "length of head to use for density filter (if specified)",
-            "default": None, "type": int, "metavar": "H"
-        },
-        ("--tail-test",): {
-            "help": "length of tail to use for density filter (if specified)",
-            "default": None, "type": int, "metavar": "T"
-        },
-        ("-c", "--cutoff"): {
-            "help": "use hard cutoff for density",
-            "default": None, "type": float, "metavar": "C"
-        },
-        ("-w", "--window-size"): {
-            "help": "size of the rolling window",
-            "default": 120, "type": int, "metavar": "W"
-        },
-        ("-n", "--num-reads"): {
-            "help": "expected number of reads in input (for progress display)",
-            "default": None, "type": int, "metavar": "N"
-        }
-    }
-)
+subparsers = parser.add_subparsers(dest="subparser")
 
 create_subparser(
     subparsers, "tailpuller", help="select overhanging reads",
-    usage="{} [-j J] tailpuller [options] bams > sam".format(__file__),
+    usage="{} tailpuller [options] bam > sam".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
-        },
-        ("-r", "--reference"): {
-            "help": "reference FASTA",
-            "required": True, "metavar": "R", "default": "no default, required"
-        },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
-        }
+        ("bam",): {"help": "name of input BAM/SAM file"},
+        ("-m", "--max-read-length"): {"help": "max read length to consider when selecting lookup regions", "default": None, "type": int, "metavar": "M"}
     }
 )
 
 create_subparser(
-    subparsers, "tailchopper", help="get clipped heads/tails of reads",
-    usage="{} [-j J] tailchopper [options] bams > fasta".format(__file__),
+    subparsers, "levenshtein", help="cluster reads by edit distance",
+    usage="{} levenshtein [options] sequencedata > tsv".format(__file__),
     rules={
-        ("bams",): {
-            "help": "name(s) of input BAM/SAM file(s)",
-            "nargs": "+"
-        },
-        ("-p", "--prime"): {
-            "help": "which 'prime' end to output",
-            "default": 5, "type": int, "choices": [5, 3]
-        }
+        ("sequencedata",): {"help": "name of input BAM/SAM file or directory with precomputed distances"},
+        ("--kmerscanner-file",): {"help": "kmerscanner file (optional, for use with --output-dir)", "default": None},
+        ("--min-cluster-size",): {"help": "minimum cluster size to consider", "default": 5, "type": int},
+        ("-o", "--output-dir",): {"help": "output directory for clustermaps and per-haplotype SAM files", "default": None},
     }
 )
 
-args = parser.parse_args()
-if args.subparser == "kmerscanner":
-    kmerscanner.main(args)
-elif args.subparser == "tailpuller":
-    tailpuller.main(args)
-elif args.subparser == "tailchopper":
-    tailchopper.main(args)
+create_subparser(
+    subparsers, "tailchopper", help="get overhanging heads/tails of reads",
+    usage="{} tailchopper [options] bam > sam".format(__file__),
+    rules={
+        ("bam",): {"help": "name of input BAM/SAM file"},
+        ("-t", "--target"): {"help": "either an ECX flag (cut relative to reference) or 'cigar'", "default": "tract_anchor", "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}}
+    }
+)
+
+create_subparser(
+    subparsers, "repeatfinder", help="discover enriched repeats in candidate sequences",
+    usage="{} repeatfinder [options] sequencefile > tsv".format(__file__),
+    rules={
+        ("sequencefile",): {"help": "name of input SAM/BAM/FASTA/FASTQ file"},
+        ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
+        ("-m", "--min-k"): {"help": "smallest target repeat length", "default": 4, "type": int},
+        ("-M", "--max-k"): {"help": "largest target repeat length", "default": 16, "type": int},
+        ("-n", "--max-motifs"): {"help": "maximum number of motifs to report", "default": None, "type": int},
+        ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
+        ("--no-context",): {"help": "allow single interspersed instances of kmers", "action": "store_true"},
+        ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"},
+        ("-s", "--jellyfish-hash-size"): {"help": "jellyfish initial hash size", "default": "2G"},
+        ("-j", "--jobs"): {"help": "number of jellyfish jobs (parallel threads)", "default": 1, "type": int, "metavar": "J"},
+    }
+)
+
+create_subparser(
+    subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
+    usage="{} kmerscanner [options] bam > dat".format(__file__),
+    rules={
+        ("bam",): {"help": "name of input SAM/BAM file"},
+        ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
+        ("--motif-file",): {"help": "file with repeated motif sequences (output of `repeatfinder`)", "required": True, "default": "no default, required", "metavar": "M"},
+        ("--head-test",): {"help": "length of head to use for density filter (if specified)", "default": None, "type": int, "metavar": "H"},
+        ("--tail-test",): {"help": "length of tail to use for density filter (if specified)", "default": None, "type": int, "metavar": "T"},
+        ("-c", "--cutoff"): {"help": "use hard cutoff for density", "default": None, "type": float, "metavar": "C"},
+        ("-w", "--window-size"): {"help": "size of the rolling window", "default": 100, "type": int, "metavar": "W"},
+        ("-n", "--num-reads"): {"help": "expected number of reads in input (for progress display)", "default": None, "type": int, "metavar": "N"}
+    }
+)
+
+create_subparser(
+    subparsers, "densityplot", help="visualize densities of candidate reads",
+    usage="{} densityplot [options] dat > pdf".format(__file__),
+    rules={
+        ("dat",): {"help": "input density file"},
+        ("-z", "--gzipped") : {"help": "input is gzipped (must specify if any of -qfF present)", "action": "store_true"},
+        ("-b", "--bin-size"): {"help": "size of each bin in bp for visualization speedup", "default": 100, "type": int, "metavar": "B"},
+        ("-e", "--exploded"): {"help": "plot each read separately", "action": "store_true"},
+        ("--zoomed-in",): {"help": "plot taller traces, cut off pre-anchor regions", "action": "store_true"},
+        ("--palette",): {"help": "custom palette for plotting motifs", "default": None},
+        ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"}
+    }
+)
+
+try:
+    kwargs = dict(parser.parse_args()._get_kwargs())
+except SystemExit:
+    if (len(argv) > 1) and (argv[1] in subparsers.choices):
+        if ("-h" not in argv) and ("--help" not in argv):
+            exit(subparsers.choices[argv[1]].print_help() or 1)
+    exit(1)
+if kwargs["subparser"] in subparsers.choices:
+    getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
 else:
-    raise ValueError("A valid subparser (subcommand) must be specified")
+    exit(parser.print_help() or 1)
