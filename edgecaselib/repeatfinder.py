@@ -14,7 +14,7 @@ from statsmodels.stats.multitest import multipletests
 
 __doc__ = """
 edgeCase repeatfinder
-====================-
+=====================
 
 Usage: {0} repeatfinder [-m integer] [-M integer] [-n integer] [-P float]
        {1}              [--no-context] [--jellyfish filename]

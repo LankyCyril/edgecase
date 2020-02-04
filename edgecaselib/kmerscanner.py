@@ -12,6 +12,51 @@ from collections import OrderedDict
 from pandas import read_csv
 
 
+__doc__ = """
+edgeCase kmerscanner
+====================
+
+Usage: {0} kmerscanner --motif-file filename [-w integer] [-n integer]
+       {1}             [-j integer]
+       {1}             [-c float] [--head-test integer] [--tail-test integer]
+       {1}             [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
+       {1}             <bam>
+
+Output:
+    DAT file with calculated motif densities along rolling windows
+
+Positional arguments:
+    <bam>                         name of input BAM/SAM file
+
+Required options:
+    --motif-file [filename]       file with repeated motif sequences (output of `repeatfinder`)
+
+Options:
+    -w, --window-size [integer]   size of the rolling window [default: 100]
+    -n, --num-reads [integer]     expected number of reads in input (for progress display)
+    -j, --jobs [integer]          number of jobs to run in parallel [default: 1]
+    -c, --cutoff [float]          use hard cutoff for density
+    --head-test [integer]         length of head to use for density filter (with --cutoff)
+    --tail-test [integer]         length of tail to use for density filter (with --cutoff)
+
+Input filtering options:
+    -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
+    -g, --flags-any [flagspec]    process only entries with any of these sam flags present [default: 65535]
+    -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+"""
+
+__docopt_converters__ = [
+    lambda window_size: int(window_size),
+    lambda num_reads: None if (num_reads is None) else int(num_reads),
+    lambda jobs: int(jobs),
+    lambda cutoff: None if (cutoff is None) else float(cutoff),
+    lambda head_test: None if (head_test is None) else int(head_test),
+    lambda tail_test: None if (tail_test is None) else int(tail_test),
+    lambda min_quality: None if (min_quality is None) else int(min_quality),
+]
+
+
 DAT_HEADER = [
     "#name", "flag", "chrom", "pos", "mapq", "motif", "abundance",
     "clip_5prime", "clip_3prime", "density"

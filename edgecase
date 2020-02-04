@@ -77,28 +77,6 @@ if __name__ == "__main__":
     exit(returncode)
 
 
-
-
-#EXCLUDE_RULES = {
-#    ("-x", "--index"): {"levenshtein", "repeatfinder", "kmerscanner"},
-#}
-
-
-#create_subparser(
-#    subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
-#    usage="{} kmerscanner [options] bam > dat".format(__file__),
-#    rules={
-#        ("bam",):                dict(help="name of input SAM/BAM file"),
-#        ("-j", "--jobs"):        dict(help="number of jobs to run in parallel", metavar="J", type=int, default=1),
-#        ("--motif-file",):       dict(help="file with repeated motif sequences (output of `repeatfinder`)", metavar="M", required=True, default="no default, required"),
-#        ("--head-test",):        dict(help="length of head to use for density filter (if specified)", metavar="H", type=int),
-#        ("--tail-test",):        dict(help="length of tail to use for density filter (if specified)", metavar="T", type=int),
-#        ("-c", "--cutoff"):      dict(help="use hard cutoff for density", metavar="C", type=float),
-#        ("-w", "--window-size"): dict(help="size of the rolling window", metavar="W", type=int, default=100),
-#        ("-n", "--num-reads"):   dict(help="expected number of reads in input (for progress display)", metavar="N", type=int),
-#    }
-#)
-#
 #create_subparser(
 #    subparsers, "densityplot", help="visualize densities of candidate reads",
 #    usage="{} densityplot [options] dat > pdf".format(__file__),
