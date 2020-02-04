@@ -21,6 +21,40 @@ from glob import glob
 from re import search
 
 
+__doc__ = """
+edgeCase levenshtein
+====================
+
+Usage:
+    {0} levenshtein [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
+    {1}             [-m integer] [-o dirname] [--kmerscanner-file filename]
+    {1}             <sequencedata>
+
+Output:
+    * TSV-formatted file with statistics describing identified clusters;
+    * optionally (with --output-dir set) PDF files with clustermaps;
+    * optionally (with --output-dir and --kmerscanner-file set) kmerscanner
+      files for each identified clustering
+
+Positional arguments:
+    <sequencedata>                     name of input BAM/SAM file or directory with precomputed distances
+
+Options:
+    -f, --flags [flagspec]             process only entries with all these sam flags present [default: 0]
+    -g, --flags-any [flagspec]         process only entries with any of these sam flags present [default: 65535]
+    -F, --flag-filter [flagspec]       process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]        process only entries with this MAPQ or higher [default: 0]
+    -m, --min-cluster-size [integer]   minimum cluster size to consider [default: 5]
+    -o, --output-dir [dirname]         output directory for clustermaps and per-haplotype SAM files
+    --kmerscanner-file [filename]      kmerscanner file (optional, for use with --output-dir)
+"""
+
+__docopt_converters__ = [
+    lambda min_quality:
+        None if (min_quality is None) else int(min_quality),
+]
+
+
 CLUSTERMAP_FIGSIZE = (10, 10)
 CLUSTERMAP_CMAP = "viridis_r"
 CLUSTERMAP_VMAX = .15

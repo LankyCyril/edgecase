@@ -1,9 +1,24 @@
-"""
+from sys import stdout
+from edgecaselib.formats import load_index, filter_bam
+from pysam import AlignmentFile
+from functools import reduce
+from operator import __or__
+from copy import deepcopy
+from edgecaselib.util import progressbar
+from itertools import chain
+from numpy import isnan, inf
+
+
+__doc__ = """
 edgeCase tailpuller
 ===================
 
-Usage: {0} tailpuller -x filename [-f flagspec] [-g flagspec] [-F flagspec]
-       {1}            [-q integer] [-m integer] <bam>
+Usage:
+    {0} tailpuller -x filename [-f flagspec] [-g flagspec] [-F flagspec]
+    {1}            [-q integer] [-m integer] <bam>
+
+Output:
+    SAM-formatted file with reads overhanging anchors defined in index
 
 Positional arguments:
     <bam>                             name of input BAM/SAM file
@@ -18,18 +33,6 @@ Options:
     -q, --min-quality [integer]       process only entries with this MAPQ or higher [default: 0]
     -m, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
 """
-
-
-from sys import stdout
-from edgecaselib.formats import load_index, filter_bam
-from pysam import AlignmentFile
-from functools import reduce
-from operator import __or__
-from copy import deepcopy
-from edgecaselib.util import progressbar
-from itertools import chain
-from numpy import isnan, inf
-
 
 __docopt_converters__ = [
     lambda min_quality:

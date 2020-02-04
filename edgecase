@@ -85,17 +85,6 @@ if __name__ == "__main__":
 
 
 #create_subparser(
-#    subparsers, "levenshtein", help="cluster reads by edit distance",
-#    usage="{} levenshtein [options] sequencedata > tsv".format(__file__),
-#    rules={
-#        ("sequencedata",):       dict(help="name of input BAM/SAM file or directory with precomputed distances"),
-#        ("--kmerscanner-file",): dict(help="kmerscanner file (optional, for use with --output-dir)", metavar="K"),
-#        ("--min-cluster-size",): dict(help="minimum cluster size to consider", metavar="m", type=int, default=5),
-#        ("-o", "--output-dir",): dict(help="output directory for clustermaps and per-haplotype SAM files", metavar="O"),
-#    }
-#)
-#
-#create_subparser(
 #    subparsers, "tailchopper", help="get overhanging heads/tails of reads",
 #    usage="{} tailchopper [options] bam > sam".format(__file__),
 #    rules={
