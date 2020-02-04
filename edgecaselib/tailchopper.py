@@ -38,7 +38,7 @@ __docopt_converters__ = [
 __docopt_tests__ = {
     lambda target:
         target in {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}:
-            "unknown value of --target"
+            "unknown value of --target",
 }
 
 
@@ -166,7 +166,7 @@ def relative_chopper(entry, ecx, integer_target):
         anchor_pos = anchor_positions.iloc[0]
         try:
             map_pos, cut_pos = find_map_and_cut_positions(
-                entry, anchor_pos, is_q
+                entry, anchor_pos, is_q,
             )
         except ValueError as e:
             update_aligned_segment(entry, None, 0, 0)
@@ -193,7 +193,7 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1,
         for entry in filter_bam(alignment, samfilters):
             if entry.query_sequence:
                 chopped_entry, error = chopper(
-                    entry, ecx, integer_target
+                    entry, ecx, integer_target,
                 )
                 if chopped_entry.query_sequence:
                     print(chopped_entry.to_string(), file=file)

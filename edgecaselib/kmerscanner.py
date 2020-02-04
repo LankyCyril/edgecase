@@ -57,7 +57,7 @@ __docopt_converters__ = [
 
 DAT_HEADER = [
     "#name", "flag", "chrom", "pos", "mapq", "motif", "abundance",
-    "clip_5prime", "clip_3prime", "density"
+    "clip_5prime", "clip_3prime", "density",
 ]
 
 
@@ -90,7 +90,7 @@ def calculate_density(entry, pattern, cutoff, window_size, head_test, tail_test,
     """Calculate density of pattern hits in a rolling window along given read"""
     if cutoff: # if cutoff specified, filter by hard cutoff
         edge_density = get_edge_density(
-            entry, pattern, head_test, tail_test
+            entry, pattern, head_test, tail_test,
         )
         passes_filter = (edge_density > cutoff)
     else: # otherwise, allow all that have data
@@ -123,7 +123,7 @@ def calculate_density_of_patterns(entry, motif_patterns, cutoff, window_size, he
     for motif, pattern in motif_patterns.items():
         passes_filter, density_array, pattern_positions = calculate_density(
             entry, pattern, cutoff, window_size, head_test, tail_test,
-            positions_accounted_for=positions_accounted_for
+            positions_accounted_for=positions_accounted_for,
         )
         if passes_filter:
             entry_set.append([entry, motif, density_array])
@@ -146,7 +146,7 @@ def pattern_scanner(entry_iterator, samfilters, motif_patterns, cutoff, window_s
             query_sequence=getattr(
                 entry, "query_sequence", getattr(entry, "sequence", None)
             ),
-            cigarstring=getattr(entry, "cigarstring", "")
+            cigarstring=getattr(entry, "cigarstring", ""),
         )
         for entry in filter_bam(entry_iterator, samfilters)
     )
@@ -154,17 +154,17 @@ def pattern_scanner(entry_iterator, samfilters, motif_patterns, cutoff, window_s
         # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
             calculate_density_of_patterns, motif_patterns=motif_patterns,
-            window_size=window_size, head_test=head_test, tail_test=tail_test, cutoff=cutoff
+            window_size=window_size, head_test=head_test, tail_test=tail_test,
+            cutoff=cutoff,
         )
         # lazy multiprocess evaluation:
         read_density_iterator = pool.imap_unordered(
-            density_calculator, simple_entry_iterator
+            density_calculator, simple_entry_iterator,
         )
         # iterate pairs (entry.query_name, density_array), same as calculate_density_of_patterns():
         desc = "Calculating density"
         yield from progressbar(
-            read_density_iterator, desc=desc,
-            unit="read", total=num_reads
+            read_density_iterator, desc=desc, unit="read", total=num_reads,
         )
 
 
@@ -204,7 +204,7 @@ def interpret_arguments(head_test, tail_test, cutoff, motif_file):
 def main(bam, flags, flags_any, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
     motif_patterns, total_abundance = interpret_arguments(
-        head_test, tail_test, cutoff, motif_file
+        head_test, tail_test, cutoff, motif_file,
     )
     print(*DAT_HEADER, sep="\t", file=file)
     # scan fastq for target motif queries, parallelizing on reads:
@@ -214,7 +214,7 @@ def main(bam, flags, flags_any, flag_filter, min_quality, motif_file, head_test,
             samfilters=[flags, flags_any, flag_filter, min_quality],
             window_size=window_size,
             head_test=head_test, tail_test=tail_test,
-            cutoff=cutoff, num_reads=num_reads, jobs=jobs
+            cutoff=cutoff, num_reads=num_reads, jobs=jobs,
         )
         # output densities of reads that pass filter:
         for entry_set in scanner:
@@ -225,7 +225,7 @@ def main(bam, flags, flags_any, flag_filter, min_quality, motif_file, head_test,
                         entry.reference_start, entry.mapping_quality,
                         motif, total_abundance[motif],
                         get_cigar_clip_length(entry, 5),
-                        get_cigar_clip_length(entry, 3)
+                        get_cigar_clip_length(entry, 3),
                     ]
                     print(*meta_fields, sep="\t", end="\t", file=file)
                     print(*density_array, sep=",", file=file)

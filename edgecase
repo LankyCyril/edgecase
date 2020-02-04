@@ -61,7 +61,7 @@ def main(module):
         submodule_entrypoint = getattr(submodule, "main", None)
         if submodule_entrypoint:
             __command_doc__ = submodule.__doc__.lstrip().format(
-                __file__, " "*len(__file__)
+                __file__, " "*len(__file__),
             )
             docopt_dict = docopt(__command_doc__, argv=[command, *raw_args])
             kwargs = postprocess_docopt(submodule, docopt_dict, __command_doc__)

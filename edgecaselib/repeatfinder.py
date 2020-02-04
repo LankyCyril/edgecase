@@ -93,7 +93,7 @@ def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, 
     """Find all repeats in sequencefile"""
     per_k_reports = []
     k_iterator = progressbar(
-        range(min_k, max_k+1), desc="Sweeping lengths", unit="k"
+        range(min_k, max_k+1), desc="Sweeping lengths", unit="k",
     )
     for k in k_iterator:
         db = path.join(tempdir, "{}.db".format(k))
@@ -106,17 +106,17 @@ def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, 
             search_k = str(k*2)
         check_output([
             jellyfish, "count", "-t", str(jobs), "-s", jellyfish_hash_size,
-            "-L", "0", "-m", search_k, "-o", db, sequencefile
+            "-L", "0", "-m", search_k, "-o", db, sequencefile,
         ])
         tsv = path.join(tempdir, "{}.tsv".format(k))
         check_output([
             jellyfish, "dump", "-c", "-t", "-L", "0",
-            "-o", tsv, db
+            "-o", tsv, db,
         ])
         k_report = read_csv(tsv, sep="\t", names=["kmer", "count"])
         if not no_context: # for downstream analyses, roll back to single motif
             doubles_indexer = k_report["kmer"].apply(
-                lambda kmer:kmer[:k]==kmer[k:]
+                lambda kmer: kmer[:k] == kmer[k:],
             )
             k_report = k_report[doubles_indexer]
             k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
@@ -156,7 +156,7 @@ def safe_fisher_exact(count, total_candidate_count, med, total_background_count)
     try:
         return fisher_exact([
             [count, total_candidate_count - count],
-            [med, total_background_count - med]
+            [med, total_background_count - med],
         ])[1]
     except ValueError:
         return 1
@@ -170,22 +170,23 @@ def get_motifs_fisher(single_length_report):
     fishery = single_length_report.copy()
     fishery["motif"] = fishery["kmer"].apply(lowest_alpha_inversion)
     fishery_groupby = fishery[["motif", "count", "abundance"]].groupby(
-        "motif", as_index=False
+        "motif", as_index=False,
     )
     fishery = fishery_groupby.sum()
     iqr = fishery["count"].quantile(.75) - fishery["count"].quantile(.25)
     whisker = fishery["count"].quantile(.75) + 1.5 * iqr
     candidates, background = (
         fishery[fishery["count"]>=whisker].copy(),
-        fishery[fishery["count"]<whisker].copy()
+        fishery[fishery["count"]<whisker].copy(),
     )
     total_candidate_count, total_background_count = (
-        candidates["count"].sum(), background["count"].sum()
+        candidates["count"].sum(), background["count"].sum(),
     )
     med = fishery["count"].median()
     candidates["p"] = candidates["count"].apply(
         lambda count: safe_fisher_exact(
-            count, total_candidate_count, med, total_background_count
+            count, total_candidate_count,
+            med, total_background_count,
         )
     )
     candidates["length"] = lengths[0]
@@ -195,12 +196,10 @@ def get_motifs_fisher(single_length_report):
 def analyze_repeats(full_report, adj="bonferroni"):
     """Analyze repeat enrichment for multiple lengths and apply multiple testing adjustment"""
     candidates = concat([
-        get_motifs_fisher(
-            full_report[full_report["length"]==length]
-        )
+        get_motifs_fisher(full_report[full_report["length"]==length])
         for length in progressbar(
             unique(full_report["length"].values), unit="k",
-            desc="Calculating enrichment"
+            desc="Calculating enrichment",
         )
     ])
     candidates["p_adjusted"] = multipletests(candidates["p"], method=adj)[1]
@@ -257,13 +256,13 @@ def coerce_to_monomer(motif):
 def format_analysis(filtered_analysis, max_motifs):
     """Make dataframe prettier"""
     filtered_analysis["motif"] = filtered_analysis["motif"].apply(
-        custom_alpha_inversion
+        custom_alpha_inversion,
     )
     filtered_analysis["monomer"] = filtered_analysis["motif"].apply(
-        coerce_to_monomer
+        coerce_to_monomer,
     )
     formatted_analysis = filtered_analysis.sort_values(
-        by=["abundance", "p_adjusted"], ascending=[False, True]
+        by=["abundance", "p_adjusted"], ascending=[False, True],
     )
     formatted_analysis = formatted_analysis[
         ["monomer", "motif", "length", "count", "abundance", "p", "p_adjusted"]
@@ -284,13 +283,13 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
         if manager == AlignmentFile: # will need to convert SAM to fastx
             samfilters = [flags, flags_any, flag_filter, min_quality]
             sequencefile, base_count = convert_input(
-                sequencefile, manager, tempdir, samfilters
+                sequencefile, manager, tempdir, samfilters,
             )
         else:
             base_count = count_fastx_bases(sequencefile)
         full_report = find_repeats(
             sequencefile, min_k, max_k, base_count,
-            no_context, jellyfish, jellyfish_hash_size, jobs, tempdir
+            no_context, jellyfish, jellyfish_hash_size, jobs, tempdir,
         )
     analysis = analyze_repeats(full_report)
     filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
