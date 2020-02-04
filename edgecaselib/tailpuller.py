@@ -6,7 +6,44 @@ from operator import __or__
 from copy import deepcopy
 from edgecaselib.util import progressbar
 from itertools import chain
-from numpy import isnan
+from numpy import isnan, inf
+
+
+__doc__ = """edgeCase tailpuller: selection of candidate telomeric reads
+
+Usage: {0} tailpuller -x filename [-f flagspec] [-g flagspec] [-F flagspec]
+       {1}            [-q integer] [-m integer] <bam>
+
+Output:
+    SAM-formatted file with reads overhanging anchors defined in index
+
+Positional arguments:
+    <bam>                             name of input BAM/SAM file
+
+Required options:
+    -x, --index [filename]            location of the reference .ecx index
+
+Options:
+    -m, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
+
+Input filtering options:
+    -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
+    -g, --flags-any [flagspec]        process only entries with any of these sam flags present [default: 65535]
+    -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]       process only entries with this MAPQ or higher [default: 0]
+"""
+
+__docopt_converters__ = [
+    lambda min_quality:
+        None if (min_quality is None) else int(min_quality),
+    lambda max_read_length:
+        inf if (max_read_length is None) else int(max_read_length),
+]
+
+__docopt_tests__ = {
+    lambda max_read_length:
+        max_read_length > 0: "--max-read-length below 0",
+}
 
 
 def get_terminal_pos(entry, cigarpos):
@@ -58,7 +95,7 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
     """Subset bam_data to a region where reads of interest can occur"""
     if chrom not in reflens:
         return []
-    elif max_read_length is None:
+    elif (max_read_length is None) or (max_read_length == inf):
         return bam_data.fetch(chrom, None, None)
     else:
         p_innermost_pos = ecxfd[chrom][5]["pos"].max() + max_read_length

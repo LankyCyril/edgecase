@@ -4,6 +4,44 @@ from re import search, split
 from edgecaselib.formats import load_index, filter_bam, interpret_flags
 
 
+__doc__ = """edgeCase tailchopper: selection of overhanging heads/tails of reads
+
+Usage: {0} tailchopper -x filename [-t targetspec] [-f flagspec] [-g flagspec]
+       {1}             [-F flagspec] [-q integer] <bam>
+
+Output:
+    SAM-formatted file with tails of candidate reads overhanging anchors defined
+    in index
+
+Positional arguments:
+    <bam>                         name of input BAM/SAM file
+
+Required options:
+    -x, --index [filename]        location of the reference .ecx index
+
+Options:
+    -t, --target [targetspec]     an ECX flag (cut relative to reference)
+                                  or 'cigar' [default: tract_anchor]
+
+Input filtering options:
+    -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
+    -g, --flags-any [flagspec]    process only entries with any of these sam flags present [default: 65535]
+    -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+"""
+
+__docopt_converters__ = [
+    lambda min_quality:
+        None if (min_quality is None) else int(min_quality),
+]
+
+__docopt_tests__ = {
+    lambda target:
+        target in {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}:
+            "unknown value of --target",
+}
+
+
 def get_cigar_clip_length(entry, prime):
     """Return only clipped part of sequence: deprecated method still used by kmerscanner"""
     if prime not in {5, 3}:
@@ -128,7 +166,7 @@ def relative_chopper(entry, ecx, integer_target):
         anchor_pos = anchor_positions.iloc[0]
         try:
             map_pos, cut_pos = find_map_and_cut_positions(
-                entry, anchor_pos, is_q
+                entry, anchor_pos, is_q,
             )
         except ValueError as e:
             update_aligned_segment(entry, None, 0, 0)
@@ -155,7 +193,7 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1,
         for entry in filter_bam(alignment, samfilters):
             if entry.query_sequence:
                 chopped_entry, error = chopper(
-                    entry, ecx, integer_target
+                    entry, ecx, integer_target,
                 )
                 if chopped_entry.query_sequence:
                     print(chopped_entry.to_string(), file=file)

@@ -15,6 +15,42 @@ from pandas import concat
 from re import search
 
 
+__doc__ = """edgeCase densityplot: visualization of motif densities
+
+Usage: {0} densityplot -x filename [-b integer] [-e] [--zoomed-in]
+       {1}             [--palette palettespec] [--title string]
+       {1}             [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
+       {1}             [-z] <dat>
+
+Output:
+    PDF file with motif densities visualized along chromosomal ends
+
+Positional arguments:
+    <dat>                         name of input kmerscanner file
+
+Required options:
+    -x, --index [filename]        location of the reference .ecx index
+
+Options:
+    -z, --gzipped                 input is gzipped (must specify if any of -qfF present
+    -b, --bin-size [integer]      size of each bin in bp for visualization speedup [default: 100]
+    -e, --exploded                plot each read separately
+    --zoomed-in                   plot taller traces, cut off pre-anchor regions
+    --palette [palettespec]       custom palette for plotting motifs
+    --title [string]              figure title (defaults to input filename)
+
+Input filtering options:
+    -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
+    -g, --flags-any [flagspec]    process only entries with any of these sam flags present [default: 65535]
+    -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+"""
+
+__docopt_converters__ = [
+    lambda bin_size: int(bin_size),
+]
+
+
 DENSITYPLOT_FIGWIDTH = 17
 
 
@@ -32,7 +68,7 @@ def motif_subplots(nreads, chrom, max_mapq):
     page, axs = subplots(
         ncols=2, nrows=nreads, squeeze=False,
         figsize=(DENSITYPLOT_FIGWIDTH, nreads*2/3), sharey=True, frameon=False,
-        gridspec_kw={"hspace": 0, "wspace": 0, "width_ratios": (15, 1)}
+        gridspec_kw={"hspace": 0, "wspace": 0, "width_ratios": (15, 1)},
     )
     # remove subplot borders:
     for ax in axs.flatten():
@@ -59,7 +95,7 @@ def chromosome_subplots(nrows, zoomed_in=False):
         hspace = .7
     figure, axs = subplots(
         figsize=figsize, gridspec_kw={"hspace": hspace},
-        nrows=nrows, squeeze=False, frameon=False
+        nrows=nrows, squeeze=False, frameon=False,
     )
     for ax in axs[:, 0]:
         simplify_axes(ax, keep={"bottom"})
@@ -91,13 +127,13 @@ def highlight_mapped_region(read_data, trace_data, name, trace_ax):
     trace_ax.add_patch(
         Rectangle(
             (leftmost_map, -.1), map_length, 1.2,
-            edgecolor="gray", facecolor="none"
+            edgecolor="gray", facecolor="none",
         )
     )
     trace_ax.text(
         leftmost_map+map_length/2, 1,
         name + "\n" + explain_sam_flags(read_flag),
-        verticalalignment="top", horizontalalignment="center"
+        verticalalignment="top", horizontalalignment="center",
     )
 
 
@@ -107,7 +143,7 @@ def plot_read_metadata(read_data, max_mapq, meta_ax):
     meta_ax.add_patch(
         Rectangle(
             (0, .2), mapq, .6,
-            edgecolor="cornflowerblue", facecolor="cornflowerblue"
+            edgecolor="cornflowerblue", facecolor="cornflowerblue",
         )
     )
     meta_ax.set(xlim=(0, max_mapq))
@@ -127,13 +163,13 @@ def chromosome_exploded_motif_plot(binned_density_dataframe, ecx, chrom, max_map
         highlight_mapped_region(read_data, trace_data, name, trace_ax)
         trace_ax.set(
             xlim=(pos_range.min(), pos_range.max()),
-            ylim=(-.2, 1.2), yticks=[]
+            ylim=(-.2, 1.2), yticks=[],
         )
         plot_read_metadata(read_data, max_mapq, meta_ax)
         plottable_flags = ecx.loc[ecx["rname"]==chrom, ["pos", "flag"]]
         for _, pos, flag in plottable_flags.itertuples():
             trace_ax.axvline(
-                pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4
+                pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4,
             )
     axs[0, 0].set(title="{}\n-f={} -g={} -F={} -q={}".format(title, *samfilters))
     return page
@@ -147,7 +183,7 @@ def make_decorated_densities_iterator(densities):
     )
     return progressbar(
         sorted_densities_iterator, total=len(densities),
-        desc="Plotting", unit="chromosome"
+        desc="Plotting", unit="chromosome",
     )
 
 
@@ -160,7 +196,7 @@ def plot_exploded_densities(densities, ecx, title, samfilters, file=stdout.buffe
             for chrom, binned_density_dataframe in decorated_densities_iterator:
                 page = chromosome_exploded_motif_plot(
                     binned_density_dataframe, ecx, chrom, max_mapq,
-                    title, samfilters
+                    title, samfilters,
                 )
                 pdf.savefig(page, bbox_inches="tight")
 
@@ -189,7 +225,7 @@ def stack_motif_densities(binned_density_dataframe):
         motif_bdfs[i] = motif_bdfs[i].reset_index()
         motif_bdfs[i]["motif"] = motif_order[i]
     plottable_df = concat(motif_bdfs, axis=0).melt(
-        id_vars=["name", "motif"], var_name="position", value_name="density"
+        id_vars=["name", "motif"], var_name="position", value_name="density",
     )
     return plottable_df, motif_order[::-1]
 
@@ -228,12 +264,12 @@ def fill_area(plottable_df, i, updated_palette, ax):
         lower_motif_data["density"] = 0
     else:
         lower_motif_data = get_motif_data(
-            plottable_df, reversed_motif_order[i-1]
+            plottable_df, reversed_motif_order[i-1],
         )
     ax.fill_between(
         x=upper_motif_data["position"],
         y1=lower_motif_data["density"], y2=upper_motif_data["density"],
-        color=color, hatch=hatch, alpha=.7
+        color=color, hatch=hatch, alpha=.7,
     )
 
 
@@ -247,7 +283,7 @@ def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.1):
     coverage_df.columns = ["position", "coverage"]
     coverage_df = coverage_df.sort_values(by="position")
     coverage_df["viz_coverage"] = 1 + y_offset + .01 * clip(
-        coverage_df["coverage"], a_min=1, a_max=50
+        coverage_df["coverage"], a_min=1, a_max=50,
     )
     ax.plot(
         [coverage_df["position"].min(), coverage_df["position"].max()],
@@ -266,11 +302,11 @@ def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.1):
     ax.text(x=x, y=1+y_offset, va="center", ha=ha, s=ticks_mask.format(1))
     ax.text(
         x=x, y=.5*(1+y_offset+coverage_df["viz_coverage"].max()),
-        va="center", ha=ha, rotation=90, s=reads_label
+        va="center", ha=ha, rotation=90, s=reads_label,
     )
     ax.fill_between(
         x=coverage_df["position"], y1=1+y_offset,
-        y2=coverage_df["viz_coverage"], step="pre", color="gray", alpha=.4
+        y2=coverage_df["viz_coverage"], step="pre", color="gray", alpha=.4,
     )
     return coverage_df["viz_coverage"].max()
 
@@ -282,7 +318,7 @@ def generate_updated_palette(palette, motif_order):
         if len(motif_order) > len(DEFAULT_MOTIF_COLORS):
             error_msk = "Cannot plot over {} motifs with default palette; {}"
             raise ValueError(error_msk.format(
-                len(DEFAULT_MOTIF_COLORS), "please provide a custom --palette"
+                len(DEFAULT_MOTIF_COLORS), "please provide a custom --palette",
             ))
         else:
             for motif, color in zip(motif_order, DEFAULT_MOTIF_COLORS):
@@ -303,18 +339,18 @@ def plot_combined_density(binned_density_dataframe, ecx, title, palette, target_
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df, motif_order = stack_motif_densities(binned_density_dataframe)
     updated_palette, updated_motif_order = generate_updated_palette(
-        palette, motif_order
+        palette, motif_order,
     )
     for i in range(len(updated_motif_order)+1):
         fill_area(plottable_df, i, updated_palette, ax)
     lineplot(
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
         palette={m: "black" for m in set(plottable_df["motif"])},
-        linewidth=.5, alpha=.7, ax=ax
+        linewidth=.5, alpha=.7, ax=ax,
     )
     lineplot(
         x=plottable_df["position"].drop_duplicates().sort_values(), y=1,
-        legend=False, color="black", linewidth=1, alpha=1, ax=ax
+        legend=False, color="black", linewidth=1, alpha=1, ax=ax,
     )
     if zoomed_in:
         ymax = coverage_plot(plottable_df, len(motif_order), is_q, ax)
@@ -365,7 +401,7 @@ def align_subplots(ax2chrom, ecx, target_anchor, is_q, unit_adjustment=1e6):
     for ax, chrom in ax2chrom.items():
         ax.set(xlim=(
             anchor_positions[ax] - max_left_span,
-            anchor_positions[ax] + max_right_span
+            anchor_positions[ax] + max_right_span,
         ))
         if unit_adjustment:
             ax.set(
@@ -401,24 +437,23 @@ def plot_density_scale(ax):
     tick_width = .0003 * DENSITYPLOT_FIGWIDTH
     xtrace = [
         bar_position+tick_width, bar_position,
-        bar_position, bar_position+tick_width
+        bar_position, bar_position+tick_width,
     ]
     ax.plot(
-        xtrace, [1, 1, 0, 0],
-        color="black", linewidth=1,
-        transform=ax.transAxes, clip_on=False
+        xtrace, [1, 1, 0, 0], transform=ax.transAxes,
+        color="black", linewidth=1, clip_on=False,
     )
     ax.text(
         x=bar_position+tick_width, y=1, transform=ax.transAxes,
-        s=" 100%", ha="left", va="center"
+        s=" 100%", ha="left", va="center",
     )
     ax.text(
         x=bar_position+tick_width, y=0, transform=ax.transAxes,
-        s=" 0%", ha="left", va="center"
+        s=" 0%", ha="left", va="center",
     )
     ax.text(
         x=bar_position-tick_width, y=.5, transform=ax.transAxes, rotation=90,
-        s="density", ha="right", va="center"
+        s="density", ha="right", va="center",
     )
 
 
@@ -441,13 +476,13 @@ def plot_densities(densities, ecx, title, palette, legend, target_anchor, is_q, 
         updated_palette = plot_combined_density(
             bdf, ecx, title, palette, target_anchor, is_q, ax=ax,
             zoomed_in=zoomed_in, display_chrom_name=display_chrom_name,
-            ecx_chrom_name=ecx_chrom_name
+            ecx_chrom_name=ecx_chrom_name,
         )
         ax2chrom[ax] = ecx_chrom_name
     align_subplots(ax2chrom, ecx, target_anchor, is_q)
     if legend:
         add_legend(
-            updated_palette, axs[0, 0], exploded=False, is_q=is_q
+            updated_palette, axs[0, 0], exploded=False, is_q=is_q,
         )
         plot_density_scale(axs[0, 0])
     figure.savefig(file, bbox_inches="tight", format="pdf")
@@ -531,16 +566,16 @@ def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_si
     """Dispatch data to subroutines"""
     samfilters = [flags, flags_any, flag_filter, min_quality]
     target_anchor, is_q, palette, legend, title = interpret_arguments(
-        palette, exploded, zoomed_in, samfilters, title, dat
+        palette, exploded, zoomed_in, samfilters, title, dat,
     )
     ecx = load_index(index)
     densities = load_kmerscan(dat, gzipped, samfilters, bin_size)
     if exploded:
         plot_exploded_densities(
-            densities, ecx, title, samfilters, file
+            densities, ecx, title, samfilters, file,
         )
     else:
         plot_densities(
             densities, ecx, title, palette, legend, target_anchor,
-            is_q, zoomed_in, file
+            is_q, zoomed_in, file,
         )

@@ -13,21 +13,17 @@ from functools import reduce
 from operator import __or__
 
 
-FLAG_COLORS = {
-    0x1000: "gray",
-    0x2000: "blueviolet",
-    0x4000: "red"
-}
-
 ALL_SAM_FLAGS = [
     "paired", "mapped_proper_pair", "unmapped", "mate_unmapped", "rev",
     "mate_rev", "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
     "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
+FLAG_COLORS = {0x1000: "gray", 0x2000: "blueviolet", 0x4000: "red"}
+
 DEFAULT_MOTIF_COLORS = [
     "#117733", "#88CCEE", "#AA4499", "#DDCC77", "#332288", "#882255",
-    "#44AA99", "#CC6677", "#EEEEEE"
+    "#44AA99", "#CC6677", "#EEEEEE",
 ]
 
 BGCOLOR = "#BBBBCA"
@@ -41,7 +37,7 @@ PAPER_PALETTE = OrderedDict([
 PAPER_PALETTE_RC = OrderedDict([
     ("CCCTAA", "#117733"), ("CCCCAA", "#AA4499"), ("CCCCTAA", "#332288"),
     ("CCCTCA", "#DDCC77"), ("CCCTGA", "#44AA99"), ("CCCCTAACCCTAA", "#EEEEEE"),
-    ("CCGCG", "#88CCEE")
+    ("CCGCG", "#88CCEE"),
 ])
 
 
@@ -99,7 +95,7 @@ def filter_and_read_tsv(dat, gzipped, samfilters):
             datflt_name = path.join(tempdir, "dat.gz")
             with gzopen(datflt_name, mode="wt") as datflt:
                 decorated_line_iterator = progressbar(
-                    dat_handle, desc="Filtering", unit=" lines"
+                    dat_handle, desc="Filtering", unit=" lines",
                 )
                 for line in decorated_line_iterator:
                     if line[0] == "#":
@@ -107,7 +103,7 @@ def filter_and_read_tsv(dat, gzipped, samfilters):
                     else:
                         fields = line.split("\t")
                         line_passes_filter = entry_filters_ok(
-                            int(fields[1]), int(fields[4]), integer_samfilters
+                            int(fields[1]), int(fields[4]), integer_samfilters,
                         )
                         if line_passes_filter:
                             number_retained += 1
@@ -145,7 +141,7 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align=False)
             padder = full(entry.pos - entry.clip_5prime - leftmost_pos, nan)
         aligned_density = concatenate([padder, unaligned_density])
         density_arrays.append(binned(
-            aligned_density, bins=aligned_density.shape[0]/bin_size
+            aligned_density, bins=aligned_density.shape[0]//bin_size,
         ))
     # pad densities on the right so they are all the same length:
     max_density_length = max(bd.shape[0] for bd in density_arrays)
@@ -154,13 +150,13 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align=False)
         density_arrays[i] = concatenate([binned_density, padder])
     naked_binned_density_dataframe = DataFrame(
         data=vstack(density_arrays),
-        columns=[leftmost_pos + j * bin_size for j in range(max_density_length)]
+        columns=[leftmost_pos+j*bin_size for j in range(max_density_length)],
     )
     binned_density_dataframe = concat(
-        [densities_subset.iloc[:,:-1], naked_binned_density_dataframe], axis=1
+        [densities_subset.iloc[:,:-1], naked_binned_density_dataframe], axis=1,
     )
     return binned_density_dataframe.sort_values(
-        by=["mapq", "name", "motif"], ascending=[False, True, True]
+        by=["mapq", "name", "motif"], ascending=[False, True, True],
     )
 
 
@@ -191,18 +187,18 @@ def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=
             lambda d: d.count(",")+1
         )
         groups = raw_densities[["name", "motif", "length"]].groupby(
-            ["name", "motif"], as_index=False
+            ["name", "motif"], as_index=False,
         ).max()
         raw_densities = merge(groups, raw_densities).drop(columns="length")
     if no_align:
         raw_densities["chrom"] = "None"
     chromosome_iterator = progressbar(
         raw_densities["chrom"].drop_duplicates(), desc="Interpreting data",
-        unit="chromosome"
+        unit="chromosome",
     )
     return {
         chrom: get_binned_density_dataframe(
-            raw_densities, chrom, bin_size, no_align
+            raw_densities, chrom, bin_size, no_align,
         )
         for chrom in chromosome_iterator
     }
@@ -215,7 +211,7 @@ def load_index(index_filename, as_filter_dict=False):
     else:
         ecx = read_csv(
             index_filename, sep="\t", skiprows=1,
-            escapechar="#", na_values="-"
+            escapechar="#", na_values="-",
         )
         ecx = ecx[ecx["blacklist"].isnull()]
         if as_filter_dict:
