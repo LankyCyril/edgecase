@@ -145,7 +145,7 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align=False)
             padder = full(entry.pos - entry.clip_5prime - leftmost_pos, nan)
         aligned_density = concatenate([padder, unaligned_density])
         density_arrays.append(binned(
-            aligned_density, bins=aligned_density.shape[0]/bin_size
+            aligned_density, bins=aligned_density.shape[0]//bin_size
         ))
     # pad densities on the right so they are all the same length:
     max_density_length = max(bd.shape[0] for bd in density_arrays)

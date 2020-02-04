@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from docopt import docopt
-from sys import stdout, stderr
+from sys import stderr
 from inspect import getfullargspec
 from re import sub, search
 import edgecaselib
@@ -67,7 +67,7 @@ def main(module):
             )
             docopt_dict = docopt(__command_doc__, argv=[command, *raw_args])
             kwargs = postprocess_docopt(submodule, docopt_dict, __command_doc__)
-            return submodule_entrypoint(**kwargs, file=stdout)
+            return submodule_entrypoint(**kwargs)
     print(__doc__.format(__file__).lstrip(), file=stderr)
     return 1
 
@@ -75,18 +75,3 @@ def main(module):
 if __name__ == "__main__":
     returncode = main(edgecaselib)
     exit(returncode)
-
-
-#create_subparser(
-#    subparsers, "densityplot", help="visualize densities of candidate reads",
-#    usage="{} densityplot [options] dat > pdf".format(__file__),
-#    rules={
-#        ("dat",):             dict(help="input density file"),
-#        ("-z", "--gzipped") : dict(help="input is gzipped (must specify if any of -qfF present)", action="store_true"),
-#        ("-b", "--bin-size"): dict(help="size of each bin in bp for visualization speedup", metavar="B", type=int, default=100),
-#        ("-e", "--exploded"): dict(help="plot each read separately", action="store_true"),
-#        ("--zoomed-in",):     dict(help="plot taller traces, cut off pre-anchor regions", action="store_true"),
-#        ("--palette",):       dict(help="custom palette for plotting motifs", metavar="P"),
-#        ("--title",):         dict(help="figure title (defaults to input filename)", metavar="T"),
-#    }
-#)
