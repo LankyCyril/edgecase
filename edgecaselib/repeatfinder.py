@@ -12,6 +12,53 @@ from scipy.stats import fisher_exact
 from statsmodels.stats.multitest import multipletests
 
 
+__doc__ = """
+edgeCase repeatfinder
+====================-
+
+Usage: {0} repeatfinder [-m integer] [-M integer] [-n integer] [-P float]
+       {1}              [--no-context] [--jellyfish filename]
+       {1}              [--jellyfish-hash-size string] [--jobs integer]
+       {1}              [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
+       {1}              [--fmt string] <sequencefile>
+
+Output:
+    TSV-formatted file with statistics describing enriched motifs
+
+Positional arguments:
+    <sequencefile>                      name of input BAM/SAM/FASTA/FASTQ file
+
+Options:
+    --fmt sam|fastx                     format of input file [default: sam]
+    -m, --min-k [integer]               smallest target repeat length [default: 4]
+    -M, --max-k [integer]               largest target repeat length [default: 16]
+    -n, --max-motifs [integer]          maximum number of motifs to report
+    -P, --max-p-adjusted [float]        cutoff adjusted p-value [default: .05]
+    --no-context                        allow single interspersed instances of kmers
+    --jellyfish [filename]              jellyfish binary (unless in $PATH)
+    -s, --jellyfish-hash-size [string]  jellyfish initial hash size [default: 2G]
+    -j, --jobs [integer]                number of jellyfish jobs (parallel threads) [default: 1]
+
+Input filtering options:
+    -f, --flags [flagspec]              process only entries with all these sam flags present [default: 0]
+    -g, --flags-any [flagspec]          process only entries with any of these sam flags present [default: 65535]
+    -F, --flag-filter [flagspec]        process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]         process only entries with this MAPQ or higher [default: 0]
+"""
+
+__docopt_converters__ = [
+    lambda min_quality: None if (min_quality is None) else int(min_quality),
+    lambda min_k: int(min_k),
+    lambda max_k: int(max_k),
+    lambda max_p_adjusted: float(max_p_adjusted),
+    lambda jobs: int(jobs),
+]
+
+__docopt_tests__ = {
+    lambda min_k, max_k: 0 < min_k < max_k: "not satisfied: 0 < m < M",
+}
+
+
 def interpret_args(fmt, jellyfish):
     """Parse and check arguments"""
     if fmt == "sam":

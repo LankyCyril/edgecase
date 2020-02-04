@@ -85,32 +85,6 @@ if __name__ == "__main__":
 
 
 #create_subparser(
-#    subparsers, "tailchopper", help="get overhanging heads/tails of reads",
-#    usage="{} tailchopper [options] bam > sam".format(__file__),
-#    rules={
-#        ("bam",):           dict(help="name of input BAM/SAM file"),
-#        ("-t", "--target"): dict(help="an ECX flag (cut relative to reference) or 'cigar'", choices=CHOPPER_FLAGS, default="tract_anchor"),
-#    }
-#)
-#
-#create_subparser(
-#    subparsers, "repeatfinder", help="discover enriched repeats in candidate sequences",
-#    usage="{} repeatfinder [options] sequencefile > tsv".format(__file__),
-#    rules={
-#        ("sequencefile",):               dict(help="name of input SAM/BAM/FASTA/FASTQ file"),
-#        ("--fmt",):                      dict(help="format of input file(s)", choices={"sam", "fastx"}, default="sam"),
-#        ("-m", "--min-k"):               dict(help="smallest target repeat length", metavar="m", type=int, default=4),
-#        ("-M", "--max-k"):               dict(help="largest target repeat length", metavar="M", type=int, default=16),
-#        ("-n", "--max-motifs"):          dict(help="maximum number of motifs to report", metavar="N", type=int),
-#        ("-P", "--max-p-adjusted"):      dict(help="cutoff adjusted p-value", metavar="P", type=float, default=.05),
-#        ("--no-context",):               dict(help="allow single interspersed instances of kmers", action="store_true"),
-#        ("--jellyfish",):                dict(help="jellyfish binary (unless in $PATH)"),
-#        ("-s", "--jellyfish-hash-size"): dict(help="jellyfish initial hash size", metavar="S", default="2G"),
-#        ("-j", "--jobs"):                dict(help="number of jellyfish jobs (parallel threads)", metavar="J", type=int, default=1),
-#    }
-#)
-#
-#create_subparser(
 #    subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
 #    usage="{} kmerscanner [options] bam > dat".format(__file__),
 #    rules={
