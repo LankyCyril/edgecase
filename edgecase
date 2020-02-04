@@ -3,6 +3,7 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from itertools import chain
 from sys import argv
 import edgecaselib
+from edgecaselib.formats import CHOPPER_FLAGS
 
 
 def WideHelpFormatter(prog):
@@ -11,15 +12,15 @@ def WideHelpFormatter(prog):
 
 
 DEFAULT_RULES = {
-    ("-x", "--index"): {"help": "location of the reference .ecx index", "required": True, "metavar": "X", "default": "no default, required"},
-    ("-f", "--flags"): {"help": "process only entries with all these sam flags present", "default": "0", "type": str, "metavar": "f"},
-    ("-g", "--flags-any"): {"help": "process only entries with any of these sam flags present", "default": "65535", "type": str, "metavar": "g"},
-    ("-F", "--flag-filter"): {"help": "process only entries with none of these sam flags present", "default": "0", "type": str, "metavar": "F"},
-    ("-q", "--min-quality"): {"help": "process only entries with MAPQ >= Q", "default": 0, "type": int, "metavar": "Q"}
+    ("-x", "--index"):       dict(help="location of the reference .ecx index", required=True, metavar="X", default="no default, required"),
+    ("-f", "--flags"):       dict(help="process only entries with all these sam flags present", metavar="f", default="0"),
+    ("-g", "--flags-any"):   dict(help="process only entries with any of these sam flags present", metavar="g", default="65535"),
+    ("-F", "--flag-filter"): dict(help="process only entries with none of these sam flags present", metavar="F", default="0"),
+    ("-q", "--min-quality"): dict(help="process only entries with MAPQ >= Q", default=0, type=int, metavar="Q"),
 }
 
 EXCLUDE_RULES = {
-    ("-x", "--index"): {"levenshtein", "repeatfinder", "kmerscanner"}
+    ("-x", "--index"): {"levenshtein", "repeatfinder", "kmerscanner"},
 }
 
 
@@ -48,8 +49,8 @@ create_subparser(
     subparsers, "tailpuller", help="select overhanging reads",
     usage="{} tailpuller [options] bam > sam".format(__file__),
     rules={
-        ("bam",): {"help": "name of input BAM/SAM file"},
-        ("-m", "--max-read-length"): {"help": "max read length to consider when selecting lookup regions", "default": None, "type": int, "metavar": "M"}
+        ("bam",):                    dict(help="name of input BAM/SAM file"),
+        ("-m", "--max-read-length"): dict(help="maximum read length to consider when selecting lookup regions", metavar="M", type=int),
     }
 )
 
@@ -57,10 +58,10 @@ create_subparser(
     subparsers, "levenshtein", help="cluster reads by edit distance",
     usage="{} levenshtein [options] sequencedata > tsv".format(__file__),
     rules={
-        ("sequencedata",): {"help": "name of input BAM/SAM file or directory with precomputed distances"},
-        ("--kmerscanner-file",): {"help": "kmerscanner file (optional, for use with --output-dir)", "default": None},
-        ("--min-cluster-size",): {"help": "minimum cluster size to consider", "default": 5, "type": int},
-        ("-o", "--output-dir",): {"help": "output directory for clustermaps and per-haplotype SAM files", "default": None},
+        ("sequencedata",):       dict(help="name of input BAM/SAM file or directory with precomputed distances"),
+        ("--kmerscanner-file",): dict(help="kmerscanner file (optional, for use with --output-dir)", metavar="K"),
+        ("--min-cluster-size",): dict(help="minimum cluster size to consider", metavar="m", type=int, default=5),
+        ("-o", "--output-dir",): dict(help="output directory for clustermaps and per-haplotype SAM files", metavar="O"),
     }
 )
 
@@ -68,8 +69,8 @@ create_subparser(
     subparsers, "tailchopper", help="get overhanging heads/tails of reads",
     usage="{} tailchopper [options] bam > sam".format(__file__),
     rules={
-        ("bam",): {"help": "name of input BAM/SAM file"},
-        ("-t", "--target"): {"help": "either an ECX flag (cut relative to reference) or 'cigar'", "default": "tract_anchor", "choices": {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}}
+        ("bam",):           dict(help="name of input BAM/SAM file"),
+        ("-t", "--target"): dict(help="an ECX flag (cut relative to reference) or 'cigar'", choices=CHOPPER_FLAGS, default="tract_anchor"),
     }
 )
 
@@ -77,16 +78,16 @@ create_subparser(
     subparsers, "repeatfinder", help="discover enriched repeats in candidate sequences",
     usage="{} repeatfinder [options] sequencefile > tsv".format(__file__),
     rules={
-        ("sequencefile",): {"help": "name of input SAM/BAM/FASTA/FASTQ file"},
-        ("--fmt",): {"help": "format of input file(s)", "default": "sam", "choices": {"sam", "fastx"}},
-        ("-m", "--min-k"): {"help": "smallest target repeat length", "default": 4, "type": int},
-        ("-M", "--max-k"): {"help": "largest target repeat length", "default": 16, "type": int},
-        ("-n", "--max-motifs"): {"help": "maximum number of motifs to report", "default": None, "type": int},
-        ("-P", "--max-p-adjusted"): {"help": "cutoff adjusted p-value", "default": .05, "type": float},
-        ("--no-context",): {"help": "allow single interspersed instances of kmers", "action": "store_true"},
-        ("--jellyfish",): {"help": "jellyfish binary (unless in $PATH)"},
-        ("-s", "--jellyfish-hash-size"): {"help": "jellyfish initial hash size", "default": "2G"},
-        ("-j", "--jobs"): {"help": "number of jellyfish jobs (parallel threads)", "default": 1, "type": int, "metavar": "J"},
+        ("sequencefile",):               dict(help="name of input SAM/BAM/FASTA/FASTQ file"),
+        ("--fmt",):                      dict(help="format of input file(s)", choices={"sam", "fastx"}, default="sam"),
+        ("-m", "--min-k"):               dict(help="smallest target repeat length", metavar="m", type=int, default=4),
+        ("-M", "--max-k"):               dict(help="largest target repeat length", metavar="M", type=int, default=16),
+        ("-n", "--max-motifs"):          dict(help="maximum number of motifs to report", metavar="N", type=int),
+        ("-P", "--max-p-adjusted"):      dict(help="cutoff adjusted p-value", metavar="P", type=float, default=.05),
+        ("--no-context",):               dict(help="allow single interspersed instances of kmers", action="store_true"),
+        ("--jellyfish",):                dict(help="jellyfish binary (unless in $PATH)"),
+        ("-s", "--jellyfish-hash-size"): dict(help="jellyfish initial hash size", metavar="S", default="2G"),
+        ("-j", "--jobs"):                dict(help="number of jellyfish jobs (parallel threads)", metavar="J", type=int, default=1),
     }
 )
 
@@ -94,14 +95,14 @@ create_subparser(
     subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
     usage="{} kmerscanner [options] bam > dat".format(__file__),
     rules={
-        ("bam",): {"help": "name of input SAM/BAM file"},
-        ("-j", "--jobs"): {"help": "number of jobs to run in parallel", "default": 1, "type": int, "metavar": "J"},
-        ("--motif-file",): {"help": "file with repeated motif sequences (output of `repeatfinder`)", "required": True, "default": "no default, required", "metavar": "M"},
-        ("--head-test",): {"help": "length of head to use for density filter (if specified)", "default": None, "type": int, "metavar": "H"},
-        ("--tail-test",): {"help": "length of tail to use for density filter (if specified)", "default": None, "type": int, "metavar": "T"},
-        ("-c", "--cutoff"): {"help": "use hard cutoff for density", "default": None, "type": float, "metavar": "C"},
-        ("-w", "--window-size"): {"help": "size of the rolling window", "default": 100, "type": int, "metavar": "W"},
-        ("-n", "--num-reads"): {"help": "expected number of reads in input (for progress display)", "default": None, "type": int, "metavar": "N"}
+        ("bam",):                dict(help="name of input SAM/BAM file"),
+        ("-j", "--jobs"):        dict(help="number of jobs to run in parallel", metavar="J", type=int, default=1),
+        ("--motif-file",):       dict(help="file with repeated motif sequences (output of `repeatfinder`)", metavar="M", required=True, default="no default, required"),
+        ("--head-test",):        dict(help="length of head to use for density filter (if specified)", metavar="H", type=int),
+        ("--tail-test",):        dict(help="length of tail to use for density filter (if specified)", metavar="T", type=int),
+        ("-c", "--cutoff"):      dict(help="use hard cutoff for density", metavar="C", type=float),
+        ("-w", "--window-size"): dict(help="size of the rolling window", metavar="W", type=int, default=100),
+        ("-n", "--num-reads"):   dict(help="expected number of reads in input (for progress display)", metavar="N", type=int),
     }
 )
 
@@ -109,13 +110,13 @@ create_subparser(
     subparsers, "densityplot", help="visualize densities of candidate reads",
     usage="{} densityplot [options] dat > pdf".format(__file__),
     rules={
-        ("dat",): {"help": "input density file"},
-        ("-z", "--gzipped") : {"help": "input is gzipped (must specify if any of -qfF present)", "action": "store_true"},
-        ("-b", "--bin-size"): {"help": "size of each bin in bp for visualization speedup", "default": 100, "type": int, "metavar": "B"},
-        ("-e", "--exploded"): {"help": "plot each read separately", "action": "store_true"},
-        ("--zoomed-in",): {"help": "plot taller traces, cut off pre-anchor regions", "action": "store_true"},
-        ("--palette",): {"help": "custom palette for plotting motifs", "default": None},
-        ("--title",): {"help": "figure title (defaults to input filename)", "metavar": "T"}
+        ("dat",):             dict(help="input density file"),
+        ("-z", "--gzipped") : dict(help="input is gzipped (must specify if any of -qfF present)", action="store_true"),
+        ("-b", "--bin-size"): dict(help="size of each bin in bp for visualization speedup", metavar="B", type=int, default=100),
+        ("-e", "--exploded"): dict(help="plot each read separately", action="store_true"),
+        ("--zoomed-in",):     dict(help="plot taller traces, cut off pre-anchor regions", action="store_true"),
+        ("--palette",):       dict(help="custom palette for plotting motifs", metavar="P"),
+        ("--title",):         dict(help="figure title (defaults to input filename)", metavar="T"),
     }
 )
 
