@@ -1,4 +1,5 @@
 from sys import stdout
+from os import path
 from edgecaselib.formats import load_index, filter_bam
 from pysam import AlignmentFile
 from functools import reduce
@@ -41,6 +42,8 @@ __docopt_converters__ = [
 ]
 
 __docopt_tests__ = {
+    lambda bam:
+        path.isfile(bam + ".bai"): "BAM index (.bai) not found",
     lambda max_read_length:
         max_read_length > 0: "--max-read-length below 0",
 }

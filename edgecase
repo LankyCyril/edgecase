@@ -12,12 +12,13 @@ Usage: {0} [-h | --help]
        {0} <command> [<args>...]
 
 Commmands (<command>):
-    tailpuller     select overhanging reads
-    levenshtein    cluster reads by edit distance
-    tailchopper    get overhanging heads/tails of reads
-    repeatfinder   discover enriched repeats in candidate sequences
-    kmerscanner    perform scan of known kmers/motifs
-    densityplot    visualize densities of candidate motifs
+    tailpuller      select overhanging reads
+    levenshtein     cluster reads by edit distance
+    tailchopper     get overhanging heads/tails of reads
+    repeatfinder    discover enriched repeats in candidate sequences
+    kmerscanner     perform scan of known kmers/motifs
+    densityplot     visualize densities of candidate motifs
+    basic-pipeline  so basic
 """
 
 
@@ -57,7 +58,7 @@ def main(module):
     dispatcher_dict = docopt(__doc__.format(__file__), options_first=True)
     command, raw_args = dispatcher_dict["<command>"], dispatcher_dict["<args>"]
     if (command is not None) and (command[0] != "_"):
-        submodule = getattr(module, command, None)
+        submodule = getattr(module, command.replace("-", "_"), None)
         submodule_entrypoint = getattr(submodule, "main", None)
         if submodule_entrypoint:
             __command_doc__ = submodule.__doc__.lstrip().format(

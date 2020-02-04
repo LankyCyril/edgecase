@@ -20,8 +20,7 @@ Required options:
     -x, --index [filename]        location of the reference .ecx index
 
 Options:
-    -t, --target [targetspec]     an ECX flag (cut relative to reference)
-                                  or 'cigar' [default: tract_anchor]
+    -t, --target [targetspec]     an ECX flag (cut relative to reference) or 'cigar' [default: tract_anchor]
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
