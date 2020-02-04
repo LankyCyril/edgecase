@@ -1,133 +1,151 @@
 #!/usr/bin/env python3
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from itertools import chain
-from sys import argv
+
+"""
+edgeCase
+========
+
+Usage: {0} [-h | --help]
+       {0} <command> [<args>...]
+
+Commmands (<command>):
+    tailpuller     select overhanging reads
+    tailchopper    get overhanging heads/tails of reads
+    repeatfinder   discover enriched repeats in candidate sequences
+    kmerscanner    perform scan of known kmers/motifs
+    levenshtein    cluster reads by edit distance
+    densityplot    visualize densities of candidate motifs
+"""
+
+from docopt import docopt
+from sys import stdout, stderr
+from inspect import getfullargspec
+from re import sub, search
 import edgecaselib
-from edgecaselib.formats import CHOPPER_FLAGS
 
 
-def WideHelpFormatter(prog):
-    """Supply formatter class to ArgumentParser with wider fields than default"""
-    return ArgumentDefaultsHelpFormatter(prog, max_help_position=30, width=150)
-
-
-DEFAULT_RULES = {
-    ("-x", "--index"):       dict(help="location of the reference .ecx index", required=True, metavar="X", default="no default, required"),
-    ("-f", "--flags"):       dict(help="process only entries with all these sam flags present", metavar="f", default="0"),
-    ("-g", "--flags-any"):   dict(help="process only entries with any of these sam flags present", metavar="g", default="65535"),
-    ("-F", "--flag-filter"): dict(help="process only entries with none of these sam flags present", metavar="F", default="0"),
-    ("-q", "--min-quality"): dict(help="process only entries with MAPQ >= Q", default=0, type=int, metavar="Q"),
-}
-
-EXCLUDE_RULES = {
-    ("-x", "--index"): {"levenshtein", "repeatfinder", "kmerscanner"},
-}
-
-
-def create_subparser(subparsers, subparser_name, help, usage, rules):
-    """Wrapper for easily creating subparsers and pushing into parent parser"""
-    _subparser = subparsers.add_parser(
-        subparser_name, help=help, usage=usage,
-        formatter_class=WideHelpFormatter
-    )
-    for rule_args, rule_kwargs in chain(DEFAULT_RULES.items(), rules.items()):
-        if subparser_name not in EXCLUDE_RULES.get(rule_args, set()):
-            if ("metavar" in rule_kwargs) or ("action" in rule_kwargs):
-                _subparser.add_argument(*rule_args, **rule_kwargs)
-            elif rule_args[0][0] != "-":
-                _subparser.add_argument(
-                    *rule_args, metavar=rule_args[0], **rule_kwargs
-                )
+def postprocess_docopt(submodule, docopt_dict, __command_doc__):
+    """Interpret and validate aruments returned by docopt"""
+    kwargs = {
+        sub(r'^[<>-]+|[<>-]+$', "", k).replace("-", "_"): v
+        for k, v in docopt_dict.items() if search(r'[^<>-]', k)
+    }
+    for converter in getattr(submodule, "__docopt_converters__", []):
+        converter_arg_names = getfullargspec(converter).args
+        if len(converter_arg_names) != 1:
+            error_mask = "Incorrect argument converter for: {}"
+            exit(error_mask.format(", ".join(converter_arg_names)))
+        elif converter_arg_names[0] not in kwargs:
+            error_mask = "Unknown converter argument: {}"
+            exit(error_mask.format(converter_arg_names[0]))
+        else:
+            key = converter_arg_names[0]
+            try:
+                kwargs[key] = converter(kwargs[key])
+            except Exception:
+                exit(__command_doc__)
+    for test, error in getattr(submodule, "__docopt_tests__", {}).items():
+        test_arg_names = getfullargspec(test).args
+        test_arguments = [kwargs[k] for k in test_arg_names]
+        if not test(*test_arguments):
+            if error:
+                exit("Error: " + error.format(*test_arguments))
             else:
-                _subparser.add_argument(*rule_args, metavar="?", **rule_kwargs)
+                exit("Could not validate: {}".format(", ".join(test_arg_names)))
+    return kwargs
 
 
-parser = ArgumentParser(prog=__file__, formatter_class=WideHelpFormatter)
-subparsers = parser.add_subparsers(dest="subparser")
+def main(module):
+    """Dispatch command line arguments to subroutines (commands)"""
+    dispatcher_dict = docopt(__doc__.format(__file__), options_first=True)
+    command, raw_args = dispatcher_dict["<command>"], dispatcher_dict["<args>"]
+    if (command is not None) and (command[0] != "_"):
+        submodule = getattr(module, command, None)
+        submodule_entrypoint = getattr(submodule, "main", None)
+        if submodule_entrypoint:
+            __command_doc__ = submodule.__doc__.lstrip().format(
+                __file__, " "*len(__file__)
+            )
+            docopt_dict = docopt(__command_doc__, argv=[command, *raw_args])
+            kwargs = postprocess_docopt(submodule, docopt_dict, __command_doc__)
+            return submodule_entrypoint(**kwargs, file=stdout)
+    print(__doc__.format(__file__).lstrip(), file=stderr)
+    return 1
 
-create_subparser(
-    subparsers, "tailpuller", help="select overhanging reads",
-    usage="{} tailpuller [options] bam > sam".format(__file__),
-    rules={
-        ("bam",):                    dict(help="name of input BAM/SAM file"),
-        ("-m", "--max-read-length"): dict(help="maximum read length to consider when selecting lookup regions", metavar="M", type=int),
-    }
-)
 
-create_subparser(
-    subparsers, "levenshtein", help="cluster reads by edit distance",
-    usage="{} levenshtein [options] sequencedata > tsv".format(__file__),
-    rules={
-        ("sequencedata",):       dict(help="name of input BAM/SAM file or directory with precomputed distances"),
-        ("--kmerscanner-file",): dict(help="kmerscanner file (optional, for use with --output-dir)", metavar="K"),
-        ("--min-cluster-size",): dict(help="minimum cluster size to consider", metavar="m", type=int, default=5),
-        ("-o", "--output-dir",): dict(help="output directory for clustermaps and per-haplotype SAM files", metavar="O"),
-    }
-)
+if __name__ == "__main__":
+    returncode = main(edgecaselib)
+    exit(returncode)
 
-create_subparser(
-    subparsers, "tailchopper", help="get overhanging heads/tails of reads",
-    usage="{} tailchopper [options] bam > sam".format(__file__),
-    rules={
-        ("bam",):           dict(help="name of input BAM/SAM file"),
-        ("-t", "--target"): dict(help="an ECX flag (cut relative to reference) or 'cigar'", choices=CHOPPER_FLAGS, default="tract_anchor"),
-    }
-)
 
-create_subparser(
-    subparsers, "repeatfinder", help="discover enriched repeats in candidate sequences",
-    usage="{} repeatfinder [options] sequencefile > tsv".format(__file__),
-    rules={
-        ("sequencefile",):               dict(help="name of input SAM/BAM/FASTA/FASTQ file"),
-        ("--fmt",):                      dict(help="format of input file(s)", choices={"sam", "fastx"}, default="sam"),
-        ("-m", "--min-k"):               dict(help="smallest target repeat length", metavar="m", type=int, default=4),
-        ("-M", "--max-k"):               dict(help="largest target repeat length", metavar="M", type=int, default=16),
-        ("-n", "--max-motifs"):          dict(help="maximum number of motifs to report", metavar="N", type=int),
-        ("-P", "--max-p-adjusted"):      dict(help="cutoff adjusted p-value", metavar="P", type=float, default=.05),
-        ("--no-context",):               dict(help="allow single interspersed instances of kmers", action="store_true"),
-        ("--jellyfish",):                dict(help="jellyfish binary (unless in $PATH)"),
-        ("-s", "--jellyfish-hash-size"): dict(help="jellyfish initial hash size", metavar="S", default="2G"),
-        ("-j", "--jobs"):                dict(help="number of jellyfish jobs (parallel threads)", metavar="J", type=int, default=1),
-    }
-)
 
-create_subparser(
-    subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
-    usage="{} kmerscanner [options] bam > dat".format(__file__),
-    rules={
-        ("bam",):                dict(help="name of input SAM/BAM file"),
-        ("-j", "--jobs"):        dict(help="number of jobs to run in parallel", metavar="J", type=int, default=1),
-        ("--motif-file",):       dict(help="file with repeated motif sequences (output of `repeatfinder`)", metavar="M", required=True, default="no default, required"),
-        ("--head-test",):        dict(help="length of head to use for density filter (if specified)", metavar="H", type=int),
-        ("--tail-test",):        dict(help="length of tail to use for density filter (if specified)", metavar="T", type=int),
-        ("-c", "--cutoff"):      dict(help="use hard cutoff for density", metavar="C", type=float),
-        ("-w", "--window-size"): dict(help="size of the rolling window", metavar="W", type=int, default=100),
-        ("-n", "--num-reads"):   dict(help="expected number of reads in input (for progress display)", metavar="N", type=int),
-    }
-)
 
-create_subparser(
-    subparsers, "densityplot", help="visualize densities of candidate reads",
-    usage="{} densityplot [options] dat > pdf".format(__file__),
-    rules={
-        ("dat",):             dict(help="input density file"),
-        ("-z", "--gzipped") : dict(help="input is gzipped (must specify if any of -qfF present)", action="store_true"),
-        ("-b", "--bin-size"): dict(help="size of each bin in bp for visualization speedup", metavar="B", type=int, default=100),
-        ("-e", "--exploded"): dict(help="plot each read separately", action="store_true"),
-        ("--zoomed-in",):     dict(help="plot taller traces, cut off pre-anchor regions", action="store_true"),
-        ("--palette",):       dict(help="custom palette for plotting motifs", metavar="P"),
-        ("--title",):         dict(help="figure title (defaults to input filename)", metavar="T"),
-    }
-)
+#EXCLUDE_RULES = {
+#    ("-x", "--index"): {"levenshtein", "repeatfinder", "kmerscanner"},
+#}
 
-try:
-    kwargs = dict(parser.parse_args()._get_kwargs())
-except SystemExit:
-    if (len(argv) > 1) and (argv[1] in subparsers.choices):
-        if ("-h" not in argv) and ("--help" not in argv):
-            exit(subparsers.choices[argv[1]].print_help() or 1)
-    exit(1)
-if kwargs["subparser"] in subparsers.choices:
-    getattr(edgecaselib, kwargs["subparser"]).main(**kwargs)
-else:
-    exit(parser.print_help() or 1)
+
+#create_subparser(
+#    subparsers, "levenshtein", help="cluster reads by edit distance",
+#    usage="{} levenshtein [options] sequencedata > tsv".format(__file__),
+#    rules={
+#        ("sequencedata",):       dict(help="name of input BAM/SAM file or directory with precomputed distances"),
+#        ("--kmerscanner-file",): dict(help="kmerscanner file (optional, for use with --output-dir)", metavar="K"),
+#        ("--min-cluster-size",): dict(help="minimum cluster size to consider", metavar="m", type=int, default=5),
+#        ("-o", "--output-dir",): dict(help="output directory for clustermaps and per-haplotype SAM files", metavar="O"),
+#    }
+#)
+#
+#create_subparser(
+#    subparsers, "tailchopper", help="get overhanging heads/tails of reads",
+#    usage="{} tailchopper [options] bam > sam".format(__file__),
+#    rules={
+#        ("bam",):           dict(help="name of input BAM/SAM file"),
+#        ("-t", "--target"): dict(help="an ECX flag (cut relative to reference) or 'cigar'", choices=CHOPPER_FLAGS, default="tract_anchor"),
+#    }
+#)
+#
+#create_subparser(
+#    subparsers, "repeatfinder", help="discover enriched repeats in candidate sequences",
+#    usage="{} repeatfinder [options] sequencefile > tsv".format(__file__),
+#    rules={
+#        ("sequencefile",):               dict(help="name of input SAM/BAM/FASTA/FASTQ file"),
+#        ("--fmt",):                      dict(help="format of input file(s)", choices={"sam", "fastx"}, default="sam"),
+#        ("-m", "--min-k"):               dict(help="smallest target repeat length", metavar="m", type=int, default=4),
+#        ("-M", "--max-k"):               dict(help="largest target repeat length", metavar="M", type=int, default=16),
+#        ("-n", "--max-motifs"):          dict(help="maximum number of motifs to report", metavar="N", type=int),
+#        ("-P", "--max-p-adjusted"):      dict(help="cutoff adjusted p-value", metavar="P", type=float, default=.05),
+#        ("--no-context",):               dict(help="allow single interspersed instances of kmers", action="store_true"),
+#        ("--jellyfish",):                dict(help="jellyfish binary (unless in $PATH)"),
+#        ("-s", "--jellyfish-hash-size"): dict(help="jellyfish initial hash size", metavar="S", default="2G"),
+#        ("-j", "--jobs"):                dict(help="number of jellyfish jobs (parallel threads)", metavar="J", type=int, default=1),
+#    }
+#)
+#
+#create_subparser(
+#    subparsers, "kmerscanner", help="perform scan of known kmers/motifs",
+#    usage="{} kmerscanner [options] bam > dat".format(__file__),
+#    rules={
+#        ("bam",):                dict(help="name of input SAM/BAM file"),
+#        ("-j", "--jobs"):        dict(help="number of jobs to run in parallel", metavar="J", type=int, default=1),
+#        ("--motif-file",):       dict(help="file with repeated motif sequences (output of `repeatfinder`)", metavar="M", required=True, default="no default, required"),
+#        ("--head-test",):        dict(help="length of head to use for density filter (if specified)", metavar="H", type=int),
+#        ("--tail-test",):        dict(help="length of tail to use for density filter (if specified)", metavar="T", type=int),
+#        ("-c", "--cutoff"):      dict(help="use hard cutoff for density", metavar="C", type=float),
+#        ("-w", "--window-size"): dict(help="size of the rolling window", metavar="W", type=int, default=100),
+#        ("-n", "--num-reads"):   dict(help="expected number of reads in input (for progress display)", metavar="N", type=int),
+#    }
+#)
+#
+#create_subparser(
+#    subparsers, "densityplot", help="visualize densities of candidate reads",
+#    usage="{} densityplot [options] dat > pdf".format(__file__),
+#    rules={
+#        ("dat",):             dict(help="input density file"),
+#        ("-z", "--gzipped") : dict(help="input is gzipped (must specify if any of -qfF present)", action="store_true"),
+#        ("-b", "--bin-size"): dict(help="size of each bin in bp for visualization speedup", metavar="B", type=int, default=100),
+#        ("-e", "--exploded"): dict(help="plot each read separately", action="store_true"),
+#        ("--zoomed-in",):     dict(help="plot taller traces, cut off pre-anchor regions", action="store_true"),
+#        ("--palette",):       dict(help="custom palette for plotting motifs", metavar="P"),
+#        ("--title",):         dict(help="figure title (defaults to input filename)", metavar="T"),
+#    }
+#)

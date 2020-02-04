@@ -25,8 +25,6 @@ ALL_SAM_FLAGS = [
     "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
-CHOPPER_FLAGS = {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}
-
 DEFAULT_MOTIF_COLORS = [
     "#117733", "#88CCEE", "#AA4499", "#DDCC77", "#332288", "#882255",
     "#44AA99", "#CC6677", "#EEEEEE"
