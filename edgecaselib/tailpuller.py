@@ -13,9 +13,8 @@ __doc__ = """
 edgeCase tailpuller
 ===================
 
-Usage:
-    {0} tailpuller -x filename [-f flagspec] [-g flagspec] [-F flagspec]
-    {1}            [-q integer] [-m integer] <bam>
+Usage: {0} tailpuller -x filename [-f flagspec] [-g flagspec] [-F flagspec]
+       {1}            [-q integer] [-m integer] <bam>
 
 Output:
     SAM-formatted file with reads overhanging anchors defined in index
@@ -27,11 +26,13 @@ Required options:
     -x, --index [filename]            location of the reference .ecx index
 
 Options:
+    -m, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
+
+Input filtering options:
     -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
     -g, --flags-any [flagspec]        process only entries with any of these sam flags present [default: 65535]
     -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]       process only entries with this MAPQ or higher [default: 0]
-    -m, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
 """
 
 __docopt_converters__ = [

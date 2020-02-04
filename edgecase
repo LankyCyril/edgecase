@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
+from docopt import docopt
+from sys import stdout, stderr
+from inspect import getfullargspec
+from re import sub, search
+import edgecaselib
 
-"""
+
+__doc__ = """
 edgeCase
 ========
 
@@ -15,12 +21,6 @@ Commmands (<command>):
     levenshtein    cluster reads by edit distance
     densityplot    visualize densities of candidate motifs
 """
-
-from docopt import docopt
-from sys import stdout, stderr
-from inspect import getfullargspec
-from re import sub, search
-import edgecaselib
 
 
 def postprocess_docopt(submodule, docopt_dict, __command_doc__):
