@@ -9,10 +9,10 @@ __doc__ = """edgeCase basic pipeline: select reads, find enriched motifs, plot
 
 Usage: {0} basic-pipeline -x filename -o dirname [--force] [-j integer]
        {1}                [-m integer] [-n integer] [--target targetspec]
-       {1}                [--min-k integer] [--max-k integer]
+       {1}                [-q integer] [--min-k integer] [--max-k integer]
        {1}                [--jellyfish filename] [--jellyfish-hash-size string]
        {1}                [--max-p-adjusted float] [--window-size integer]
-       {1}                [--palette palettespec] [-q integer] <bam>
+       {1}                [--n-boot integer] [--palette palettespec] <bam>
 
 Output (in --output-dir):
     * tailpuller.sam                 candidate reads
@@ -43,6 +43,7 @@ Options:
     --jellyfish [filename]           jellyfish binary (unless in $PATH)
     --jellyfish-hash-size [string]   jellyfish initial hash size [default: 2G]
     --window-size [integer]          size of the window (for kmerscanner and densityplot) [default: 100]
+    --n-boot [integer]               number of bootstrap iterations for plotting [default: 1000]
     --palette [palettespec]          custom palette for plotting motifs
 
 Input filtering options:
@@ -58,6 +59,7 @@ __docopt_converters__ = [
     lambda max_k: int(max_k),
     lambda max_p_adjusted: float(max_p_adjusted),
     lambda window_size: int(window_size),
+    lambda n_boot: int(n_boot),
     lambda min_quality: None if (min_quality is None) else int(min_quality),
 ]
 
@@ -79,7 +81,7 @@ __docopt_tests__ = {
 }
 
 
-def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, window_size, palette, min_quality, **kwargs):
+def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, window_size, n_boot, palette, min_quality, **kwargs):
     """basic pipeline: select reads, find enriched motifs, plot"""
     get_filename = lambda fn: path.join(output_dir, fn)
     tailpuller_sam = get_filename("tailpuller.sam")
@@ -119,8 +121,8 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
                 densityplot.main(
                     kmerscanner_dat, gzipped=True, index=index, flags=f,
                     flags_any=65535, flag_filter=F, min_quality=min_quality,
-                    bin_size=window_size, exploded=False, zoomed_in=False,
-                    palette=palette, title=None, file=pdf
+                    bin_size=window_size, n_boot=n_boot, exploded=False,
+                    zoomed_in=False, palette=palette, title=None, file=pdf
                 )
             except EmptyKmerscanError:
                 pass

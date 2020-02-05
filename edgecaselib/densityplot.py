@@ -34,6 +34,7 @@ Required options:
 Options:
     -z, --gzipped                 input is gzipped (must specify if any of -qfF present
     -b, --bin-size [integer]      size of each bin in bp for visualization speedup [default: 100]
+    --n-boot [integer]            number of bootstrap iterations for 95% confidence intervals [default: 1000]
     -e, --exploded                plot each read separately
     --zoomed-in                   plot taller traces, cut off pre-anchor regions
     --palette [palettespec]       custom palette for plotting motifs
@@ -48,6 +49,7 @@ Input filtering options:
 
 __docopt_converters__ = [
     lambda bin_size: int(bin_size),
+    lambda n_boot: int(n_boot),
 ]
 
 
@@ -335,7 +337,7 @@ def generate_updated_palette(palette, motif_order):
     return updated_palette, updated_motif_order
 
 
-def plot_combined_density(binned_density_dataframe, ecx, title, palette, target_anchor, is_q, display_chrom_name, ecx_chrom_name, zoomed_in, ax):
+def plot_combined_density(binned_density_dataframe, n_boot, ecx, title, palette, target_anchor, is_q, display_chrom_name, ecx_chrom_name, zoomed_in, ax):
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df, motif_order = stack_motif_densities(binned_density_dataframe)
     updated_palette, updated_motif_order = generate_updated_palette(
@@ -346,7 +348,7 @@ def plot_combined_density(binned_density_dataframe, ecx, title, palette, target_
     lineplot(
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
         palette={m: "black" for m in set(plottable_df["motif"])},
-        linewidth=.5, alpha=.7, ax=ax,
+        n_boot=n_boot, linewidth=.5, alpha=.7, ax=ax,
     )
     lineplot(
         x=plottable_df["position"].drop_duplicates().sort_values(), y=1,
@@ -457,7 +459,7 @@ def plot_density_scale(ax):
     )
 
 
-def plot_densities(densities, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, file=stdout.buffer):
+def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, file=stdout.buffer):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
@@ -474,7 +476,7 @@ def plot_densities(densities, ecx, title, palette, legend, target_anchor, is_q, 
         else:
             display_chrom_name = short_chrom_name
         updated_palette = plot_combined_density(
-            bdf, ecx, title, palette, target_anchor, is_q, ax=ax,
+            bdf, n_boot, ecx, title, palette, target_anchor, is_q, ax=ax,
             zoomed_in=zoomed_in, display_chrom_name=display_chrom_name,
             ecx_chrom_name=ecx_chrom_name,
         )
@@ -562,7 +564,7 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
-def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, exploded, zoomed_in, palette, title, file=stdout.buffer, **kwargs):
+def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flags_any, flag_filter, min_quality]
     target_anchor, is_q, palette, legend, title = interpret_arguments(
@@ -576,6 +578,6 @@ def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_si
         )
     else:
         plot_densities(
-            densities, ecx, title, palette, legend, target_anchor,
+            densities, n_boot, ecx, title, palette, legend, target_anchor,
             is_q, zoomed_in, file,
         )
