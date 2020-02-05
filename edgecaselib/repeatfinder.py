@@ -114,6 +114,8 @@ def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, 
             "-o", tsv, db,
         ])
         k_report = read_csv(tsv, sep="\t", names=["kmer", "count"])
+        if len(k_report) == 0:
+            return None
         if not no_context: # for downstream analyses, roll back to single motif
             doubles_indexer = k_report["kmer"].apply(
                 lambda kmer: kmer[:k] == kmer[k:],
@@ -268,7 +270,7 @@ def format_analysis(filtered_analysis, max_motifs):
         ["monomer", "motif", "length", "count", "abundance", "p", "p_adjusted"]
     ]
     formatted_analysis.columns = [
-        "#monomer", "motif", "length", "count", "abundance", "p", "p_adjusted"
+        "#monomer", "motif", "length", "count", "abundance", "p", "p_adjusted",
     ]
     if max_motifs is None:
         return formatted_analysis
@@ -291,7 +293,14 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
             sequencefile, min_k, max_k, base_count,
             no_context, jellyfish, jellyfish_hash_size, jobs, tempdir,
         )
-    analysis = analyze_repeats(full_report)
-    filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
-    formatted_analysis = format_analysis(filtered_analysis, max_motifs)
-    formatted_analysis.to_csv(file, sep="\t", index=False)
+    if full_report is None:
+        columns = [
+            "#monomer", "motif", "length", "count", "abundance",
+            "p", "p_adjusted",
+        ]
+        print(*columns, sep="\t", file=file)
+    else:
+        analysis = analyze_repeats(full_report)
+        filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
+        formatted_analysis = format_analysis(filtered_analysis, max_motifs)
+        formatted_analysis.to_csv(file, sep="\t", index=False)

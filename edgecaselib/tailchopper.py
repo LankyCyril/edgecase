@@ -2,6 +2,7 @@ from sys import stdout, stderr
 from pysam import AlignmentFile
 from re import search, split
 from edgecaselib.formats import load_index, filter_bam, interpret_flags
+from edgecaselib.util import progressbar
 
 
 __doc__ = """edgeCase tailchopper: selection of overhanging heads/tails of reads
@@ -178,7 +179,7 @@ def relative_chopper(entry, ecx, integer_target):
     return entry, error
 
 
-def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1, file=stdout, **kwargs):
+def main(bam, index, flags, flags_any, flag_filter, min_quality, target, file=stdout, **kwargs):
     """Interpret arguments and dispatch data to subroutines"""
     if target == "cigar":
         chopper, integer_target = cigar_chopper, None
@@ -189,7 +190,10 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1,
         print(str(alignment.header).rstrip("\n"), file=file)
         samfilters = [flags, flags_any, flag_filter, min_quality]
         n_skipped = 0
-        for entry in filter_bam(alignment, samfilters):
+        bam_iterator = progressbar(
+            filter_bam(alignment, samfilters), desc="Chopping", unit="read",
+        )
+        for entry in bam_iterator:
             if entry.query_sequence:
                 chopped_entry, error = chopper(
                     entry, ecx, integer_target,

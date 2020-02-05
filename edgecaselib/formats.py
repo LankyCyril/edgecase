@@ -41,6 +41,11 @@ PAPER_PALETTE_RC = OrderedDict([
 ])
 
 
+class EmptyKmerscanError(ValueError):
+    """Raised when supplied kmerscanner file is empty"""
+    pass
+
+
 def explain_sam_flags(flag, sep="|"):
     """Convert an integer flag into string"""
     return sep.join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
@@ -177,6 +182,8 @@ def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
         raw_densities = filter_and_read_tsv(dat, gzipped, samfilters)
+    if len(raw_densities) == 0:
+        raise EmptyKmerscanError
     if not are_motifs_consistent(raw_densities):
         raise NotImplementedError(
             "Inconsistent number of motifs in DAT; plotting of reads " +

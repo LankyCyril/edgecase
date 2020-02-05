@@ -19,7 +19,7 @@ Output:
     SAM-formatted file with reads overhanging anchors defined in index
 
 Positional arguments:
-    <bam>                             name of input BAM/SAM file
+    <bam>                             name of input BAM/SAM file; must have a .bai index
 
 Required options:
     -x, --index [filename]            location of the reference .ecx index
