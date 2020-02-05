@@ -113,7 +113,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
                 tailpuller_sam, flags=f, flags_any=65535, flag_filter=F,
                 min_quality=min_quality, motif_file=repeatfinder_tsv,
                 head_test=None, tail_test=None, cutoff=None, num_reads=None,
-                window_size=window_size, jobs=jobs, file=dat
+                window_size=window_size, jobs=jobs, file=dat,
             )
         densityplot_pdf = get_filename("densityplot-{}_arm.pdf".format(arm))
         with open(densityplot_pdf, mode="wb") as pdf:
@@ -122,7 +122,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
                     kmerscanner_dat, gzipped=True, index=index, flags=f,
                     flags_any=65535, flag_filter=F, min_quality=min_quality,
                     bin_size=window_size, n_boot=n_boot, exploded=False,
-                    zoomed_in=False, palette=palette, title=None, file=pdf
+                    zoomed_in=False, palette=palette, title=None, file=pdf,
                 )
             except EmptyKmerscanError:
                 pass

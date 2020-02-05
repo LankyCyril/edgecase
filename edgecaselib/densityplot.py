@@ -173,7 +173,9 @@ def chromosome_exploded_motif_plot(binned_density_dataframe, ecx, chrom, max_map
             trace_ax.axvline(
                 pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4,
             )
-    axs[0, 0].set(title="{}\n-f={} -g={} -F={} -q={}".format(title, *samfilters))
+    axs[0, 0].set(
+        title="{}\n-f={} -g={} -F={} -q={}".format(title, *samfilters),
+    )
     return page
 
 
@@ -487,6 +489,9 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
             updated_palette, axs[0, 0], exploded=False, is_q=is_q,
         )
         plot_density_scale(axs[0, 0])
+    if title:
+        axs[0, 0].set(title=title)
+    axs[-1, 0].set(xlabel="Mbp")
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
