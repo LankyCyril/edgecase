@@ -237,10 +237,10 @@ def coerce_and_filter_report(analysis, max_p_adjusted):
     ].copy()
 
 
-def coerce_to_monomer(motif):
+def coerce_to_monomer(motif, min_k):
     """Coerce motif to monomer, e.g. TATA -> TA, CAT -> CAT; this can be used to find functionally synonymous entries too"""
     n = len(motif)
-    for i in range(1, int(n/2)+1):
+    for i in range(min_k, int(n/2)+1):
         q, r = divmod(n, i)
         if r == 0:
             if motif[:i]*q == motif:
@@ -249,13 +249,13 @@ def coerce_to_monomer(motif):
         return motif
 
 
-def format_analysis(filtered_analysis, max_motifs):
+def format_analysis(filtered_analysis, min_k, max_motifs):
     """Make dataframe prettier"""
     filtered_analysis["motif"] = filtered_analysis["motif"].apply(
         custom_alpha_inversion,
     )
     filtered_analysis["monomer"] = filtered_analysis["motif"].apply(
-        coerce_to_monomer,
+        lambda motif: coerce_to_monomer(motif, min_k=min_k),
     )
     formatted_analysis = filtered_analysis.sort_values(
         by=["abundance", "p_adjusted"], ascending=[False, True],
@@ -296,5 +296,7 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
     else:
         analysis = analyze_repeats(full_report)
         filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
-        formatted_analysis = format_analysis(filtered_analysis, max_motifs)
+        formatted_analysis = format_analysis(
+            filtered_analysis, min_k, max_motifs,
+        )
         formatted_analysis.to_csv(file, sep="\t", index=False)
