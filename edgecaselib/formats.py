@@ -1,4 +1,5 @@
 from sys import stderr
+from collections import OrderedDict
 from contextlib import contextmanager, ExitStack
 from itertools import chain
 from numpy import linspace, array, mean, concatenate, fromstring, full, vstack
@@ -7,38 +8,42 @@ from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
 from tempfile import TemporaryDirectory
 from os import path
-from tqdm import tqdm
+from edgecaselib.util import progressbar
 from functools import reduce
 from operator import __or__
 
 
-FLAG_COLORS = {
-    0x1000: "gray",
-    0x2000: "red",
-    0x4000: "green"
-}
-
 ALL_SAM_FLAGS = [
-    "paired", "mapped_proper_pair", "unmapped", "mate_unmapped",
-    "rev", "mate_rev", "1stmate", "2ndmate", "secondary",
-    "qcfail", "pcrdup", "supp",
+    "paired", "mapped_proper_pair", "unmapped", "mate_unmapped", "rev",
+    "mate_rev", "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
     "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
+FLAG_COLORS = {0x1000: "gray", 0x2000: "blueviolet", 0x4000: "red"}
+
 DEFAULT_MOTIF_COLORS = [
-    "#88CCEE", "#DDCC77", "#CC6677", "#AA4499",
-    "#882255", "#332288", "#117733", "#44AA99"
+    "#117733", "#88CCEE", "#AA4499", "#DDCC77", "#332288", "#882255",
+    "#44AA99", "#CC6677", "#EEEEEE",
 ]
 
-DEFAULT_MOTIF_HATCHES = [None] * len(DEFAULT_MOTIF_COLORS)
+BGCOLOR = "#BBBBCA"
 
-MEME_HEADER_FMT = r'^MOTIF\s([A-Za-z]+)\sMEME-([0-9]+).*llr.*E-value\s*=\s*([0-9e.-]+)'
-MEME_REGEX_HEADER_FMT = r'Motif\s[A-Za-z]+\sMEME-([0-9]+)\sregular\sexpression'
+PAPER_PALETTE = OrderedDict([
+    ("TTAGGG", "#117733"), ("TTGGGG", "#AA4499"), ("TTAGGGG", "#332288"),
+    ("TGAGGG", "#DDCC77"), ("TCAGGG", "#44AA99"), ("TTAGGGTTAGGGG", "#EEEEEE"),
+    ("CGCGG", "#88CCEE"),
+])
+
+PAPER_PALETTE_RC = OrderedDict([
+    ("CCCTAA", "#117733"), ("CCCCAA", "#AA4499"), ("CCCCTAA", "#332288"),
+    ("CCCTCA", "#DDCC77"), ("CCCTGA", "#44AA99"), ("CCCCTAACCCTAA", "#EEEEEE"),
+    ("CCGCG", "#88CCEE"),
+])
 
 
-def split_hatch(hatches_pattern):
-    """Split provided hatches pattern into individual ones"""
-    return [h if h != "None" else None for h in hatches_pattern.split("|")]
+class EmptyKmerscanError(ValueError):
+    """Raised when supplied kmerscanner file is empty"""
+    pass
 
 
 def explain_sam_flags(flag, sep="|"):
@@ -94,8 +99,8 @@ def filter_and_read_tsv(dat, gzipped, samfilters):
         with TemporaryDirectory() as tempdir:
             datflt_name = path.join(tempdir, "dat.gz")
             with gzopen(datflt_name, mode="wt") as datflt:
-                decorated_line_iterator = tqdm(
-                    dat_handle, desc="Filtering", unit=" lines"
+                decorated_line_iterator = progressbar(
+                    dat_handle, desc="Filtering", unit=" lines",
                 )
                 for line in decorated_line_iterator:
                     if line[0] == "#":
@@ -103,7 +108,7 @@ def filter_and_read_tsv(dat, gzipped, samfilters):
                     else:
                         fields = line.split("\t")
                         line_passes_filter = entry_filters_ok(
-                            int(fields[1]), int(fields[4]), integer_samfilters
+                            int(fields[1]), int(fields[4]), integer_samfilters,
                         )
                         if line_passes_filter:
                             number_retained += 1
@@ -122,7 +127,7 @@ def binned(A, bins, func=mean):
     ])
 
 
-def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
+def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align=False):
     """Subset to densities of reads on `chrom`, bin densities, convert to dataframe"""
     indexer = (raw_densities["chrom"] == chrom)
     densities_subset = raw_densities[indexer].reset_index(drop=True)
@@ -141,7 +146,7 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
             padder = full(entry.pos - entry.clip_5prime - leftmost_pos, nan)
         aligned_density = concatenate([padder, unaligned_density])
         density_arrays.append(binned(
-            aligned_density, bins=aligned_density.shape[0]/bin_size
+            aligned_density, bins=aligned_density.shape[0]//bin_size,
         ))
     # pad densities on the right so they are all the same length:
     max_density_length = max(bd.shape[0] for bd in density_arrays)
@@ -150,13 +155,13 @@ def get_binned_density_dataframe(raw_densities, chrom, bin_size, no_align):
         density_arrays[i] = concatenate([binned_density, padder])
     naked_binned_density_dataframe = DataFrame(
         data=vstack(density_arrays),
-        columns=[leftmost_pos + j * bin_size for j in range(max_density_length)]
+        columns=[leftmost_pos+j*bin_size for j in range(max_density_length)],
     )
     binned_density_dataframe = concat(
-        [densities_subset.iloc[:,:-1], naked_binned_density_dataframe], axis=1
+        [densities_subset.iloc[:,:-1], naked_binned_density_dataframe], axis=1,
     )
     return binned_density_dataframe.sort_values(
-        by=["mapq", "name", "motif"], ascending=[False, True, True]
+        by=["mapq", "name", "motif"], ascending=[False, True, True],
     )
 
 
@@ -170,32 +175,37 @@ def are_motifs_consistent(raw_densities):
         return True
 
 
-def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align, each_once=True):
+def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
     if not any(samfilters): # all zero / None
         print("Loading DAT...", file=stderr, flush=True)
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
         raw_densities = filter_and_read_tsv(dat, gzipped, samfilters)
+    if len(raw_densities) == 0:
+        raise EmptyKmerscanError
     if not are_motifs_consistent(raw_densities):
-        raise IOError("Inconsistent number of motifs in DAT")
+        raise NotImplementedError(
+            "Inconsistent number of motifs in DAT; plotting of reads " +
+            "identified de novo with kmerscanner is not implemented"
+        )
     if each_once:
         raw_densities["length"] = raw_densities["density"].apply(
             lambda d: d.count(",")+1
         )
         groups = raw_densities[["name", "motif", "length"]].groupby(
-            ["name", "motif"], as_index=False
+            ["name", "motif"], as_index=False,
         ).max()
         raw_densities = merge(groups, raw_densities).drop(columns="length")
     if no_align:
         raw_densities["chrom"] = "None"
-    chromosome_iterator = tqdm(
+    chromosome_iterator = progressbar(
         raw_densities["chrom"].drop_duplicates(), desc="Interpreting data",
-        unit="chromosome"
+        unit="chromosome",
     )
     return {
         chrom: get_binned_density_dataframe(
-            raw_densities, chrom, bin_size, no_align
+            raw_densities, chrom, bin_size, no_align,
         )
         for chrom in chromosome_iterator
     }
@@ -208,7 +218,7 @@ def load_index(index_filename, as_filter_dict=False):
     else:
         ecx = read_csv(
             index_filename, sep="\t", skiprows=1,
-            escapechar="#", na_values="-"
+            escapechar="#", na_values="-",
         )
         ecx = ecx[ecx["blacklist"].isnull()]
         if as_filter_dict:
@@ -249,4 +259,4 @@ def filter_bam(alignment, samfilters, desc=None):
     if desc is None:
         return filtered_iterator
     else:
-        return tqdm(filtered_iterator, desc=desc, unit="read")
+        return progressbar(filtered_iterator, desc=desc, unit="read")
