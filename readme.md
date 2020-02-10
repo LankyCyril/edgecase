@@ -178,9 +178,9 @@ optional arguments:
   --fmt ?                     format of input file(s) (default: sam)
   -m ?, --min-k ?             smallest target repeat length (default: 4)
   -M ?, --max-k ?             largest target repeat length (default: 16)
+  -r R, --min-repeats R       minimum number of consecutive repeats (default: 2)
   -n ?, --max-motifs ?        maximum number of motifs to report (default: None)
   -P ?, --max-p-adjusted ?    cutoff adjusted p-value (default: 0.05)
-  --no-context                allow single interspersed instances of kmers (default: False)
   --jellyfish ?               jellyfish binary (unless in $PATH) (default: None)
   --jellyfish-hash-size ?     jellyfish initial hash size (default: 2G)
   -j J, --jobs J              number of jellyfish jobs (parallel threads) (default: 1)
@@ -193,10 +193,7 @@ Relies on [jellyfish](http://www.genome.umd.edu/jellyfish.html) to count
 *k*-mers. If *edgeCase* has been installed with the Conda method (by creating
 an environment from *environment.yaml*), *jellyfish* is already installed and no
 special action is needed. Otherwise, it needs to be installed manually and, if
-not in $PATH, supplied with the *--jellyfish* option.  
-By default, only finds motifs in repeating contexts (e.g., treats motifs ACGT
-and ACGTT as completely distinct). This can be overridden with *--no-context*
-(to make ACGTT count towards both itself and ACGT).
+not in $PATH, supplied with the *--jellyfish* option.
 
 
 ### kmerscanner
