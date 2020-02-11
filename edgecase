@@ -12,15 +12,18 @@ Usage: {0} [-h | --help]
        {0} <command> [<args>...]
 
 Commmands (<command>):
-    tailpuller               select overhanging reads
-    levenshtein              cluster reads by edit distance
-    tailchopper              get overhanging heads/tails of reads
+    tailpuller               select overhanging long reads
+    levenshtein              cluster long reads by edit distance
+    tailchopper              get overhanging heads/tails of long reads
     repeatfinder             discover enriched repeats in candidate sequences
     kmerscanner              perform scan of known kmers/motifs
     densityplot              visualize densities of candidate motifs
 
 Combined "pipeline" commands:
     basic-pipeline-longread  extract candidate long reads, discover motifs, plot
+
+Development area:
+    tailpuller-10x           select overhanging read clouds
 """
 
 
