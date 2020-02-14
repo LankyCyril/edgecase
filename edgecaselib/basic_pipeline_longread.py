@@ -12,7 +12,8 @@ Usage: {0} basic-pipeline-longread -x filename -o dirname [--force] [-j integer]
        {1}                [-q integer] [--min-k integer] [--max-k integer]
        {1}                [--jellyfish filename] [--jellyfish-hash-size string]
        {1}                [--max-p-adjusted float] [--window-size integer]
-       {1}                [--n-boot integer] [--palette palettespec] <bam>
+       {1}                [--n-boot integer] [--palette palettespec]
+       {1}                [--title string] <bam>
 
 Output (in --output-dir):
     * tailpuller.sam                 candidate reads
@@ -45,6 +46,7 @@ Options:
     --window-size [integer]          size of the window (for kmerscanner and densityplot) [default: 100]
     --n-boot [integer]               number of bootstrap iterations for plotting [default: 1000]
     --palette [palettespec]          custom palette for plotting motifs
+    --title [string]                 title for the density plots
 
 Input filtering options:
     -q, --min-quality [integer]      process only entries with this MAPQ or higher [default: 0]
@@ -81,7 +83,7 @@ __docopt_tests__ = {
 }
 
 
-def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, window_size, n_boot, palette, min_quality, **kwargs):
+def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, window_size, n_boot, palette, title, min_quality, **kwargs):
     """basic pipeline: select reads, find enriched motifs, plot"""
     get_filename = lambda fn: path.join(output_dir, fn)
     tailpuller_sam = get_filename("tailpuller.sam")
@@ -104,7 +106,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
                 flags=f, flags_any=65535, flag_filter=F,
                 min_quality=min_quality, min_k=min_k, max_k=max_k,
                 max_motifs=max_motifs, max_p_adjusted=max_p_adjusted,
-                no_context=False, jellyfish=jellyfish,
+                no_context=False, jellyfish=jellyfish, min_repeats=2,
                 jellyfish_hash_size=jellyfish_hash_size, jobs=jobs, file=tsv,
             )
         kmerscanner_dat = get_filename("kmerscanner-{}_arm.dat.gz".format(arm))
@@ -118,11 +120,16 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
         densityplot_pdf = get_filename("densityplot-{}_arm.pdf".format(arm))
         with open(densityplot_pdf, mode="wb") as pdf:
             try:
+                if title is None:
+                    plot_title = None
+                else:
+                    plot_title = "{}, {} arm".format(title, arm)
                 densityplot.main(
                     kmerscanner_dat, gzipped=True, index=index, flags=f,
                     flags_any=65535, flag_filter=F, min_quality=min_quality,
                     bin_size=window_size, n_boot=n_boot, exploded=False,
-                    zoomed_in=False, palette=palette, title=None, file=pdf,
+                    zoomed_in=False, palette=palette, title=plot_title,
+                    file=pdf,
                 )
             except EmptyKmerscanError:
                 pass
