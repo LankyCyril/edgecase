@@ -19,6 +19,7 @@ __doc__ = """edgeCase densityplot: visualization of motif densities
 
 Usage: {0} densityplot -x filename [-b integer] [-e] [--zoomed-in]
        {1}             [--palette palettespec] [--title string]
+       {1}             [--n-boot integer]
        {1}             [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
        {1}             [-z] <dat>
 
