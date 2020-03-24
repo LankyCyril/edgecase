@@ -23,7 +23,7 @@ Combined "pipeline" commands:
     basic-pipeline-longread  extract candidate long reads, discover motifs, plot
 
 Development area:
-    tailpuller-10x           select overhanging read clouds
+    shortread                experiments with short reads
 """
 
 
