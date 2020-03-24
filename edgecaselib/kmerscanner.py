@@ -4,7 +4,7 @@ from numpy import zeros, array, cumsum, nan
 from multiprocessing import Pool
 from edgecaselib.formats import filter_bam
 from edgecaselib.tailchopper import get_cigar_clip_length
-from pysam import AlignmentFile
+from pysam import AlignmentFile, FastxFile
 from types import SimpleNamespace
 from functools import partial
 from edgecaselib.util import progressbar
@@ -14,22 +14,23 @@ from pandas import read_csv
 
 __doc__ = """edgeCase kmerscanner: calculation of motif densities
 
-Usage: {0} kmerscanner --motif-file filename [-w integer] [-n integer]
-       {1}             [-j integer]
+Usage: {0} kmerscanner [-j integer] --motif-file filename
+       {1}             [-w integer] [-n integer]
        {1}             [-c float] [--head-test integer] [--tail-test integer]
        {1}             [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
-       {1}             <bam>
+       {1}             [--fmt string] <sequencefile>
 
 Output:
     DAT file with calculated motif densities along rolling windows
 
 Positional arguments:
-    <bam>                         name of input BAM/SAM file
+    <sequencefile>                name of input BAM/SAM/FASTA/FASTQ file
 
 Required options:
     --motif-file [filename]       file with repeated motif sequences (output of `repeatfinder`)
 
 Options:
+    --fmt sam|fastx               format of input file [default: sam]
     -w, --window-size [integer]   size of the rolling window [default: 100]
     -n, --num-reads [integer]     expected number of reads in input (for progress display)
     -j, --jobs [integer]          number of jobs to run in parallel [default: 1]
@@ -132,8 +133,12 @@ def calculate_density_of_patterns(entry, motif_patterns, cutoff, window_size, he
     return entry_set
 
 
-def pattern_scanner(entry_iterator, samfilters, motif_patterns, cutoff, window_size, head_test, tail_test, num_reads, jobs):
+def pattern_scanner(entry_iterator, fmt, samfilters, motif_patterns, cutoff, window_size, head_test, tail_test, num_reads, jobs):
     """Calculate density of pattern hits in a rolling window along each read"""
+    if fmt == "sam":
+        filtered_iterator = filter_bam(entry_iterator, samfilters)
+    else:
+        filtered_iterator = entry_iterator
     simple_entry_iterator = (
         SimpleNamespace(
             query_name=getattr(
@@ -148,7 +153,7 @@ def pattern_scanner(entry_iterator, samfilters, motif_patterns, cutoff, window_s
             ),
             cigarstring=getattr(entry, "cigarstring", ""),
         )
-        for entry in filter_bam(entry_iterator, samfilters)
+        for entry in filtered_iterator
     )
     with Pool(jobs) as pool:
         # imap_unordered() only accepts single-argument functions:
@@ -168,8 +173,14 @@ def pattern_scanner(entry_iterator, samfilters, motif_patterns, cutoff, window_s
         )
 
 
-def interpret_arguments(head_test, tail_test, cutoff, motif_file):
+def interpret_arguments(fmt, head_test, tail_test, cutoff, motif_file):
     """Parse and check arguments"""
+    if fmt == "sam":
+        manager = AlignmentFile
+    elif fmt == "fastx":
+        manager = FastxFile
+    else:
+        raise ValueError("--fmt can only be 'sam' or 'fastx'")
     if (head_test is not None) and (tail_test is not None):
         raise ValueError("Can only specify one of --head-test, --tail-test")
     elif (cutoff is not None) and (head_test is None) and (tail_test is None):
@@ -198,21 +209,21 @@ def interpret_arguments(head_test, tail_test, cutoff, motif_file):
         ))
     else:
         total_abundance = {m: nan for m in motif_data["motif"]}
-    return motif_patterns, total_abundance
+    return manager, motif_patterns, total_abundance
 
 
-def main(bam, flags, flags_any, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
-    motif_patterns, total_abundance = interpret_arguments(
-        head_test, tail_test, cutoff, motif_file,
+    manager, motif_patterns, total_abundance = interpret_arguments(
+        fmt, head_test, tail_test, cutoff, motif_file,
     )
     print(*DAT_HEADER, sep="\t", file=file)
     # scan fastq for target motif queries, parallelizing on reads:
-    with AlignmentFile(bam) as entry_iterator:
+    with manager(sequencefile) as entry_iterator:
         scanner = pattern_scanner(
             entry_iterator, motif_patterns=motif_patterns,
             samfilters=[flags, flags_any, flag_filter, min_quality],
-            window_size=window_size,
+            fmt=fmt, window_size=window_size,
             head_test=head_test, tail_test=tail_test,
             cutoff=cutoff, num_reads=num_reads, jobs=jobs,
         )
