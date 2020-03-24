@@ -2,6 +2,7 @@ from sys import stdout, stderr
 from collections import OrderedDict
 from edgecaselib.kmerscanner import get_circular_pattern
 from pysam import FastxFile
+from numpy import array
 
 __doc__ = """edgeCase shortread: experiments with short reads
 
@@ -62,8 +63,9 @@ def main(sequencefile, fmt, min_k, max_k, min_repeats, motifs, jobs=1, file=stdo
     print(*motif_patterns.keys(), sep="\t", file=file)
     with FastxFile(sequencefile) as fastx:
         for entry in fastx:
-            motif_counts = [
+            motif_counts = array([
                 sum(1 for _ in p.finditer(entry.sequence, overlapped=True))
                 for p in motif_patterns.values()
-            ]
-            print(*motif_counts, sep="\t", file=file)
+            ])
+            if (motif_counts != 0).any():
+                print(*motif_counts, sep="\t", file=file)
