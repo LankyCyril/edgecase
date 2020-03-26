@@ -5,6 +5,7 @@ from re import finditer, IGNORECASE
 from os import path
 from edgecaselib.util import get_executable, progressbar
 from edgecaselib.formats import filter_bam
+from functools import lru_cache
 from subprocess import check_output
 from pandas import read_csv, concat
 from numpy import unique
@@ -122,6 +123,7 @@ def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish,
     return concat(per_k_reports, axis=0)
 
 
+@lru_cache(maxsize=None)
 def lowest_alpha_inversion(kmer):
     """Get alphabetically lowest inversion of kmer (e.g., for TTAGGG will return AGGGTT)"""
     return min(kmer[i:]+kmer[:i] for i in range(len(kmer)))
