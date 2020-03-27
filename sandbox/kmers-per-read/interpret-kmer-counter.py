@@ -32,7 +32,7 @@ def main(raw_kmercount_filename):
     motif_count_database, counts = [], defaultdict(int)
     with gzopen(raw_kmercount_filename, mode="rt") as raw_kc:
         for line in tqdm(map(str.strip, raw_kc), total=3506715):
-            if (line == ";") and counts:
+            if line == ";":
                 motif_count_database.append(counts)
                 counts = defaultdict(int)
             else:
