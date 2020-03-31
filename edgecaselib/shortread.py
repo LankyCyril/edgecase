@@ -1,21 +1,20 @@
-from sys import stdout, stderr
-from collections import OrderedDict
+from sys import stdout
+from contextlib import contextmanager, ExitStack
 from edgecaselib.util import get_executable, progressbar
-from edgecaselib.kmerscanner import get_circular_pattern
-from pysam import FastxFile
-from numpy import array
 from edgecaselib.repeatfinder import lowest_alpha_inversion
 from functools import lru_cache
 from tempfile import TemporaryDirectory
 from os import path
-from subprocess import check_output
-from pandas import DataFrame
+from pysam import FastxFile
+from threading import Thread
+from subprocess import call
 
 __doc__ = """edgeCase shortread: experiments with short reads
 
-Usage: {0} shortread [-m integer] [-M integer] [-r integer]
-       {1}           [--kmer-counter string] [--motifs string]
-       {1}           [--fmt string] [-n integer] <sequencefile>
+Usage: {0} shortread [-j integer] [--bioawk string] [--kmer-counter string]
+       {1}           [--target string] [-m integer] [-M integer] [-r integer]
+       {1}           [--prefix string] [--chunks integer]
+       {1}           [--fmt string] <sequencefile>
 
 Output:
     TSV-formatted file with motif incidence per read
@@ -25,69 +24,44 @@ Positional arguments:
 
 Options:
     --fmt sam|fastx               format of input file [default: fastx]
+    -j, --jobs [integer]          number of jobs to run in parallel [default: 1]
+    -c, --chunks [integer]        number of chunks in which to split <sequencefile>
+    --kmer-counter [string]       kmer-counter binary (unless in $PATH)
+    --bioawk [string]             bioawk binary (unless in $PATH)
+    --target [string]             only consider reads containing this kmer [default: TTAGGG]
     -m, --min-k [integer]         smallest target repeat length [default: 4]
     -M, --max-k [integer]         largest target repeat length [default: 16]
     -r, --min-repeats [integer]   minimum number of consecutive repeats [default: 2]
-    --kmer-counter [string]       kmer-counter binary (unless in $PATH)
-    --motifs [string]             list of target motifs, separated with '|'
-    -n, --num-reads [integer]     expected number of reads in input (for progress display)
+    --prefix [string]             prefix for temporary files
 
 Notes:
-* if --motifs is specified, options -m and -M have no effect
+* reverse-complement of the target motif will also be considered
 * kmer-counter is available at https://github.com/alexpreynolds/kmer-counter
+* if --prefix is not specified, will store temporary files in $TEMP
 """
 
 __docopt_converters__ = [
+    lambda jobs: int(jobs),
     lambda min_k: int(min_k),
     lambda max_k: int(max_k),
     lambda min_repeats: int(min_repeats),
-    lambda num_reads: None if (num_reads is None) else int(num_reads),
+    lambda chunks: None if chunks is None else int(chunks),
 ]
 
 __docopt_tests__ = {
-    lambda min_k, max_k: 0 < min_k < max_k: "not satisfied: 0 < m < M",
-    lambda min_repeats: min_repeats > 0: "--min-repeats must be integer > 0",
-    lambda fmt: fmt in {"sam", "fastx"}: "unknown value of --fmt",
+    lambda min_k, max_k:
+        0 < min_k < max_k:
+            "not satisfied: 0 < m < M",
+    lambda min_repeats:
+        min_repeats > 0:
+            "--min-repeats must be integer > 0",
+    lambda fmt:
+        fmt in {"sam", "fastx"}:
+            "unknown value of --fmt",
+    lambda target, min_k, max_k:
+        min_k <= len(target) <= max_k:
+            "length of --target is outside of --min-k and --max-k boundaries",
 }
-
-
-BUFFER_CHUNKSIZE = 65536
-
-
-def interpret_arguments(fmt, min_k, max_k, min_repeats, kmer_counter, motifs):
-    """Parse and check arguments"""
-    if fmt == "fastx":
-        manager, seq_attribute = FastxFile, "sequence"
-    else:
-        raise NotImplementedError("--fmt={}".format(fmt))
-    if motifs:
-        print("WARNING: Using --motifs, ignoring -m and -M", file=stderr)
-        motif_patterns = OrderedDict([
-            [motif, get_circular_pattern(motif)]
-            for motif in motifs.split("|")
-        ])
-    else:
-        motif_patterns = None
-    return (
-        manager, seq_attribute, motif_patterns,
-        get_executable("kmer-counter", kmer_counter)
-    )
-
-
-def sweep_specific_motifs(entry_iterator, seq_attribute, motif_patterns, num_reads):
-    """Count motif_patterns in each entry from entry_iterator"""
-    decorated_iterator = progressbar(
-        entry_iterator, total=num_reads, unit="read", desc="Sweeping motifs"
-    )
-    for entry in decorated_iterator:
-        sequence = getattr(entry, seq_attribute, None)
-        if sequence:
-            motif_counts = array([
-                sum(1 for _ in pattern.finditer(sequence, overlapped=True))
-                for pattern in motif_patterns.values()
-            ])
-            if (motif_counts != 0).any():
-                yield motif_counts
 
 
 @lru_cache(maxsize=None)
@@ -101,62 +75,79 @@ def get_motif_identity(kmer, min_repeats):
         return None
 
 
-def generate_motif_count_database(entry_iterator, seq_attribute, min_k, max_k, min_repeats, kmer_counter, num_reads):
-    """Count incidence of all motifs from min_k to max_k in repeat contexts"""
-    motif_count_database, sequence_buffer = [], []
-    decorated_iterator = progressbar(
-        entry_iterator, total=num_reads, unit="read", desc="Sweeping motifs"
+def interpret_arguments(kmer_counter, bioawk, prefix, chunks, jobs):
+    """Parse and check arguments"""
+    if prefix is None:
+        TempPrefix = TemporaryDirectory
+    else:
+        def TempPrefix_inner():
+            yield path.abspath(prefix)
+        TempPrefix = contextmanager(TempPrefix_inner)
+    return (
+        get_executable("kmer-counter", kmer_counter),
+        get_executable("bioawk", bioawk),
+        TempPrefix,
+        chunks or jobs
     )
-    with TemporaryDirectory() as tempdir:
-        temp_fa = path.join(tempdir, "input.fa")
-        for entry in decorated_iterator:
-            sequence, counts = getattr(entry, seq_attribute, None), {}
-            if sequence:
-                sequence_buffer.append(sequence)
-            if len(sequence_buffer) >= BUFFER_CHUNKSIZE:
-                with open(temp_fa, mode="wt") as handle:
-                    for i, sequence in enumerate(sequence_buffer):
-                        print(">{}\n{}".format(i, sequence), file=handle)
-                sequence_buffer = []
-                for k in range(min_k, max_k+1):
-                    counter_cmd = [
-                        kmer_counter, "--double-count-palindromes",
-                        "--k", str(k), "--fasta", temp_fa
-                    ]
-                    raw_counts = check_output(counter_cmd).decode()
-                    for line in raw_counts.strip().split("\n"):
-                        stats = line.split("\t")[1].split(" ")
-                        for stat in stats:
-                            try:
-                                kmer, count = stat.split(":")
-                            except ValueError: # some lines are empty
-                                continue
-                            motif = get_motif_identity(kmer, min_repeats)
-                            if motif:
-                                counts[motif] = int(count)
-                if counts:
-                    motif_count_database.append(counts)
-    return motif_count_database
 
 
-def main(sequencefile, fmt, min_k, max_k, min_repeats, motifs, kmer_counter, num_reads, jobs=1, file=stdout, **kwargs):
+def generate_temp_name(temp_prefix, name):
+    """Generate temporary name based on whether temp_prefix is a directory"""
+    if path.isdir(temp_prefix):
+        return path.join(temp_prefix, name)
+    else:
+        return temp_prefix + name
+
+
+def chunk_input(sequencefile, chunks, temp_prefix):
+    """Split input into many small FASTA files"""
+    chunked_fastas = [
+        generate_temp_name(temp_prefix, str(i))
+        for i in range(chunks)
+    ]
+    with FastxFile(sequencefile) as fasta, ExitStack() as chunk_stack:
+        chunked_fasta_handles = [
+            chunk_stack.enter_context(open(chunkname, mode="wt"))
+            for chunkname in chunked_fastas
+        ]
+        i = 0
+        for entry in progressbar(fasta, desc="Splitting input", unit="entry"):
+            print(entry, file=chunked_fasta_handles[i])
+            i = (i + 1) % chunks
+    return chunked_fastas
+
+
+def kmer_counter_pipeline(kmer_counter, k, chunkname):
+    pipeline_mask = " ".join([
+        "{} --double-count-palindromes --k {} --fasta {}",
+        "| cut -f2 | sed 's/$/ ;/g' | tr ' ' '\\n'",
+        "| awk -F':' '{{if (($1==\";\") || (substr($1,1,{})==substr($1,{})))",
+            "{{print}}}}'",
+        "| gzip -3 > {}.txt.gz"
+    ])
+    cmd = pipeline_mask.format(
+        kmer_counter, k * 2, chunkname, k, k + 1, chunkname
+    )
+    call(cmd, shell=True)
+
+
+def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, bioawk, prefix, chunks, jobs=1, file=stdout, **kwargs):
     # parse arguments:
-    manager, seq_attribute, motif_patterns, kmer_counter = interpret_arguments(
-        fmt, min_k, max_k, min_repeats, kmer_counter, motifs,
+    kmer_counter, bioawk, TempPrefix, chunks = interpret_arguments(
+        kmer_counter, bioawk, prefix, chunks, jobs
     )
-    with manager(sequencefile) as entry_iterator:
-        if motif_patterns:
-            counts_iterator = sweep_specific_motifs(
-                entry_iterator, seq_attribute, motif_patterns, num_reads,
+    with TempPrefix() as temp_prefix:
+        chunked_fastas = chunk_input(sequencefile, chunks, temp_prefix)
+        threads = [
+            Thread(target=kmer_counter_pipeline,
+                args=(kmer_counter, 6, chunkname)
             )
-            for counts in counts_iterator:
-                print(*counts, sep="\t", file=file)
-        else:
-            motif_count_database = generate_motif_count_database(
-                entry_iterator, seq_attribute, min_k, max_k, min_repeats,
-                kmer_counter, num_reads,
-            )
-            print("Merging table...", file=stderr)
-            motif_count_table = DataFrame(motif_count_database).fillna(0)
-            print("Writing table...", file=stderr)
-            motif_count_table.astype(int).to_csv(file, sep="\t", index=False)
+            for chunkname in chunked_fastas
+        ]
+        job_offset = 0
+        while job_offset < len(threads):
+            for thread in threads[job_offset:job_offset+jobs]:
+                thread.start()
+            for thread in threads[job_offset:job_offset+jobs]:
+                thread.join()
+            job_offset += jobs
