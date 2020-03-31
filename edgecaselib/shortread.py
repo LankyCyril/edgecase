@@ -5,34 +5,33 @@ from edgecaselib.repeatfinder import lowest_alpha_inversion
 from functools import lru_cache
 from tempfile import TemporaryDirectory
 from os import path
-from pysam import FastxFile
+from pysam import FastxFile, AlignmentFile
 from threading import Thread
 from subprocess import call
 
+
 __doc__ = """edgeCase shortread: experiments with short reads
 
-Usage: {0} shortread [-j integer] [--bioawk string] [--kmer-counter string]
+Usage: {0} shortread [-j integer] [-c integer] [--kmer-counter string]
        {1}           [--target string] [-m integer] [-M integer] [-r integer]
-       {1}           [--prefix string] [--chunks integer]
-       {1}           [--fmt string] <sequencefile>
+       {1}           [--prefix string] [--fmt string] <sequencefile>
 
 Output:
     TSV-formatted file with motif incidence per read
 
 Positional arguments:
-    <sequencefile>                name of input BAM/SAM/FASTA/FASTQ file
+    <sequencefile>                   name of input BAM/SAM/FASTA/FASTQ file
 
 Options:
-    --fmt sam|fastx               format of input file [default: fastx]
-    -j, --jobs [integer]          number of jobs to run in parallel [default: 1]
-    -c, --chunks [integer]        number of chunks in which to split <sequencefile>
-    --kmer-counter [string]       kmer-counter binary (unless in $PATH)
-    --bioawk [string]             bioawk binary (unless in $PATH)
-    --target [string]             only consider reads containing this kmer [default: TTAGGG]
-    -m, --min-k [integer]         smallest target repeat length [default: 4]
-    -M, --max-k [integer]         largest target repeat length [default: 16]
-    -r, --min-repeats [integer]   minimum number of consecutive repeats [default: 2]
-    --prefix [string]             prefix for temporary files
+    --fmt sam|fastx                  format of input file [default: fastx]
+    -j, --jobs [integer]             number of jobs to run in parallel [default: 1]
+    -c, --chunks-per-job [integer]   number of chunks of <sequencefile> per job [default: 32]
+    --kmer-counter [string]          kmer-counter binary (unless in $PATH)
+    --target [string]                only consider reads containing this kmer [default: TTAGGG]
+    -m, --min-k [integer]            smallest target repeat length [default: 4]
+    -M, --max-k [integer]            largest target repeat length [default: 16]
+    -r, --min-repeats [integer]      minimum number of consecutive repeats [default: 2]
+    --prefix [string]                prefix for temporary files
 
 Notes:
 * reverse-complement of the target motif will also be considered
@@ -45,7 +44,7 @@ __docopt_converters__ = [
     lambda min_k: int(min_k),
     lambda max_k: int(max_k),
     lambda min_repeats: int(min_repeats),
-    lambda chunks: None if chunks is None else int(chunks),
+    lambda chunks_per_job: int(chunks_per_job)
 ]
 
 __docopt_tests__ = {
@@ -75,8 +74,14 @@ def get_motif_identity(kmer, min_repeats):
         return None
 
 
-def interpret_arguments(kmer_counter, bioawk, prefix, chunks, jobs):
+def interpret_arguments(kmer_counter, fmt, prefix, chunks_per_job, jobs):
     """Parse and check arguments"""
+    if fmt == "fastx":
+        manager, seq_attr = FastxFile, "sequence"
+    elif fmt == "sam":
+        manager, seq_attr = AlignmentFile, "query_sequence"
+    else:
+        raise ValueError("Unknown --fmt: {}".format(fmt))
     if prefix is None:
         TempPrefix = TemporaryDirectory
     else:
@@ -85,9 +90,7 @@ def interpret_arguments(kmer_counter, bioawk, prefix, chunks, jobs):
         TempPrefix = contextmanager(TempPrefix_inner)
     return (
         get_executable("kmer-counter", kmer_counter),
-        get_executable("bioawk", bioawk),
-        TempPrefix,
-        chunks or jobs
+        manager, seq_attr, TempPrefix, chunks_per_job * jobs,
     )
 
 
@@ -99,11 +102,10 @@ def generate_temp_name(temp_prefix, name):
         return temp_prefix + name
 
 
-def chunk_input(sequencefile, chunks, temp_prefix):
+def preprocess_input(sequencefile, manager, seq_attr, chunks, temp_prefix):
     """Split input into many small FASTA files"""
     chunked_fastas = [
-        generate_temp_name(temp_prefix, str(i))
-        for i in range(chunks)
+        generate_temp_name(temp_prefix, str(i)) for i in range(chunks)
     ]
     with FastxFile(sequencefile) as fasta, ExitStack() as chunk_stack:
         chunked_fasta_handles = [
@@ -117,39 +119,73 @@ def chunk_input(sequencefile, chunks, temp_prefix):
     return chunked_fastas
 
 
-def kmer_counter_pipeline(kmer_counter, k, chunkname):
+def get_chunk_child_name(chunkname, *args):
+    """Facilitate reproducible naming of temporary files"""
+    return chunkname + "-" + "-".join([str(a) for a in args])
+
+
+def kmer_counter_pipeline(kmer_counter, k, chunkname, chunk_child_name):
+    """Unsafely pipe data through standard GNU/Linux tools"""
     pipeline_mask = " ".join([
         "{} --double-count-palindromes --k {} --fasta {}",
         "| cut -f2 | sed 's/$/ ;/g' | tr ' ' '\\n'",
         "| awk -F':' '{{if (($1==\";\") || (substr($1,1,{})==substr($1,{})))",
             "{{print}}}}'",
-        "| gzip -3 > {}.txt.gz"
+        "| gzip -3 > {}",
     ])
     cmd = pipeline_mask.format(
-        kmer_counter, k * 2, chunkname, k, k + 1, chunkname
+        kmer_counter, k * 2, chunkname, k, k + 1, chunk_child_name,
     )
     call(cmd, shell=True)
 
 
-def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, bioawk, prefix, chunks, jobs=1, file=stdout, **kwargs):
+def prepare_kmer_counter_threads(kmer_counter, min_k, max_k, min_repeats, chunked_fastas):
+    """Stage threads for kmer-counter"""
+    for chunkname in chunked_fastas:
+        for k in range(min_k, max_k + 1):
+            yield Thread(
+                target=kmer_counter_pipeline,
+                kwargs={
+                    "kmer_counter": kmer_counter,
+                    "k": k,
+                    "chunkname": chunkname,
+                    "chunk_child_name": get_chunk_child_name(
+                        chunkname, k, "doubled",
+                    ),
+                },
+            )
+
+
+def run_kmer_counter(kmer_counter, min_k, max_k, min_repeats, chunked_fastas, jobs):
+    """Run kmer-counter in multiple threads"""
+    threads = list(prepare_kmer_counter_threads(
+        kmer_counter, min_k, max_k, min_repeats, chunked_fastas,
+    ))
+    kmer_count_files = [
+        thread._kwargs["chunk_child_name"] for thread in threads
+    ]
+    job_offset_iterator = progressbar(
+        range(0, len(threads), jobs), desc="Counting kmers", unit="batch",
+    )
+    for job_offset in job_offset_iterator:
+        for thread in threads[job_offset:job_offset+jobs]:
+            thread.start()
+        for thread in threads[job_offset:job_offset+jobs]:
+            thread.join()
+    return kmer_count_files
+
+
+def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, prefix, chunks_per_job, jobs=1, file=stdout, **kwargs):
     # parse arguments:
-    kmer_counter, bioawk, TempPrefix, chunks = interpret_arguments(
-        kmer_counter, bioawk, prefix, chunks, jobs
+    if min_repeats != 2:
+        raise NotImplementedError("Only --min-repeats=2 is implemented so far")
+    kmer_counter, manager, seq_attr, TempPrefix, chunks = interpret_arguments(
+        kmer_counter, fmt, prefix, chunks_per_job, jobs,
     )
     with TempPrefix() as temp_prefix:
-        chunked_fastas = chunk_input(sequencefile, chunks, temp_prefix)
-        threads = [
-            Thread(
-                target=kmer_counter_pipeline,
-                args=(kmer_counter, 7, chunkname)
-            )
-            for chunkname in chunked_fastas
-        ]
-        job_offset_iterator = progressbar(
-            range(0, len(threads), jobs), desc="Counting kmers", unit="batch"
+        chunked_fastas = preprocess_input(
+            sequencefile, manager, seq_attr, chunks, temp_prefix,
         )
-        for job_offset in job_offset_iterator:
-            for thread in threads[job_offset:job_offset+jobs]:
-                thread.start()
-            for thread in threads[job_offset:job_offset+jobs]:
-                thread.join()
+        kmer_count_files = run_kmer_counter(
+            kmer_counter, min_k, max_k, min_repeats, chunked_fastas, jobs,
+        )
