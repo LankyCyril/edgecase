@@ -139,15 +139,17 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, bio
     with TempPrefix() as temp_prefix:
         chunked_fastas = chunk_input(sequencefile, chunks, temp_prefix)
         threads = [
-            Thread(target=kmer_counter_pipeline,
-                args=(kmer_counter, 6, chunkname)
+            Thread(
+                target=kmer_counter_pipeline,
+                args=(kmer_counter, 7, chunkname)
             )
             for chunkname in chunked_fastas
         ]
-        job_offset = 0
-        while job_offset < len(threads):
+        job_offset_iterator = progressbar(
+            range(0, len(threads), jobs), desc="Counting kmers", unit="batch"
+        )
+        for job_offset in job_offset_iterator:
             for thread in threads[job_offset:job_offset+jobs]:
                 thread.start()
             for thread in threads[job_offset:job_offset+jobs]:
                 thread.join()
-            job_offset += jobs
