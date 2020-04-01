@@ -1,4 +1,5 @@
-from sys import stdout
+from sys import stdout, stderr
+from re import compile
 from contextlib import contextmanager, ExitStack
 from edgecaselib.util import get_executable, progressbar
 from edgecaselib.repeatfinder import lowest_alpha_inversion
@@ -8,6 +9,12 @@ from os import path
 from pysam import FastxFile, AlignmentFile
 from threading import Thread
 from subprocess import call
+from collections import defaultdict
+from gzip import open as gzopen
+from pandas import DataFrame, concat
+from scipy.stats import spearmanr
+from numpy import eye, triu, full, nan
+from statsmodels.stats.multitest import multipletests
 
 
 __doc__ = """edgeCase shortread: experiments with short reads
@@ -17,7 +24,7 @@ Usage: {0} shortread [-j integer] [-c integer] [--kmer-counter string]
        {1}           [--prefix string] [--fmt string] <sequencefile>
 
 Output:
-    TSV-formatted file with motif incidence per read
+    TSV-formatted file with significant motif correlations
 
 Positional arguments:
     <sequencefile>                   name of input BAM/SAM/FASTA/FASTQ file
@@ -63,8 +70,29 @@ __docopt_tests__ = {
 }
 
 
+ALPHABET = list("AaCcNnnNgGtT")
+COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
+COMPLEMENT_PATTERN = compile(r'|'.join(COMPLEMENTS.keys()))
+
+
 @lru_cache(maxsize=None)
-def get_motif_identity(kmer, min_repeats):
+def revcomp(sequence):
+    matcher = lambda match: COMPLEMENTS[match.group()]
+    return COMPLEMENT_PATTERN.sub(matcher, sequence[::-1])
+
+
+@lru_cache(maxsize=None)
+def all_inversions(kmer):
+    return {kmer[i:]+kmer[:i] for i in range(len(kmer))}
+
+
+@lru_cache(maxsize=None)
+def is_revcomp_inversion(s1, s2):
+    return len(all_inversions(s1) & all_inversions(revcomp(s2))) != 0
+
+
+@lru_cache(maxsize=None)
+def get_motif_identity(kmer, min_repeats=2):
     """Reduce kmer to motif if motif in repeat context"""
     lai = lowest_alpha_inversion(kmer)
     motif = lai[:int(len(lai)/min_repeats)]
@@ -175,6 +203,54 @@ def run_kmer_counter(kmer_counter, min_k, max_k, min_repeats, chunked_fastas, jo
     return kmer_count_files
 
 
+def generate_count_table(chunked_fastas, k):
+    """Combine outputs of kmer-counter for one k into a DataFrame"""
+    motif_count_database, counts = [], defaultdict(int)
+    for chunkname in chunked_fastas:
+        chunk_child_name = get_chunk_child_name(chunkname, k, "doubled")
+        with gzopen(chunk_child_name, mode="rt") as raw_kc:
+            for line in map(str.strip, raw_kc):
+                if line == ";":
+                    motif_count_database.append(counts)
+                    counts = defaultdict(int)
+                else:
+                    stat = line.split(":")
+                    if len(stat) == 2:
+                        counts[get_motif_identity(stat[0])] += int(stat[1])
+    return DataFrame(motif_count_database).fillna(0).astype(int)
+
+
+def correlate_motifs(count_tables, method="spearman", adjust="bonferroni", alpha=.05):
+    """Combine motif counts and correlate; report significant correlations only"""
+    print("Correlating motif counts...", end=" ", file=stderr)
+    count_table = concat(count_tables, axis=1)
+    N = count_table.shape[1]
+    motif_rs = count_table.corr(method=method)
+    # https://github.com/pandas-dev/pandas/issues/25726, p-values :
+    motif_ps = count_table.corr(method=lambda x, y: spearmanr(x, y)[1]) - eye(N)
+    # remove symmetrical pairs and self-to-self correlations:
+    triu_mask = triu(full((N, N), True), 0)
+    motif_rs[triu_mask] = nan
+    motif_ps[triu_mask] = nan
+    # remove revcomp-to-revcomp pairs and negavite correlations:
+    for x in motif_rs.index:
+        for y in motif_rs.columns:
+            if (motif_rs.loc[x, y] < 0) or is_revcomp_inversion(x, y):
+                motif_rs.loc[x, y] = nan
+                motif_ps.loc[x, y] = nan
+    # adjust p-values:
+    flat_padjs = multipletests(motif_ps.values.flatten(), method=adjust)[1]
+    motif_padjs = DataFrame(
+        data=flat_padjs.reshape(N, N),
+        index=motif_ps.index, columns=motif_ps.columns,
+    )
+    # drop correlation coefficients for non-significant correlations:
+    motif_rs[motif_padjs>=alpha] = nan
+    # drop rows and columns not containing any significant correlations:
+    print("done", file=stderr)
+    return motif_rs.dropna(how="all", axis=0).dropna(how="all", axis=1)
+
+
 def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, prefix, chunks_per_job, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     if min_repeats != 2:
@@ -189,3 +265,14 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
         kmer_count_files = run_kmer_counter(
             kmer_counter, min_k, max_k, min_repeats, chunked_fastas, jobs,
         )
+        count_tables = [
+            generate_count_table(chunked_fastas, k)
+            for k in progressbar(
+                range(min_k, max_k + 1), desc="Interpreting motif counts",
+                unit="k"
+            )
+        ]
+        significant_correlation_matrix = correlate_motifs(
+            count_tables, method="spearman", adjust="bonferroni", alpha=.05
+        )
+    significant_correlation_matrix.to_csv(file, sep="\t")
