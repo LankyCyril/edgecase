@@ -12,7 +12,7 @@ from subprocess import call
 from collections import defaultdict
 from gzip import open as gzopen
 from pandas import DataFrame, Series, concat
-from scipy.stats import pearsonr
+from scipy.stats import spearmanr
 from numpy import nan
 from statsmodels.stats.multitest import multipletests
 
@@ -220,7 +220,7 @@ def generate_count_table(chunked_fastas, k):
     return DataFrame(motif_count_database).fillna(0).astype(int)
 
 
-def correlate_motifs(count_tables, target, method=pearsonr):
+def correlate_motifs(count_tables, target, method=spearmanr):
     """Combine motif counts and correlate; report significant correlations only"""
     print("Correlating motif counts...", end=" ", file=stderr, flush=True)
     count_table = concat(count_tables, axis=1)
@@ -262,6 +262,6 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
             )
         ]
         correlation_matrix = correlate_motifs(
-            count_tables, target=target, method=pearsonr,
+            count_tables, target=target, method=spearmanr,
         )
     correlation_matrix.to_csv(file, sep="\t")
