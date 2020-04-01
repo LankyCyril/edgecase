@@ -24,7 +24,7 @@ Usage: {0} shortread [-j integer] [-c integer] [--kmer-counter string]
        {1}           [--prefix string] [--fmt string] <sequencefile>
 
 Output:
-    TSV-formatted file with significant motif correlations
+    TSV-formatted file with motif correlations
 
 Positional arguments:
     <sequencefile>                   name of input BAM/SAM/FASTA/FASTQ file
@@ -220,35 +220,24 @@ def generate_count_table(chunked_fastas, k):
     return DataFrame(motif_count_database).fillna(0).astype(int)
 
 
-def correlate_motifs(count_tables, target, adjust="bonferroni", alpha=.05):
+def correlate_motifs(count_tables, target, method=pearsonr):
     """Combine motif counts and correlate; report significant correlations only"""
     print("Correlating motif counts...", end=" ", file=stderr, flush=True)
     count_table = concat(count_tables, axis=1)
-    motif_rs = count_table.drop(columns=target).corrwith(
-        count_table[target], method="pearson",
-    )
-    # https://github.com/pandas-dev/pandas/issues/25726, p-values :
-    motif_ps = count_table.drop(columns=target).corrwith(
-        count_table[target], method=lambda x, y: pearsonr(x, y)[1]
-    )
+    target_lai = lowest_alpha_inversion(target)
+    correlation_matrix = count_table.drop(columns=target_lai).corrwith(
+        count_table[target_lai],
+        # https://github.com/pandas-dev/pandas/issues/25726, p-values :
+        method=lambda x, y: Series(method(x, y))
+    ).T
+    correlation_matrix.columns = [target, "p-value"]
     # remove revcomp-to-revcomp pairs and negavite correlations:
-    for motif, r in motif_rs.iteritems():
-        if (r < 0) or is_revcomp_inversion(target, motif):
-            motif_rs[motif] = nan
-            motif_ps[motif] = nan
-    motif_rs = motif_rs.dropna()
-    motif_ps = motif_ps.dropna()
-    # adjust p-values:
-    motif_padjs = Series(
-        data=multipletests(motif_ps, method=adjust)[1],
-        index=motif_ps.index
-    )
-    # drop correlation coefficients for non-significant correlations:
-    motif_rs[motif_padjs>=alpha] = nan
-    motif_rs[motif_padjs.isnull()] = nan
+    for motif, (r, _) in correlation_matrix.iterrows():
+        if (r < 0) or is_revcomp_inversion(target_lai, motif):
+            correlation_matrix.loc[motif] = nan
     # drop rows and columns not containing any significant correlations:
     print("done", file=stderr, flush=True)
-    return motif_rs.dropna().to_frame(name=target)
+    return correlation_matrix.dropna()
 
 
 def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, prefix, chunks_per_job, jobs=1, file=stdout, **kwargs):
@@ -272,8 +261,7 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
                 unit="k"
             )
         ]
-        significant_correlation_matrix = correlate_motifs(
-            count_tables, target=lowest_alpha_inversion(target),
-            adjust="bonferroni", alpha=.05,
+        correlation_matrix = correlate_motifs(
+            count_tables, target=target, method=pearsonr,
         )
-    significant_correlation_matrix.to_csv(file, sep="\t")
+    correlation_matrix.to_csv(file, sep="\t")
