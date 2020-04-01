@@ -11,9 +11,9 @@ from threading import Thread
 from subprocess import call
 from collections import defaultdict
 from gzip import open as gzopen
-from pandas import DataFrame, concat
-from scipy.stats import spearmanr
-from numpy import eye, triu, full, nan
+from pandas import DataFrame, Series, concat
+from scipy.stats import pearsonr
+from numpy import nan
 from statsmodels.stats.multitest import multipletests
 
 
@@ -220,35 +220,35 @@ def generate_count_table(chunked_fastas, k):
     return DataFrame(motif_count_database).fillna(0).astype(int)
 
 
-def correlate_motifs(count_tables, method="spearman", adjust="bonferroni", alpha=.05):
+def correlate_motifs(count_tables, target, adjust="bonferroni", alpha=.05):
     """Combine motif counts and correlate; report significant correlations only"""
-    print("Correlating motif counts...", end=" ", file=stderr)
+    print("Correlating motif counts...", end=" ", file=stderr, flush=True)
     count_table = concat(count_tables, axis=1)
-    N = count_table.shape[1]
-    motif_rs = count_table.corr(method=method)
+    motif_rs = count_table.drop(columns=target).corrwith(
+        count_table[target], method="pearson",
+    )
     # https://github.com/pandas-dev/pandas/issues/25726, p-values :
-    motif_ps = count_table.corr(method=lambda x, y: spearmanr(x, y)[1]) - eye(N)
-    # remove symmetrical pairs and self-to-self correlations:
-    triu_mask = triu(full((N, N), True), 0)
-    motif_rs[triu_mask] = nan
-    motif_ps[triu_mask] = nan
+    motif_ps = count_table.drop(columns=target).corrwith(
+        count_table[target], method=lambda x, y: pearsonr(x, y)[1]
+    )
     # remove revcomp-to-revcomp pairs and negavite correlations:
-    for x in motif_rs.index:
-        for y in motif_rs.columns:
-            if (motif_rs.loc[x, y] < 0) or is_revcomp_inversion(x, y):
-                motif_rs.loc[x, y] = nan
-                motif_ps.loc[x, y] = nan
+    for motif, r in motif_rs.iteritems():
+        if (r < 0) or is_revcomp_inversion(target, motif):
+            motif_rs[motif] = nan
+            motif_ps[motif] = nan
+    motif_rs = motif_rs.dropna()
+    motif_ps = motif_ps.dropna()
     # adjust p-values:
-    flat_padjs = multipletests(motif_ps.values.flatten(), method=adjust)[1]
-    motif_padjs = DataFrame(
-        data=flat_padjs.reshape(N, N),
-        index=motif_ps.index, columns=motif_ps.columns,
+    motif_padjs = Series(
+        data=multipletests(motif_ps, method=adjust)[1],
+        index=motif_ps.index
     )
     # drop correlation coefficients for non-significant correlations:
     motif_rs[motif_padjs>=alpha] = nan
+    motif_rs[motif_padjs.isnull()] = nan
     # drop rows and columns not containing any significant correlations:
-    print("done", file=stderr)
-    return motif_rs.dropna(how="all", axis=0).dropna(how="all", axis=1)
+    print("done", file=stderr, flush=True)
+    return motif_rs.dropna().to_frame(name=target)
 
 
 def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, prefix, chunks_per_job, jobs=1, file=stdout, **kwargs):
@@ -273,6 +273,7 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
             )
         ]
         significant_correlation_matrix = correlate_motifs(
-            count_tables, method="spearman", adjust="bonferroni", alpha=.05
+            count_tables, target=lowest_alpha_inversion(target),
+            adjust="bonferroni", alpha=.05,
         )
     significant_correlation_matrix.to_csv(file, sep="\t")
