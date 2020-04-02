@@ -217,19 +217,36 @@ def generate_count_table(chunked_fastas, k):
     return DataFrame(motif_count_database)
 
 
-def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni", alpha=.05):
-    """Combine motif counts and correlate; report significant correlations only"""
-    print("Merging...", end=" ", file=stderr, flush=True)
-    count_table = concat(count_tables, axis=1)
-    print("done", file=stderr, flush=True)
-    print("Correlating...", end=" ", file=stderr, flush=True)
-    target_lai = lowest_alpha_inversion(target)
-    correlation_matrix = count_table.drop(columns=target_lai).corrwith(
-        count_table[target_lai],
+def correlation_worker(count_table, target_counts, method):
+    """Thread worker correlating count_table to target_counts"""
+    return count_table.loc[:, count_table.columns!=target_counts.name].corrwith(
+        target_counts,
         method=lambda x, y: Series(method(x, y)),
-    ).T
+    )
+
+
+def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni", alpha=.05, jobs=1):
+    """Combine motif counts and correlate; report significant correlations only"""
+    target_lai = lowest_alpha_inversion(target)
+    for count_table in count_tables: # find target counts:
+        if target_lai in count_table:
+            target_counts = count_table[target_lai]
+            break
+    else:
+        raise ValueError("Could not get counts of --target")
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = [
+            pool.submit(correlation_worker, count_table, target_counts, method)
+            for count_table in count_tables
+        ]
+        correlation_matrices = [
+            future.result().T for future in
+            progressbar(futures, desc="Correlating counts", unit="k")
+        ]
+    correlation_matrix = concat(correlation_matrices, axis=0)
     correlation_matrix.columns = [target, "p"]
-    # remove revcomp-to-revcomp pairs and negavite correlations:
+    print("Adjusting p-values...", file=stderr, flush=True)
+    # remove revcomp-to-revcomp pairs and negative correlations:
     for motif, (r, _) in correlation_matrix.iterrows():
         if (r < 0) or is_revcomp_inversion(target_lai, motif):
             correlation_matrix.loc[motif] = nan
@@ -242,7 +259,6 @@ def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni"
     correlation_matrix = correlation_matrix.sort_values(
         by=["pass", target], ascending=False,
     )
-    # drop rows and columns not containing any significant correlations:
     print("done", file=stderr, flush=True)
     return correlation_matrix.drop(columns="pass")
 
@@ -269,6 +285,6 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
             )
         ]
         correlation_matrix = correlate_motifs(
-            count_tables, target=target, method=spearmanr,
+            count_tables, target=target, method=spearmanr, jobs=jobs,
         )
     correlation_matrix.to_csv(file, sep="\t")
