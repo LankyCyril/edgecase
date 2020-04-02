@@ -34,17 +34,18 @@ Options:
     --fmt sam|fastx                  format of input file [default: fastx]
     -j, --jobs [integer]             number of jobs to run in parallel [default: 1]
     -c, --chunks-per-job [integer]   number of chunks of <sequencefile> per job [default: 32]
-    --kmer-counter [string]          kmer-counter binary (unless in $PATH)
-    --target [string]                only consider reads containing this kmer [default: TTAGGG]
+    --target [string]                only consider reads containing this kmer* [default: TTAGGG]
     -m, --min-k [integer]            smallest target repeat length [default: 4]
     -M, --max-k [integer]            largest target repeat length [default: 16]
     -r, --min-repeats [integer]      minimum number of consecutive repeats [default: 2]
-    --prefix [string]                prefix for temporary files
+    --kmer-counter [string]          kmer-counter binary (unless in $PATH)**
+    --prefix [string]                prefix for temporary files***
 
 Notes:
 * reverse-complement of the target motif will also be considered
-* kmer-counter is available at https://github.com/alexpreynolds/kmer-counter
-* if --prefix is not specified, will store temporary files in $TEMP
+** kmer-counter is available at https://github.com/alexpreynolds/kmer-counter
+*** if --prefix is not specified, will store temporary files in $TEMP
+*** if --prefix is specified, will not delete intermediate files
 """
 
 __docopt_converters__ = [
@@ -299,7 +300,7 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
         chunked_fastas = preprocess_input(
             sequencefile, manager, seq_attr, chunks, temp_prefix,
         )
-        kmer_count_files = run_kmer_counter(
+        _ = run_kmer_counter(
             kmer_counter, min_k, max_k, min_repeats, chunked_fastas, jobs,
         )
         count_tables = [
