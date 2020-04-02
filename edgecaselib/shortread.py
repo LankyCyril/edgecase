@@ -4,12 +4,12 @@ from contextlib import contextmanager, ExitStack
 from edgecaselib.util import get_executable, progressbar
 from edgecaselib.repeatfinder import lowest_alpha_inversion
 from edgecaselib.repeatfinder import custom_alpha_inversion
+from edgecaselib.kmerscanner import get_circular_pattern
 from functools import lru_cache
 from tempfile import TemporaryDirectory
 from os import path
-from pysam import FastxFile, AlignmentFile
 from concurrent.futures import ThreadPoolExecutor
-from subprocess import call
+from subprocess import call, Popen, PIPE
 from collections import defaultdict
 from gzip import open as gzopen
 from pandas import DataFrame, Series, concat
@@ -21,6 +21,7 @@ from statsmodels.stats.multitest import multipletests
 __doc__ = """edgeCase shortread: experiments with short reads
 
 Usage: {0} shortread [-j integer] [-c integer] [--kmer-counter string]
+       {1}           [--bioawk string] [--samtools string]
        {1}           [--target string] [-m integer] [-M integer] [-r integer]
        {1}           [--prefix string] [--fmt string] <sequencefile>
 
@@ -39,6 +40,8 @@ Options:
     -M, --max-k [integer]            largest target repeat length [default: 16]
     -r, --min-repeats [integer]      minimum number of consecutive repeats [default: 2]
     --kmer-counter [string]          kmer-counter binary (unless in $PATH)**
+    --bioawk [string]                bioawk binary (unless in $PATH)
+    --samtools [string]              samtools binary (unless in $PATH)
     --prefix [string]                prefix for temporary files***
 
 Notes:
@@ -58,8 +61,8 @@ __docopt_converters__ = [
 
 __docopt_tests__ = {
     lambda min_k, max_k:
-        0 < min_k < max_k:
-            "not satisfied: 0 < m < M",
+        0 < min_k <= max_k:
+            "not satisfied: 0 < m <= M",
     lambda min_repeats:
         min_repeats > 0:
             "--min-repeats must be integer > 0",
@@ -104,14 +107,8 @@ def get_motif_identity(kmer, min_repeats=2):
         return None
 
 
-def interpret_arguments(kmer_counter, fmt, prefix, chunks_per_job, jobs):
+def interpret_arguments(kmer_counter, bioawk, samtools, prefix, chunks_per_job, jobs):
     """Parse and check arguments"""
-    if fmt == "fastx":
-        manager, seq_attr = FastxFile, "sequence"
-    elif fmt == "sam":
-        manager, seq_attr = AlignmentFile, "query_sequence"
-    else:
-        raise ValueError("Unknown --fmt: {}".format(fmt))
     if prefix is None:
         TempPrefix = TemporaryDirectory
     else:
@@ -120,7 +117,9 @@ def interpret_arguments(kmer_counter, fmt, prefix, chunks_per_job, jobs):
         TempPrefix = contextmanager(TempPrefix_inner)
     return (
         get_executable("kmer-counter", kmer_counter),
-        manager, seq_attr, TempPrefix, chunks_per_job * jobs,
+        get_executable("bioawk", bioawk),
+        get_executable("samtools", samtools),
+        TempPrefix, chunks_per_job * jobs,
     )
 
 
@@ -132,19 +131,58 @@ def generate_temp_name(temp_prefix, name):
         return temp_prefix + name
 
 
-def preprocess_input(sequencefile, manager, seq_attr, chunks, temp_prefix):
+def input_filter_subprocess(sequencefile, fmt, target, bioawk, samtools):
+    """Filter input with external tools"""
+    pattern = "|".join((
+        set(get_circular_pattern(target).pattern.split("|")) |
+        set(get_circular_pattern(revcomp(target)).pattern.split("|"))
+    ))
+    if fmt == "fastx":
+        pipeline_mask = " ".join([
+            "cat {} | gunzip -f",
+            "| {} -c fastx '{{print \">\"$name; print $seq}}'",
+            "| grep -EiB1 --no-group-separator '{}'",
+            "| paste - -",
+        ])
+        entry_iterator_command = pipeline_mask.format(
+            sequencefile, bioawk, pattern,
+        )
+    elif fmt == "sam":
+        pipeline_mask = " ".join([
+            "{} view -F3844 {}",
+            "| {} -c sam '{{print \">\"$qname; print $seq}}'",
+            "| grep -EiB1 --no-group-separator '{}'",
+            "| paste - -",
+        ])
+        entry_iterator_command = pipeline_mask.format(
+            samtools, sequencefile, bioawk, pattern,
+        )
+    else:
+        raise ValueError("Unsupported value of `fmt`: {}".format(fmt))
+    return Popen(entry_iterator_command, shell=True, stdout=PIPE)
+
+
+def preprocess_input(sequencefile, fmt, target, chunks, temp_prefix, bioawk, samtools):
     """Split input into many small FASTA files"""
     chunked_fastas = [
         generate_temp_name(temp_prefix, str(i)) for i in range(chunks)
     ]
-    with FastxFile(sequencefile) as fasta, ExitStack() as chunk_stack:
+    entry_iterator_process = input_filter_subprocess(
+        sequencefile, fmt, target, bioawk, samtools,
+    )
+    with ExitStack() as chunk_stack:
+        decorated_entry_iterator = progressbar(
+            entry_iterator_process.stdout,
+            desc="Filtering and splitting input", unit="hit",
+        )
         chunked_fasta_handles = [
             chunk_stack.enter_context(open(chunkname, mode="wt"))
             for chunkname in chunked_fastas
         ]
         i = 0
-        for entry in progressbar(fasta, desc="Splitting input", unit="entry"):
-            print(entry, file=chunked_fasta_handles[i])
+        for entry in decorated_entry_iterator:
+            entry_string = entry.decode().replace("\t", "\n").rstrip("\n")
+            print(entry_string, file=chunked_fasta_handles[i])
             i = (i + 1) % chunks
     return chunked_fastas
 
@@ -289,16 +327,16 @@ def redecorate_report(correlation_matrix):
     ]]
 
 
-def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, prefix, chunks_per_job, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, prefix, chunks_per_job, bioawk, samtools, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     if min_repeats != 2:
         raise NotImplementedError("Only --min-repeats=2 is implemented so far")
-    kmer_counter, manager, seq_attr, TempPrefix, chunks = interpret_arguments(
-        kmer_counter, fmt, prefix, chunks_per_job, jobs,
+    kmer_counter, bioawk, samtools, TempPrefix, chunks = interpret_arguments(
+        kmer_counter, bioawk, samtools, prefix, chunks_per_job, jobs,
     )
     with TempPrefix() as temp_prefix:
         chunked_fastas = preprocess_input(
-            sequencefile, manager, seq_attr, chunks, temp_prefix,
+            sequencefile, fmt, target, chunks, temp_prefix, bioawk, samtools,
         )
         _ = run_kmer_counter(
             kmer_counter, min_k, max_k, min_repeats, chunked_fastas, jobs,
