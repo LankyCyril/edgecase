@@ -3,6 +3,7 @@ from re import compile
 from contextlib import contextmanager, ExitStack
 from edgecaselib.util import get_executable, progressbar
 from edgecaselib.repeatfinder import lowest_alpha_inversion
+from edgecaselib.repeatfinder import custom_alpha_inversion
 from functools import lru_cache
 from tempfile import TemporaryDirectory
 from os import path
@@ -222,7 +223,17 @@ def correlation_worker(count_table, target_counts, method):
     return count_table.loc[:, count_table.columns!=target_counts.name].corrwith(
         target_counts,
         method=lambda x, y: Series(method(x, y)),
+    ).T
+
+
+def collapse_revcomp(correlation_matrices):
+    """Remove identical entries for revcomp motifs"""
+    correlation_matrix = concat(correlation_matrices, axis=0)
+    correlation_matrix["__identity"] = correlation_matrix.index.map(
+        lambda m: min(m, lowest_alpha_inversion(revcomp(m)))
     )
+    correlation_matrix = correlation_matrix.drop_duplicates()
+    return correlation_matrix.drop(columns="__identity")
 
 
 def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni", alpha=.05, jobs=1):
@@ -240,10 +251,10 @@ def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni"
             for count_table in count_tables
         ]
         correlation_matrices = [
-            future.result().T for future in
+            future.result() for future in
             progressbar(futures, desc="Correlating counts", unit="k")
         ]
-    correlation_matrix = concat(correlation_matrices, axis=0)
+    correlation_matrix = collapse_revcomp(correlation_matrices)
     correlation_matrix.columns = [target, "p"]
     print("Adjusting p-values...", file=stderr, flush=True)
     # remove revcomp-to-revcomp pairs and negative correlations:
@@ -261,6 +272,20 @@ def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni"
     )
     print("done", file=stderr, flush=True)
     return correlation_matrix.drop(columns="pass")
+
+
+def redecorate_report(correlation_matrix):
+    """Provide forward- and reverse-complements of motifs in report"""
+    redecorated = correlation_matrix.copy()
+    redecorated["forward"] = redecorated.index.map(
+        custom_alpha_inversion
+    )
+    redecorated["reverse"] = redecorated.index.map(
+        lambda m: custom_alpha_inversion(revcomp(m))
+    )
+    return redecorated[[
+        "forward", "reverse", correlation_matrix.columns[0], "p", "p_adjusted",
+    ]]
 
 
 def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, prefix, chunks_per_job, jobs=1, file=stdout, **kwargs):
@@ -287,4 +312,4 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
         correlation_matrix = correlate_motifs(
             count_tables, target=target, method=spearmanr, jobs=jobs,
         )
-    correlation_matrix.to_csv(file, sep="\t")
+    redecorate_report(correlation_matrix).to_csv(file, sep="\t", index=False)
