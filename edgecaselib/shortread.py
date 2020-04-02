@@ -217,27 +217,37 @@ def generate_count_table(chunked_fastas, k):
                     stat = line.split(":")
                     if len(stat) == 2:
                         counts[get_motif_identity(stat[0])] += int(stat[1])
-    return DataFrame(motif_count_database).fillna(0).astype(int)
+    return DataFrame(motif_count_database)
 
 
-def correlate_motifs(count_tables, target, method=spearmanr):
+def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni", alpha=.05):
     """Combine motif counts and correlate; report significant correlations only"""
-    print("Correlating motif counts...", end=" ", file=stderr, flush=True)
+    print("Merging...", end=" ", file=stderr, flush=True)
     count_table = concat(count_tables, axis=1)
+    print("done", file=stderr, flush=True)
+    print("Correlating...", end=" ", file=stderr, flush=True)
     target_lai = lowest_alpha_inversion(target)
     correlation_matrix = count_table.drop(columns=target_lai).corrwith(
         count_table[target_lai],
-        # https://github.com/pandas-dev/pandas/issues/25726, p-values :
-        method=lambda x, y: Series(method(x, y))
+        method=lambda x, y: Series(method(x, y)),
     ).T
-    correlation_matrix.columns = [target, "p-value"]
+    correlation_matrix.columns = [target, "p"]
     # remove revcomp-to-revcomp pairs and negavite correlations:
     for motif, (r, _) in correlation_matrix.iterrows():
         if (r < 0) or is_revcomp_inversion(target_lai, motif):
             correlation_matrix.loc[motif] = nan
+    # apply multiple testing correction:
+    correlation_matrix = correlation_matrix.dropna()
+    correlation_matrix["p_adjusted"] = multipletests(
+        correlation_matrix["p"], adjust=adjust,
+    )[1]
+    correlation_matrix["pass"] = (correlation_matrix["p_adjusted"] < alpha)
+    correlation_matrix = correlation_matrix.sort_values(
+        by=["pass", target], ascending=False,
+    )
     # drop rows and columns not containing any significant correlations:
     print("done", file=stderr, flush=True)
-    return correlation_matrix.dropna()
+    return correlation_matrix.drop(columns="pass")
 
 
 def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, prefix, chunks_per_job, jobs=1, file=stdout, **kwargs):
@@ -257,8 +267,8 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
         count_tables = [
             generate_count_table(chunked_fastas, k)
             for k in progressbar(
-                range(min_k, max_k + 1), desc="Interpreting motif counts",
-                unit="k"
+                range(min_k, max_k + 1), unit="k",
+                desc="Interpreting motif counts",
             )
         ]
         correlation_matrix = correlate_motifs(
