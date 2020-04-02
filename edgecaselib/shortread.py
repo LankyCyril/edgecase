@@ -7,7 +7,7 @@ from functools import lru_cache
 from tempfile import TemporaryDirectory
 from os import path
 from pysam import FastxFile, AlignmentFile
-from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 from subprocess import call
 from collections import defaultdict
 from gzip import open as gzopen
@@ -167,40 +167,37 @@ def kmer_counter_pipeline(kmer_counter, k, chunkname, chunk_child_name):
     call(cmd, shell=True)
 
 
-def prepare_kmer_counter_threads(kmer_counter, min_k, max_k, min_repeats, chunked_fastas):
-    """Stage threads for kmer-counter"""
+def prepare_kmer_counter_kwargs(kmer_counter, min_k, max_k, min_repeats, chunked_fastas):
+    """Stage thread arguments for kmer-counter"""
     for chunkname in chunked_fastas:
         for k in range(min_k, max_k + 1):
-            yield Thread(
-                target=kmer_counter_pipeline,
-                kwargs={
-                    "kmer_counter": kmer_counter,
-                    "k": k,
-                    "chunkname": chunkname,
-                    "chunk_child_name": get_chunk_child_name(
-                        chunkname, k, "doubled",
-                    ),
-                },
-            )
+            yield {
+                "kmer_counter": kmer_counter,
+                "k": k,
+                "chunkname": chunkname,
+                "chunk_child_name": get_chunk_child_name(
+                    chunkname, k, "doubled",
+                ),
+            }
 
 
 def run_kmer_counter(kmer_counter, min_k, max_k, min_repeats, chunked_fastas, jobs):
     """Run kmer-counter in multiple threads"""
-    threads = list(prepare_kmer_counter_threads(
-        kmer_counter, min_k, max_k, min_repeats, chunked_fastas,
-    ))
-    kmer_count_files = [
-        thread._kwargs["chunk_child_name"] for thread in threads
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        thread_kwargs = list(prepare_kmer_counter_kwargs(
+            kmer_counter, min_k, max_k, min_repeats, chunked_fastas,
+        ))
+        futures = [
+            pool.submit(kmer_counter_pipeline, **kwargs)
+            for kwargs in thread_kwargs
+        ]
+        _ = [
+            future.result() for future in
+            progressbar(futures, desc="Counting kmers", unit="chunk")
+        ]
+    return [
+        kwargs["chunk_child_name"] for kwargs in thread_kwargs
     ]
-    job_offset_iterator = progressbar(
-        range(0, len(threads), jobs), desc="Counting kmers", unit="batch",
-    )
-    for job_offset in job_offset_iterator:
-        for thread in threads[job_offset:job_offset+jobs]:
-            thread.start()
-        for thread in threads[job_offset:job_offset+jobs]:
-            thread.join()
-    return kmer_count_files
 
 
 def generate_count_table(chunked_fastas, k):
@@ -239,7 +236,7 @@ def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni"
     # apply multiple testing correction:
     correlation_matrix = correlation_matrix.dropna()
     correlation_matrix["p_adjusted"] = multipletests(
-        correlation_matrix["p"], adjust=adjust,
+        correlation_matrix["p"], method=adjust,
     )[1]
     correlation_matrix["pass"] = (correlation_matrix["p_adjusted"] < alpha)
     correlation_matrix = correlation_matrix.sort_values(
