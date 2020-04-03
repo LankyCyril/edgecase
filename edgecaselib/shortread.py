@@ -240,7 +240,7 @@ def run_kmer_counter(kmer_counter, min_k, max_k, min_repeats, chunked_fastas, jo
     ]
 
 
-def generate_count_table(chunked_fastas, k):
+def generate_count_table(chunked_fastas, k, fillna=0):
     """Combine outputs of kmer-counter for one k into a DataFrame"""
     motif_count_database, counts = [], defaultdict(int)
     for chunkname in chunked_fastas:
@@ -254,7 +254,12 @@ def generate_count_table(chunked_fastas, k):
                     stat = line.split(":")
                     if len(stat) == 2:
                         counts[get_motif_identity(stat[0])] += int(stat[1])
-    return DataFrame(motif_count_database)
+    if fillna and isinstance(fillna, int):
+        return DataFrame(motif_count_database).fillna(fillna).astype(int)
+    elif fillna:
+        return DataFrame(motif_count_database).fillna(fillna)
+    else:
+        return DataFrame(motif_count_database)
 
 
 def correlation_worker(count_table, target_counts, method):
