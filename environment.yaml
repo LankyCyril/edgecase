@@ -8,6 +8,7 @@ channels:
 dependencies:
   - _libgcc_mutex=0.1=main
   - bcftools=1.9=ha228f0b_4
+  - bioawk=1.0=hed695b0_5
   - blas=2.10=openblas
   - bzip2=1.0.8=h516909a_0
   - ca-certificates=2019.11.28=hecc5488_0
@@ -60,7 +61,7 @@ dependencies:
   - networkx=2.3=py_0
   - numba=0.46.0=py36hb3f55d8_1
   - openblas=0.3.6=h6e990d7_4
-  - openssl=1.1.1e=h516909a_0
+  - openssl=1.1.1f=h516909a_0
   - pcre=8.41=hf484d3e_1003
   - pip=19.1.1=py36_0
   - pthread-stubs=0.4=h14c3975_1001
