@@ -729,3 +729,45 @@ rule giab_entropies:
         )
         for (q, wqval), qval in zip(wqstats, qstats):
             print("{:03d}\t{:.6f}\t{:.6f}".format(int(q*100), qval, wqval))
+
+
+SHORTREAD_NASA_SAMPLES = [
+    "10X/Subject_1_1/Subject_1_1_Longranger_2_1_4_phased_possorted-telomerecat",
+    "10X/Subject_1_2/Subject_1_2_Longranger_2_1_4_phased_possorted-telomerecat",
+    "10X/Subject_1_3/Subject_1_3_Longranger_2_1_4_phased_possorted-telomerecat",
+    "10X/Subject_2/Subject_2_Longranger_2_1_4_phased_possorted-telomerecat",
+    "Illumina/A/A-telomerecat", "Illumina/B/B-telomerecat",
+    "Illumina/C/C-telomerecat", "Illumina/D/D-telomerecat",
+    "Illumina/PINE_MAR15_01/PINE_MAR15_01-telomerecat",
+    "Illumina/PINE_MAR15_02/PINE_MAR15_02-telomerecat",
+    "RNASeq/reads_out_unfiltered",
+]
+SHORTREAD_SAMPLES = ["NASA/" + sample for sample in SHORTREAD_NASA_SAMPLES]
+
+
+rule shortread_fasta:
+    input: bam="data/datasets/{sample}.bam"
+    output: fa="data/datasets/{sample}.fa"
+    shell: """
+        samtools view -F3844 {input.bam} \
+        | bioawk -c sam '{{print ">"$qname; print $seq}}' \
+        > {output.fa}
+    """
+
+
+rule shortread_repeatfinder:
+    input: fa="data/datasets/{sample}.fa"
+    output: tsv="data/datasets/{sample}-repeatfinder.tsv"
+    threads: 4
+    shell: """
+        ./edgecase repeatfinder -j {threads} \
+            -m 4 -M 16 -P 1.1 --fmt fastx {input.fa} > {output.tsv}
+    """
+
+
+rule shortread_repeatfinder_combined:
+    input:
+        tsvs=expand(
+            "data/datasets/{sample}-repeatfinder.tsv",
+            sample=SHORTREAD_SAMPLES
+        )
