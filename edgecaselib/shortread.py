@@ -17,6 +17,9 @@ from scipy.stats import spearmanr
 from statsmodels.stats.multitest import multipletests
 
 
+__warning__ = """The `shortread` subprogram is in development!
+Expect the unexpected."""
+
 __doc__ = """edgeCase shortread: experiments with short reads
 
 Usage: {0} shortread [-j integer] [-c integer] [--kmer-counter string]

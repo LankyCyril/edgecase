@@ -13,7 +13,6 @@ Usage: {0} [-h | --help]
 
 Commmands (<command>):
     tailpuller               select overhanging long reads
-    levenshtein              cluster long reads by edit distance
     tailchopper              get overhanging heads/tails of long reads
     repeatfinder             discover enriched repeats in candidate sequences
     kmerscanner              perform scan of known kmers/motifs
@@ -21,8 +20,10 @@ Commmands (<command>):
 
 Combined "pipeline" commands:
     basic-pipeline-longread  extract candidate long reads, discover motifs, plot
+    basic-pipeline           synonym for basic-pipeline-longread
 
 Development area:
+    levenshtein              cluster long reads by edit distance
     shortread                experiments with short reads
 """
 
@@ -66,6 +67,9 @@ def main(module):
         submodule = getattr(module, command.replace("-", "_"), None)
         submodule_entrypoint = getattr(submodule, "main", None)
         if submodule_entrypoint:
+            submodule_warning = getattr(submodule, "__warning__", None)
+            if submodule_warning:
+                print("WARNING:", submodule_warning.strip(), file=stderr)
             __command_doc__ = submodule.__doc__.lstrip().format(
                 __file__, " "*len(__file__),
             )

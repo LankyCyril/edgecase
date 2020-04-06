@@ -21,6 +21,10 @@ from glob import glob
 from re import search
 
 
+__warning__ = """The `levenshtein` subprogram is in development!
+Pairwise distance computation is O(n^2) and is not suited for large scale
+experiments."""
+
 __doc__ = """edgeCase levenshtein: clustering of telomeric reads by distance
 
 Usage: {0} levenshtein [-m integer] [-o dirname] [--kmerscanner-file filename]
@@ -333,13 +337,6 @@ def hide_stats_warnings(state=True):
             "ignore",
             message="looks suspiciously like an uncondensed distance matrix",
         )
-        msg1 = "the levenshtein subprogram is in development!"
-        msg2 = (
-            "pairwise distance computation is O(n^2) " +
-            "and not suited for large scale experiments"
-        )
-        print("WARNING:", msg1, file=stderr)
-        print("WARNING:", msg2, file=stderr)
     else:
         resetwarnings()
 
