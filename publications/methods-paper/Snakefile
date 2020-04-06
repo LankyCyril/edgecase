@@ -774,6 +774,8 @@ rule shortread_repeatfinder_combined:
         )
     output:
         tsv="data/datasets/shortread-combined-repeatfinder.tsv"
+    params:
+        alpha=1.1
     run:
         rfs = OrderedDict([(
                 tsv.split("/")[4].split("-")[0],
@@ -794,6 +796,6 @@ rule shortread_repeatfinder_combined:
             index=rf_combined.index, columns=[c+"-adjusted" for c in p_locs],
         )
         rf_adjusted = concat([rf_combined, p_adjusted], axis=1)
-        rf_adjusted = rf_adjusted[(p_adjusted<.05).all(axis=1)]
+        rf_adjusted = rf_adjusted[(p_adjusted<params.alpha).all(axis=1)]
         rf_adjusted = rf_adjusted[["monomer"]+sorted(rf_adjusted.columns[1:])]
         rf_adjusted.to_csv(output.tsv, sep="\t", index=False)
