@@ -5,11 +5,58 @@ from re import finditer, IGNORECASE
 from os import path
 from edgecaselib.util import get_executable, progressbar
 from edgecaselib.formats import filter_bam
+from functools import lru_cache
 from subprocess import check_output
 from pandas import read_csv, concat
 from numpy import unique
 from scipy.stats import fisher_exact
 from statsmodels.stats.multitest import multipletests
+
+
+__doc__ = """edgeCase repeatfinder: de novo repeat discovery
+
+Usage: {0} repeatfinder [-m integer] [-M integer] [-r integer] [-P float]
+       {1}              [--jellyfish filename] [--jellyfish-hash-size string]
+       {1}              [-n integer] [-j integer] [-f flagspec] [-g flagspec]
+       {1}              [-F flagspec] [-q integer] [--fmt string] <sequencefile>
+
+Output:
+    TSV-formatted file with statistics describing enriched motifs
+
+Positional arguments:
+    <sequencefile>                      name of input BAM/SAM/FASTA/FASTQ file
+
+Options:
+    --fmt sam|fastx                     format of input file [default: sam]
+    -m, --min-k [integer]               smallest target repeat length [default: 4]
+    -M, --max-k [integer]               largest target repeat length [default: 16]
+    -r, --min-repeats [integer]         minimum number of consecutive repeats [default: 2]
+    -P, --max-p-adjusted [float]        cutoff adjusted p-value [default: .05]
+    --jellyfish [filename]              jellyfish binary (unless in $PATH)
+    -s, --jellyfish-hash-size [string]  jellyfish initial hash size [default: 2G]
+    -n, --max-motifs [integer]          maximum number of motifs to report
+    -j, --jobs [integer]                number of jellyfish jobs (parallel threads) [default: 1]
+
+Input filtering options:
+    -f, --flags [flagspec]              process only entries with all these sam flags present [default: 0]
+    -g, --flags-any [flagspec]          process only entries with any of these sam flags present [default: 65535]
+    -F, --flag-filter [flagspec]        process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]         process only entries with this MAPQ or higher [default: 0]
+"""
+
+__docopt_converters__ = [
+    lambda min_quality: None if (min_quality is None) else int(min_quality),
+    lambda min_k: int(min_k),
+    lambda max_k: int(max_k),
+    lambda min_repeats: int(min_repeats),
+    lambda max_p_adjusted: float(max_p_adjusted),
+    lambda jobs: int(jobs),
+]
+
+__docopt_tests__ = {
+    lambda min_k, max_k: 0 < min_k < max_k: "not satisfied: 0 < m < M",
+    lambda min_repeats: min_repeats > 0: "--min-repeats must be integer > 0",
+}
 
 
 def interpret_args(fmt, jellyfish):
@@ -44,43 +91,39 @@ def count_fastx_bases(sequencefile, pattern=r'[acgt]', flags=IGNORECASE, desc="C
         )
 
 
-def find_repeats(sequencefile, min_k, max_k, base_count, no_context, jellyfish, jellyfish_hash_size, jobs, tempdir):
+def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish, jellyfish_hash_size, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
     k_iterator = progressbar(
-        range(min_k, max_k+1), desc="Sweeping lengths", unit="k"
+        range(min_k, max_k+1), desc="Sweeping lengths", unit="k",
     )
     for k in k_iterator:
         db = path.join(tempdir, "{}.db".format(k))
-        if no_context:
-            search_k = str(k)
-        else:
-            # instead of looking for e.g. TTAGGG, look for TTAGGGTTAGGG,
-            # this implies repeat context and larger motifs like TTAGGGA do
-            # not confound it:
-            search_k = str(k*2)
+        search_k = str(k * min_repeats)
         check_output([
             jellyfish, "count", "-t", str(jobs), "-s", jellyfish_hash_size,
-            "-L", "0", "-m", search_k, "-o", db, sequencefile
+            "-L", "0", "-m", search_k, "-o", db, sequencefile,
         ])
         tsv = path.join(tempdir, "{}.tsv".format(k))
         check_output([
             jellyfish, "dump", "-c", "-t", "-L", "0",
-            "-o", tsv, db
+            "-o", tsv, db,
         ])
         k_report = read_csv(tsv, sep="\t", names=["kmer", "count"])
-        if not no_context: # for downstream analyses, roll back to single motif
-            doubles_indexer = k_report["kmer"].apply(
-                lambda kmer:kmer[:k]==kmer[k:]
-            )
-            k_report = k_report[doubles_indexer]
-            k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
+        if len(k_report) == 0:
+            return None
+        repeats_indexer = k_report["kmer"].apply(
+            lambda kmer: kmer[:k] * min_repeats == kmer
+        )
+        k_report = k_report[repeats_indexer]
+        k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
         k_report["abundance"] = k_report["count"] / base_count
         k_report["length"] = k
         per_k_reports.append(k_report)
     return concat(per_k_reports, axis=0)
 
 
+@lru_cache(maxsize=None)
 def lowest_alpha_inversion(kmer):
     """Get alphabetically lowest inversion of kmer (e.g., for TTAGGG will return AGGGTT)"""
     return min(kmer[i:]+kmer[:i] for i in range(len(kmer)))
@@ -111,7 +154,7 @@ def safe_fisher_exact(count, total_candidate_count, med, total_background_count)
     try:
         return fisher_exact([
             [count, total_candidate_count - count],
-            [med, total_background_count - med]
+            [med, total_background_count - med],
         ])[1]
     except ValueError:
         return 1
@@ -125,22 +168,23 @@ def get_motifs_fisher(single_length_report):
     fishery = single_length_report.copy()
     fishery["motif"] = fishery["kmer"].apply(lowest_alpha_inversion)
     fishery_groupby = fishery[["motif", "count", "abundance"]].groupby(
-        "motif", as_index=False
+        "motif", as_index=False,
     )
     fishery = fishery_groupby.sum()
     iqr = fishery["count"].quantile(.75) - fishery["count"].quantile(.25)
     whisker = fishery["count"].quantile(.75) + 1.5 * iqr
     candidates, background = (
         fishery[fishery["count"]>=whisker].copy(),
-        fishery[fishery["count"]<whisker].copy()
+        fishery[fishery["count"]<whisker].copy(),
     )
     total_candidate_count, total_background_count = (
-        candidates["count"].sum(), background["count"].sum()
+        candidates["count"].sum(), background["count"].sum(),
     )
     med = fishery["count"].median()
     candidates["p"] = candidates["count"].apply(
         lambda count: safe_fisher_exact(
-            count, total_candidate_count, med, total_background_count
+            count, total_candidate_count,
+            med, total_background_count,
         )
     )
     candidates["length"] = lengths[0]
@@ -150,12 +194,10 @@ def get_motifs_fisher(single_length_report):
 def analyze_repeats(full_report, adj="bonferroni"):
     """Analyze repeat enrichment for multiple lengths and apply multiple testing adjustment"""
     candidates = concat([
-        get_motifs_fisher(
-            full_report[full_report["length"]==length]
-        )
+        get_motifs_fisher(full_report[full_report["length"]==length])
         for length in progressbar(
             unique(full_report["length"].values), unit="k",
-            desc="Calculating enrichment"
+            desc="Calculating enrichment",
         )
     ])
     candidates["p_adjusted"] = multipletests(candidates["p"], method=adj)[1]
@@ -197,10 +239,10 @@ def coerce_and_filter_report(analysis, max_p_adjusted):
     ].copy()
 
 
-def coerce_to_monomer(motif):
+def coerce_to_monomer(motif, min_k):
     """Coerce motif to monomer, e.g. TATA -> TA, CAT -> CAT; this can be used to find functionally synonymous entries too"""
     n = len(motif)
-    for i in range(1, int(n/2)+1):
+    for i in range(min_k, int(n/2)+1):
         q, r = divmod(n, i)
         if r == 0:
             if motif[:i]*q == motif:
@@ -209,22 +251,22 @@ def coerce_to_monomer(motif):
         return motif
 
 
-def format_analysis(filtered_analysis, max_motifs):
+def format_analysis(filtered_analysis, min_k, max_motifs):
     """Make dataframe prettier"""
     filtered_analysis["motif"] = filtered_analysis["motif"].apply(
-        custom_alpha_inversion
+        custom_alpha_inversion,
     )
     filtered_analysis["monomer"] = filtered_analysis["motif"].apply(
-        coerce_to_monomer
+        lambda motif: coerce_to_monomer(motif, min_k=min_k),
     )
     formatted_analysis = filtered_analysis.sort_values(
-        by=["abundance", "p_adjusted"], ascending=[False, True]
+        by=["abundance", "p_adjusted"], ascending=[False, True],
     )
     formatted_analysis = formatted_analysis[
         ["monomer", "motif", "length", "count", "abundance", "p", "p_adjusted"]
     ]
     formatted_analysis.columns = [
-        "#monomer", "motif", "length", "count", "abundance", "p", "p_adjusted"
+        "#monomer", "motif", "length", "count", "abundance", "p", "p_adjusted",
     ]
     if max_motifs is None:
         return formatted_analysis
@@ -232,22 +274,31 @@ def format_analysis(filtered_analysis, max_motifs):
         return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, max_motifs, max_p_adjusted, no_context, jellyfish, jellyfish_hash_size, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
         if manager == AlignmentFile: # will need to convert SAM to fastx
             samfilters = [flags, flags_any, flag_filter, min_quality]
             sequencefile, base_count = convert_input(
-                sequencefile, manager, tempdir, samfilters
+                sequencefile, manager, tempdir, samfilters,
             )
         else:
             base_count = count_fastx_bases(sequencefile)
         full_report = find_repeats(
-            sequencefile, min_k, max_k, base_count,
-            no_context, jellyfish, jellyfish_hash_size, jobs, tempdir
+            sequencefile, min_k, max_k, min_repeats, base_count,
+            jellyfish, jellyfish_hash_size, jobs, tempdir,
         )
-    analysis = analyze_repeats(full_report)
-    filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
-    formatted_analysis = format_analysis(filtered_analysis, max_motifs)
-    formatted_analysis.to_csv(file, sep="\t", index=False)
+    if full_report is None:
+        columns = [
+            "#monomer", "motif", "length", "count", "abundance",
+            "p", "p_adjusted",
+        ]
+        print(*columns, sep="\t", file=file)
+    else:
+        analysis = analyze_repeats(full_report)
+        filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
+        formatted_analysis = format_analysis(
+            filtered_analysis, min_k, max_motifs,
+        )
+        formatted_analysis.to_csv(file, sep="\t", index=False)
