@@ -14,7 +14,6 @@ from collections import defaultdict
 from gzip import open as gzopen
 from pandas import DataFrame, Series, concat
 from scipy.stats import spearmanr
-from numpy import nan
 from statsmodels.stats.multitest import multipletests
 
 
@@ -87,22 +86,14 @@ def revcomp(sequence):
 
 
 @lru_cache(maxsize=None)
-def all_inversions(kmer):
-    return {kmer[i:]+kmer[:i] for i in range(len(kmer))}
-
-
-@lru_cache(maxsize=None)
-def is_revcomp_inversion(s1, s2):
-    return len(all_inversions(s1) & all_inversions(revcomp(s2))) != 0
-
-
-@lru_cache(maxsize=None)
 def get_motif_identity(kmer, min_repeats=2):
     """Reduce kmer to motif if motif in repeat context"""
-    lai = lowest_alpha_inversion(kmer)
-    motif = lai[:int(len(lai)/min_repeats)]
-    if motif * min_repeats == lai:
-        return motif
+    raw_motif = kmer[:int(len(kmer)/min_repeats)]
+    if raw_motif * min_repeats == kmer:
+        return min(
+            lowest_alpha_inversion(raw_motif),
+            lowest_alpha_inversion(revcomp(raw_motif)),
+        )
     else:
         return None
 
@@ -270,19 +261,11 @@ def correlation_worker(count_table, target_counts, method):
     ).T
 
 
-def collapse_revcomp(correlation_matrices):
-    """Remove identical entries for revcomp motifs"""
-    correlation_matrix = concat(correlation_matrices, axis=0)
-    correlation_matrix["__identity"] = correlation_matrix.index.map(
-        lambda m: min(m, lowest_alpha_inversion(revcomp(m)))
-    )
-    correlation_matrix = correlation_matrix.drop_duplicates()
-    return correlation_matrix.drop(columns="__identity")
-
-
 def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni", alpha=.05, jobs=1):
     """Combine motif counts and correlate; report significant correlations only"""
-    target_lai = lowest_alpha_inversion(target)
+    target_lai = min(
+        lowest_alpha_inversion(target), lowest_alpha_inversion(revcomp(target)),
+    )
     for count_table in count_tables: # find target counts:
         if target_lai in count_table:
             target_counts = count_table[target_lai]
@@ -298,15 +281,12 @@ def correlate_motifs(count_tables, target, method=spearmanr, adjust="bonferroni"
             future.result() for future in
             progressbar(futures, desc="Correlating counts", unit="k")
         ]
-    correlation_matrix = collapse_revcomp(correlation_matrices)
+    correlation_matrix = concat(correlation_matrices, axis=0)
     correlation_matrix.columns = [target, "p"]
     print("Adjusting p-values...", file=stderr, flush=True)
-    # remove revcomp-to-revcomp pairs and negative correlations:
-    for motif, (r, _) in correlation_matrix.iterrows():
-        if (r < 0) or is_revcomp_inversion(target_lai, motif):
-            correlation_matrix.loc[motif] = nan
+    # remove negative correlations:
+    correlation_matrix = correlation_matrix[correlation_matrix[target] >= 0]
     # apply multiple testing correction:
-    correlation_matrix = correlation_matrix.dropna()
     correlation_matrix["p_adjusted"] = multipletests(
         correlation_matrix["p"], method=adjust,
     )[1]
@@ -353,6 +333,8 @@ def main(sequencefile, fmt, target, min_k, max_k, min_repeats, kmer_counter, pre
                 desc="Interpreting motif counts",
             )
         ]
+        for k, count_table in enumerate(count_tables, start=min_k):
+            count_table.to_csv("{:02d}.csv.xz".format(k), compression="xz")
         correlation_matrix = correlate_motifs(
             count_tables, target=target, method=spearmanr, jobs=jobs,
         )
