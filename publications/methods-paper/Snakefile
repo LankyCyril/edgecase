@@ -775,7 +775,7 @@ rule shortread_repeatfinder_combined:
     output:
         tsv="data/datasets/shortread-combined-repeatfinder.tsv"
     params:
-        alpha=1.1
+        adjust=False, alpha=1.1
     run:
         rfs = OrderedDict([(
                 tsv.split("/")[4].split("-")[0],
@@ -786,16 +786,27 @@ rule shortread_repeatfinder_combined:
             rf.columns = ["monomer", name, name + " p-value"]
             # fix old repeatfinder's issue with 1-3-mers reported too short:
             rf["monomer"] = rf["monomer"].apply(lambda m: m*int(ceil(4/len(m))))
-        rf_combined = reduce(partial(merge, on="monomer"), rfs.values())
-        # adjust together:
-        p_locs = [c for c in rf_combined.columns if c.endswith(" p-value")]
-        pvals = rf_combined[p_locs].fillna(1).values.flatten()
-        flattened_p_adjusted = multipletests(pvals, method="bonferroni")[1]
-        p_adjusted = DataFrame(
-            data=flattened_p_adjusted.reshape(-1, len(p_locs)),
-            index=rf_combined.index, columns=[c+"-adjusted" for c in p_locs],
-        )
-        rf_adjusted = concat([rf_combined, p_adjusted], axis=1)
-        rf_adjusted = rf_adjusted[(p_adjusted<params.alpha).all(axis=1)]
-        rf_adjusted = rf_adjusted[["monomer"]+sorted(rf_adjusted.columns[1:])]
-        rf_adjusted.to_csv(output.tsv, sep="\t", index=False)
+        if params.adjust: # adjust together
+            rf_combined = reduce(partial(merge, on="monomer"), rfs.values())
+            p_locs = [c for c in rf_combined.columns if c.endswith(" p-value")]
+            pvals = rf_combined[p_locs].fillna(1).values.flatten()
+            flattened_p_adjusted = multipletests(pvals, method="bonferroni")[1]
+            p_adjusted = DataFrame(
+                data=flattened_p_adjusted.reshape(-1, len(p_locs)),
+                index=rf_combined.index,
+                columns=[c+"-adjusted" for c in p_locs],
+            )
+            rf_adjusted = concat([rf_combined, p_adjusted], axis=1)
+            rf_adjusted = rf_adjusted[(p_adjusted<params.alpha).all(axis=1)]
+            rf_adjusted = rf_adjusted[
+                ["monomer"]+sorted(rf_adjusted.columns[1:])
+            ]
+            rf_adjusted.to_csv(output.tsv, sep="\t", index=False)
+        else:
+            rf_combined = reduce(
+                partial(merge, how="outer", on="monomer"), rfs.values()
+            )
+            rf_combined = rf_combined[
+                ["monomer"]+sorted(rf_combined.columns[1:])
+            ]
+            rf_combined.to_csv(output.tsv, sep="\t", index=False)
