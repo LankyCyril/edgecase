@@ -61,6 +61,7 @@ rule all:
 
 
 rule telbam_to_fastq:
+    """Extracts reads in FASTQ format from telbams for: mapping to long reads; shortread-only analyses. Telbams come from previous analyses."""
     input: bam="{prefix}-telbam.bam"
     output: fq="{prefix}-telbam.fq.gz"
     run:
@@ -77,6 +78,7 @@ rule telbam_to_fastq:
 
 
 rule tailchopper_faidx:
+    """Creates a FASTA index (FAI) for mapping telbam FASTQs to long reads. Tailchopper BAMs come from previous analyses."""
     input: bam="{prefix}-tailchopper.bam"
     output: fa="{prefix}-tailchopper.fa", fai="{prefix}-tailchopper.fa.fai"
     shell: """
@@ -95,6 +97,7 @@ def map_telbam_to_tailchopper_input(w):
 
 
 rule map_telbam_to_tailchopper:
+    """Maps telbam FASTQs (from telbam_to_fastq) to tailchopper FASTAs (from tailchopper_faidx)"""
     input: unpack(map_telbam_to_tailchopper_input)
     output: bam="data/datasets/{group}/Illumina/{sample}/{sample}-telbam2tailchopper.bam"
     threads: 12
@@ -115,6 +118,7 @@ def telbam_support_input(w):
 
 
 rule telbam_support:
+    """Outputs stretches of long reads that are mapped by short telbam reads (from map_telbam_to_tailchopper)"""
     input:
         unpack(telbam_support_input)
     output:
@@ -232,6 +236,7 @@ def write_support_stats(telbam2tailchopper, telbam_fq, supported_bases, total_ba
 
 
 rule telbam_support_coverage:
+    """Calculates and visualizes telbam support of long reads (from telbam_support)"""
     input:
         telbam_fq="data/datasets/{group}/Illumina/{sample}/{sample}-telbam.fq.gz",
         telbam2tailchopper="data/datasets/{group}/Illumina/{sample}/{sample}-telbam2tailchopper.bam",
@@ -292,6 +297,13 @@ def repeatfinder_input(w):
 
 
 rule repeatfinder:
+    """Runs edgecase repeatfinder on any PacBio sample. Outputs of relevance to the paper:
+        GIAB: PacBio: HG001.RTG-repeatfinder-p_arm.tsv
+        GIAB: PacBio: HG001.RTG-repeatfinder-q_arm.tsv
+        GIAB: PacBio: HG002.10kb+15kb-repeatfinder-p_arm.tsv
+        GIAB: PacBio: HG002.10kb+15kb-repeatfinder-q_arm.tsv
+        GIAB: PacBio: HG005.10x-repeatfinder-p_arm.tsv
+        GIAB: PacBio: HG005.10x-repeatfinder-q_arm.tsv"""
     input:
         unpack(repeatfinder_input)
     output:
@@ -322,6 +334,10 @@ def load_repeatfinder(unfiltered_filenames, arm):
 
 
 rule giab_repeats:
+    """Combines GIAB repeatfinder results (from repeatfinder) into one table, calculates [TODO] Mudholkar-George combined p-values.
+    Outputs of relevance to the paper:
+        GIAB: PacBio: repeatfinder-paper-p_arm.tsv
+        GIAB: PacBio: repeatfinder-paper-q_arm.tsv"""
     input:
         giab=expand(
             "data/datasets/GIAB/PacBio/{sample}-repeatfinder-{arm}.tsv",
@@ -365,6 +381,9 @@ rule giab_repeats:
 
 
 rule plottable_repeats:
+    """Selects top repeats for plotting. Of relevance to the paper:
+        GIAB: PacBio: repeatfinder-plottable-p_arm.tsv
+        GIAB: PacBio: repeatfinder-plottable-q_arm.tsv"""
     input:
         giab=expand("data/datasets/GIAB/PacBio/repeatfinder-paper-{arm}.tsv", arm=["p_arm", "q_arm"]),
         chm=expand("data/datasets/T2T/PacBio/sorted_pbhifi_t2t_CHM13hTERT-repeatfinder-{arm}.tsv", arm=["p_arm", "q_arm"])
@@ -416,6 +435,13 @@ def get_sam_flags(arm):
 
 
 rule kmerscanner:
+    """Runs kmerscanner for only the plottable repeats (from plottable_repeats). Outputs of relevance to the paper:
+        GIAB: PacBio: HG001.RTG-kmerscanner-plottable-p_arm-temp.dat.gz
+        GIAB: PacBio: HG001.RTG-kmerscanner-plottable-q_arm-temp.dat.gz
+        GIAB: PacBio: HG002.10kb+15kb-kmerscanner-plottable-p_arm-temp.dat.gz
+        GIAB: PacBio: HG002.10kb+15kb-kmerscanner-plottable-q_arm-temp.dat.gz
+        GIAB: PacBio: HG005.10x-kmerscanner-plottable-p_arm-temp.dat.gz
+        GIAB: PacBio: HG005.10x-kmerscanner-plottable-q_arm-temp.dat.gz"""
     input: unpack(kmerscanner_input)
     output: dat=temp("{prefix}/{group}/PacBio/{sample}-kmerscanner-plottable-{arm}-temp.dat.gz")
     run:
@@ -427,6 +453,13 @@ rule kmerscanner:
 
 
 rule kmerscanner_filtered:
+    """Filters kmerscanner outputs (from kmerscanner) to only the chromosome arms that are covered enough. Of relevance to the paper:
+        GIAB: PacBio: HG001.RTG-kmerscanner-plottable-p_arm.dat.gz
+        GIAB: PacBio: HG001.RTG-kmerscanner-plottable-q_arm.dat.gz
+        GIAB: PacBio: HG002.10kb+15kb-kmerscanner-plottable-p_arm.dat.gz
+        GIAB: PacBio: HG002.10kb+15kb-kmerscanner-plottable-q_arm.dat.gz
+        GIAB: PacBio: HG005.10x-kmerscanner-plottable-p_arm.dat.gz
+        GIAB: PacBio: HG005.10x-kmerscanner-plottable-q_arm.dat.gz"""
     input: dat="{prefix}/{group}/PacBio/{sample}-kmerscanner-plottable-{arm}-temp.dat.gz"
     output: dat="{prefix}/{group}/PacBio/{sample}-kmerscanner-plottable-{arm}.dat.gz"
     params: min_reads=5
@@ -445,6 +478,7 @@ rule kmerscanner_filtered:
 
 
 rule densityplot:
+    """Plots density plots for each of the kmer scan files (from kmerscanner_filtered)"""
     input: dat="{prefix}/{group}/PacBio/{sample}-kmerscanner-plottable-{arm}.dat.gz"
     output: pdf="{prefix}/{group}/PacBio/{sample}-densityplot-{arm}.pdf"
     params: index="assets/hg38ext.fa.ecx"
@@ -457,6 +491,7 @@ rule densityplot:
 
 
 rule levenshtein:
+    """Runs Levenshtein-based clustering for all longread samples"""
     input: bam="{prefix}-tailpuller.bam", tsv="{prefix}-kmerscanner-plottable-{arm}.dat.gz"
     output: tsv="{prefix}-levenshtein-{arm}.tsv"
     params: directory="{prefix}-levenshtein-{arm}"
@@ -479,6 +514,7 @@ def haplotype_densityplots_input(w):
 
 
 rule haplotype_densityplots:
+    """Plots density plots for each of the haplotype kmer scan files (from levenshtein)"""
     input:
         haplotype_densityplots_input
     output:
@@ -513,6 +549,9 @@ rule haplotype_densityplots:
 
 
 rule kmerscan_for_bootstrap:
+    """Performs kmerscan with a different window size (BOOTSTRAP_W) for further bootstrapping.
+    Note: for visualization in densityplots, we ended up relying on seaborn's internal bootstrapping procedures, which are identical
+    to the ones outlined here."""
     input:
         bam="data/datasets/GIAB/PacBio/{sample}-tailpuller.bam",
         tsv="data/datasets/GIAB/PacBio/repeatfinder-paper-{arm}.tsv"
@@ -551,6 +590,7 @@ def bootstrap_margin(bdf, n_boot, ci_f, dropna=True):
 
 
 rule bootstrap_per_sample:
+    """Performs bootstrapping"""
     input: dat="data/datasets/GIAB/PacBio/{sample}-bootstrap/kmerscanner-{arm}.dat.gz"
     output: tsv="data/datasets/GIAB/PacBio/{sample}-bootstrap/bootstrap-{arm}.tsv.gz"
     params: n_boot=1000, ci_f=.95
@@ -596,6 +636,7 @@ def filter_margins(margins, arm, zeros_action="keep"):
 
 
 rule bootstrap_combined:
+    """Combines bootstraps for multiple samples into one dataframe; not used in the paper"""
     input:
         tsvs=expand(
             "data/datasets/GIAB/PacBio/{sample}-bootstrap/bootstrap-{arm}.tsv.gz",
@@ -625,6 +666,7 @@ def weighted_quantile(points, weights, q):
 
 
 rule bootstrap_median:
+    """Visualizes values of bootstrap median; not used in the paper"""
     input: tsv="data/datasets/GIAB/PacBio/bootstraps.tsv.gz"
     output: pdf="data/datasets/GIAB/PacBio/bootstraps.pdf"
     params: weighted=False
@@ -657,6 +699,7 @@ rule bootstrap_median:
 
 
 rule kmerscan_for_entropy:
+    """Performs kmerscan with a different window size (ENTROPY_W) for further calculation of entropy"""
     input:
         bam="data/datasets/GIAB/PacBio/{sample}-tailpuller.bam",
         tsv="data/datasets/GIAB/PacBio/repeatfinder-paper-{arm}.tsv"
@@ -678,6 +721,7 @@ def safe_idxmax(column):
 
 
 rule giab_entropy:
+    """Performs entropy calculation"""
     input: dat="data/datasets/GIAB/PacBio/{sample}-entropy/kmerscanner-{arm}.dat.gz"
     output: tsv="data/datasets/GIAB/PacBio/{sample}-entropy/entropies-{arm}.tsv.gz"
     run:
@@ -711,6 +755,7 @@ rule giab_entropy:
 
 
 rule giab_entropies:
+    """Combines entropies for multiple samples into one dataframe"""
     input:
         tsvs=expand(
             "data/datasets/GIAB/PacBio/{sample}-entropy/entropies-{arm}.tsv.gz",
