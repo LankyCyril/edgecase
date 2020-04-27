@@ -124,7 +124,7 @@ providing average coverages of $\sim$5x, $\sim$9x, and $\sim$6x, respectively, b
 
 \subsection*{Telomeric reads contain variations of the canonical motif}
 \addcontentsline{toc}{subsection}{Telomeric reads contain variations of the canonical motif}
-We performed \textit{de novo} repeat discovery in the supported regions for motifs of lengths 4 through 16 and identified motifs in repeat contexts that are statistically enriched in all three datasets.
+We performed \textit{de novo} repeat discovery in the supported regions for motifs of lengths 4 through 16 and identified motifs in repeat contexts that are statistically enriched in the three datasets.
 The majority of motifs were either the canonical TTAGGG / CCCTAA, its variation (e.g., TT\underline{G}GGG / CCC\underline{C}AA), or a duplet of variants, such as TTAGGGTTA\underline{G}GGG (\autoref{tab:repeatfinder_full}).
 CG-rich motifs were also observed on the \textit{p} arms.
 When the entire candidate PacBio CCS sequences were considered, the top enriched motif (TTAGGG) explained 79.9\% of the telomeric component, while all enriched motifs combined explained 87.7\%.
@@ -204,7 +204,7 @@ $ C_{0,0} = $ {\rmfamily count of target \textit{k}-mer},
 $ C_{0,1} = $ {\rmfamily sum of counts of other potentially classifiable \textit{k}-mers},
 $ C_{1,0} = $ {\rmfamily median count of \textit{k}-mer},
 $ C_{1,1} = $ {\rmfamily sum of counts of other non-classifiable \textit{k}-mers}.
-The Bonferroni multiple testing correction was applied to the resultant \textit{p}-values, and motifs for which \textit{k}-mers yielded \textit{p}-values below the cutoff of 0.05 were reported.
+The resultant \textit{p}-values for each motif among the samples were combined using the Mudholkar-George method \cite{george}, the Bonferroni multiple testing correction was applied, and motifs for which \textit{k}-mers yielded \textit{p}-values below the cutoff of 0.05 were reported.
 \\~\\
 As telomeric reads contain long low-complexity regions and present an alignment challenge, we evaluated concordance of their sequences without realignment of their portions that extended past the reference sequence.
 To that end, for all reads mapping to the same chromosomal arm, we calculated densities of each motif in a rolling window starting from the innermost mapped position.
