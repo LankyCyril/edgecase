@@ -193,7 +193,7 @@ To identify regions of the telomeres that are fully supported by both short and 
 with \textit{Telomerecat} \cite{telomerecat}, and selected those that mapped perfectly with \textit{minimap2} (at least a 50bp-long exact match without insertions or deletions, allowing all secondary mappings) to the telomeric regions of the PacBio CCS candidates from the same subject's dataset.
 \\~\\
 Within the regions supported by both PacBio CCS and Illumina candidate reads, overrepresentation of motifs of lengths $k \subset [4 .. 16]$ was tested.
-To target motifs in repeat contexts and to distinguish motifs differing by indels (for example, ACGT and ACGTT), doubled sequences (for example, \textit{k}-mer ACGTACGT for motif ACGT) were counted with \textit{jellyfish} \cite{jellyfish}, and counts of \textit{k}-mers synonymous with respect to circular shifts (for example, ACGTACGT and CGTACGTA) were summed together.
+To target motifs in repeat contexts, doubled sequences (for example, \textit{k}-mer ACGTACGT for motif ACGT) were counted with \textit{jellyfish} \cite{jellyfish}, and counts of \textit{k}-mers synonymous with respect to circular shifts (for example, ACGTACGT and CGTACGTA) were summed together.
 For each such \textit{k}-mer, Fisher's exact test was performed to determine whether its count is significant on the background of counts of other \textit{k}-mers of the same length.
 Briefly, we considered \textit{k}-mers with counts higher than 1.5 interquartile range above the third quartile of the distribution as potentially classifiable, and a 2\texttimes{}2 contingency matrix $ C $ for the test was constructed as follows:
 row 0 contained counts of potentially classifiable \textit{k}-mers,
