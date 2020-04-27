@@ -3,14 +3,13 @@ from re import search
 from statsmodels.stats.multitest import multipletests
 from itertools import product, count, chain
 from numpy import array, arange, fromiter, full_like, uint32, concatenate, nan
-from numpy import sort, ceil, trim_zeros, argsort, median, cumsum, interp
+from numpy import sort, ceil, argsort, median, cumsum, interp
 from numpy import log as log2
-from numpy.random import choice
 from glob import glob
 from os import path, getcwd
 from sys import path as sys_path
 from matplotlib.pyplot import switch_backend, subplots
-from seaborn import lineplot, heatmap, kdeplot
+from seaborn import lineplot, heatmap
 from pysam import AlignmentFile, FastxFile
 from gzip import open as gzopen
 from collections import defaultdict, OrderedDict
@@ -630,85 +629,6 @@ rule giab_entropies:
             print("{:03d}\t{:.6f}\t{:.6f}".format(int(q*100), qval, wqval))
 
 
-SHORTREAD_NASA_SAMPLES = [
-    "10X/Subject_1_1/Subject_1_1_Longranger_2_1_4_phased_possorted-telomerecat",
-    "10X/Subject_1_2/Subject_1_2_Longranger_2_1_4_phased_possorted-telomerecat",
-    "10X/Subject_1_3/Subject_1_3_Longranger_2_1_4_phased_possorted-telomerecat",
-    "10X/Subject_2/Subject_2_Longranger_2_1_4_phased_possorted-telomerecat",
-    "Illumina/A/A-telomerecat", "Illumina/B/B-telomerecat",
-    "Illumina/C/C-telomerecat", "Illumina/D/D-telomerecat",
-    "Illumina/PINE_MAR15_01/PINE_MAR15_01-telomerecat",
-    "Illumina/PINE_MAR15_02/PINE_MAR15_02-telomerecat",
-    "RNASeq/reads_out_unfiltered",
-]
-SHORTREAD_SAMPLES = ["NASA/" + sample for sample in SHORTREAD_NASA_SAMPLES]
-
-
-rule shortread_fasta:
-    input: bam="data/datasets/{sample}.bam"
-    output: fa="data/datasets/{sample}.fa"
-    shell: """
-        samtools view -F3844 {input.bam} \
-        | bioawk -c sam '{{print ">"$qname; print $seq}}' \
-        > {output.fa}
-    """
-
-
-rule shortread_repeatfinder:
-    input: fa="data/datasets/{sample}.fa"
-    output: tsv="data/datasets/{sample}-repeatfinder.tsv"
-    threads: 4
-    shell: """
-        ./edgecase repeatfinder -j {threads} \
-            -m 4 -M 16 -P 1.1 --fmt fastx {input.fa} > {output.tsv}
-    """
-
-
-rule shortread_repeatfinder_combined:
-    input:
-        tsvs=expand(
-            "data/datasets/{sample}-repeatfinder.tsv",
-            sample=SHORTREAD_SAMPLES
-        )
-    output:
-        tsv="data/datasets/shortread-combined-repeatfinder.tsv"
-    params:
-        adjust=False, alpha=1.1
-    run:
-        rfs = OrderedDict([(
-                tsv.split("/")[4].split("-")[0],
-                read_csv(tsv, sep="\t", usecols=(0, 4, 5))
-            ) for tsv in input.tsvs
-        ])
-        for name, rf in rfs.items():
-            rf.columns = ["monomer", name, name + " p-value"]
-            # fix old repeatfinder's issue with 1-3-mers reported too short:
-            rf["monomer"] = rf["monomer"].apply(lambda m: m*int(ceil(4/len(m))))
-        if params.adjust: # adjust together
-            rf_combined = reduce(partial(merge, on="monomer"), rfs.values())
-            p_locs = [c for c in rf_combined.columns if c.endswith(" p-value")]
-            pvals = rf_combined[p_locs].fillna(1).values.flatten()
-            flattened_p_adjusted = multipletests(pvals, method="bonferroni")[1]
-            p_adjusted = DataFrame(
-                data=flattened_p_adjusted.reshape(-1, len(p_locs)),
-                index=rf_combined.index,
-                columns=[c+"-adjusted" for c in p_locs],
-            )
-            rf_adjusted = concat([rf_combined, p_adjusted], axis=1)
-            rf_adjusted = rf_adjusted[(p_adjusted<params.alpha).all(axis=1)]
-            rf_adjusted = rf_adjusted[
-                ["monomer"]+sorted(rf_adjusted.columns[1:])
-            ]
-            rf_adjusted.to_csv(output.tsv, sep="\t", index=False)
-        else:
-            rf_combined = reduce(
-                partial(merge, how="outer", on="monomer"), rfs.values()
-            )
-            rf_combined = rf_combined[
-                ["monomer"]+sorted(rf_combined.columns[1:])
-            ]
-            rf_combined.to_csv(output.tsv, sep="\t", index=False)
-
-
-# Retained for documentation purposes:
-include: "../../publications/methods-paper/snakefiles/bootstraps.snake"
+# Retained for documentation/historical purposes:
+# include: "../../publications/methods-paper/snakefiles/old-shortread.snake"
+# include: "../../publications/methods-paper/snakefiles/bootstraps.snake"

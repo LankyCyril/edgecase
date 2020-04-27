@@ -1,3 +1,8 @@
+from numpy import sort, trim_zeros
+from numpy.random import choice
+from seaborn import kdeplot
+
+
 BOOTSTRAP_W = 10
 
 
