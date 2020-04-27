@@ -13,7 +13,7 @@ from seaborn import lineplot, heatmap
 from pysam import AlignmentFile, FastxFile
 from gzip import open as gzopen
 from collections import defaultdict, OrderedDict
-from scipy.stats import entropy
+from scipy.stats import combine_pvalues, entropy
 from functools import reduce, partial
 
 sys_path.insert(0, getcwd())
@@ -325,7 +325,7 @@ def load_repeatfinder(unfiltered_filenames, arm):
 
 
 rule giab_repeats:
-    """Combines GIAB repeatfinder results (from repeatfinder) into one table, calculates [TODO] Mudholkar-George combined p-values.
+    """Combines GIAB repeatfinder results (from repeatfinder) into one table, calculates Mudholkar-George combined p-values.
     Outputs of relevance to the paper:
         GIAB: PacBio: repeatfinder-paper-p_arm.tsv
         GIAB: PacBio: repeatfinder-paper-q_arm.tsv"""
@@ -345,28 +345,23 @@ rule giab_repeats:
         subjects = p_arm_subjects
         merged_report = concat([p_arm_report, q_arm_report], axis=0)
         p_ilocs = list(range(1, len(input.giab), 2))
-        flattened_p_adjusted = multipletests(
-            merged_report.iloc[:,p_ilocs].fillna(1).values.flatten(),
-            method="bonferroni"
-        )[1]
-        p_adjusted = DataFrame(
-            data=flattened_p_adjusted.reshape(-1, len(p_ilocs)),
-            index=merged_report.index,
-            columns=[subject+" p_adjusted" for subject in subjects]
+        george = merged_report.iloc[:,p_ilocs].fillna(1).apply(
+            lambda r: combine_pvalues(r, method="mudholkar_george")[1], axis=1,
         )
-        adjusted_merged_report = concat([merged_report, p_adjusted], axis=1)
-        adjusted_merged_report = adjusted_merged_report[
-            (p_adjusted<.05).all(axis=1)
-        ]
-        adjusted_merged_report.index.name = "#motif"
-        adjusted_merged_report = adjusted_merged_report[sorted(
-            c for c in adjusted_merged_report.columns if not c.endswith("p")
+        merged_report["mgp_adjusted"] = Series(
+            data=multipletests(george, method="bonferroni")[1],
+            index=george.index,
+        )
+        merged_report = merged_report[merged_report["mgp_adjusted"]<.05]
+        merged_report.index.name = "#motif"
+        merged_report = merged_report[sorted(
+            c for c in merged_report.columns if not c.endswith("p")
         )]
         subset_report = lambda df, arm: df[df["arm"]==arm].drop(columns="arm")
-        subset_report(adjusted_merged_report, "p_arm").to_csv(
+        subset_report(merged_report, "p_arm").to_csv(
             output.giab_merged_p_arm, sep="\t"
         )
-        subset_report(adjusted_merged_report, "q_arm").to_csv(
+        subset_report(merged_report, "q_arm").to_csv(
             output.giab_merged_q_arm, sep="\t"
         )
 
