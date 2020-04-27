@@ -24,7 +24,6 @@ Combined "pipeline" commands:
 
 Development area:
     levenshtein              cluster long reads by edit distance
-    shortread                experiments with short reads
 """
 
 
