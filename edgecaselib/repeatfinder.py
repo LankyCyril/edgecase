@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 from pysam import AlignmentFile, FastxFile
 from re import finditer, IGNORECASE
 from os import path
-from edgecaselib.util import get_executable, progressbar
+from edgecaselib.util import get_executable, progressbar, revcomp
 from edgecaselib.formats import filter_bam
 from functools import lru_cache
 from subprocess import check_output
@@ -18,7 +18,8 @@ __doc__ = """edgeCase repeatfinder: de novo repeat discovery
 Usage: {0} repeatfinder [-m integer] [-M integer] [-r integer] [-P float]
        {1}              [--jellyfish filename] [--jellyfish-hash-size string]
        {1}              [-n integer] [-j integer] [-f flagspec] [-g flagspec]
-       {1}              [-F flagspec] [-q integer] [--fmt string] <sequencefile>
+       {1}              [-F flagspec] [-q integer] [--fmt string]
+       {1}              [--collapse-reverse-complement] <sequencefile>
 
 Output:
     TSV-formatted file with statistics describing enriched motifs
@@ -36,6 +37,7 @@ Options:
     -s, --jellyfish-hash-size [string]  jellyfish initial hash size [default: 2G]
     -n, --max-motifs [integer]          maximum number of motifs to report
     -j, --jobs [integer]                number of jellyfish jobs (parallel threads) [default: 1]
+    -C, --collapse-reverse-complement   collapse counts of reverse complement motifs
 
 Input filtering options:
     -f, --flags [flagspec]              process only entries with all these sam flags present [default: 0]
@@ -54,7 +56,7 @@ __docopt_converters__ = [
 ]
 
 __docopt_tests__ = {
-    lambda min_k, max_k: 0 < min_k < max_k: "not satisfied: 0 < m < M",
+    lambda min_k, max_k: 0 < min_k <= max_k: "not satisfied: 0 < m <= M",
     lambda min_repeats: min_repeats > 0: "--min-repeats must be integer > 0",
 }
 
@@ -91,7 +93,7 @@ def count_fastx_bases(sequencefile, pattern=r'[acgt]', flags=IGNORECASE, desc="C
         )
 
 
-def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish, jellyfish_hash_size, jobs, tempdir):
+def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
     k_iterator = progressbar(
@@ -99,11 +101,13 @@ def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish,
     )
     for k in k_iterator:
         db = path.join(tempdir, "{}.db".format(k))
-        search_k = str(k * min_repeats)
-        check_output([
+        jellyfish_count_options = [
             jellyfish, "count", "-t", str(jobs), "-s", jellyfish_hash_size,
-            "-L", "0", "-m", search_k, "-o", db, sequencefile,
-        ])
+            "-L", "0", "-m", str(k * min_repeats)
+        ]
+        if collapse_reverse_complement:
+            jellyfish_count_options += ["-C"]
+        check_output(jellyfish_count_options + ["-o", db, sequencefile])
         tsv = path.join(tempdir, "{}.tsv".format(k))
         check_output([
             jellyfish, "dump", "-c", "-t", "-L", "0",
@@ -127,6 +131,14 @@ def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish,
 def lowest_alpha_inversion(kmer):
     """Get alphabetically lowest inversion of kmer (e.g., for TTAGGG will return AGGGTT)"""
     return min(kmer[i:]+kmer[:i] for i in range(len(kmer)))
+
+
+@lru_cache(maxsize=None)
+def lowest_collapsed_revcomp_alpha_inversion(kmer):
+    """Get alphabetically lowest inversion of kmer regardless of strand (e.g., for TTAGGG will return AACCCT)"""
+    return min(
+        lowest_alpha_inversion(kmer), lowest_alpha_inversion(revcomp(kmer)),
+    )
 
 
 def custom_alpha_inversion(motif):
@@ -160,13 +172,16 @@ def safe_fisher_exact(count, total_candidate_count, med, total_background_count)
         return 1
 
 
-def get_motifs_fisher(single_length_report):
+def get_motifs_fisher(single_length_report, collapse_reverse_complement=False):
     """Analyze repeat enrichment given the same motif length"""
     lengths = unique(single_length_report["length"].values)
     if len(lengths) != 1:
         raise ValueError("`get_motifs_fisher`: multiple lengths found")
     fishery = single_length_report.copy()
-    fishery["motif"] = fishery["kmer"].apply(lowest_alpha_inversion)
+    fishery["motif"] = fishery["kmer"].apply(
+        lowest_collapsed_revcomp_alpha_inversion if collapse_reverse_complement
+        else lowest_alpha_inversion
+    )
     fishery_groupby = fishery[["motif", "count", "abundance"]].groupby(
         "motif", as_index=False,
     )
@@ -191,10 +206,13 @@ def get_motifs_fisher(single_length_report):
     return candidates
 
 
-def analyze_repeats(full_report, adj="bonferroni"):
+def analyze_repeats(full_report, collapse_reverse_complement=False, adj="bonferroni"):
     """Analyze repeat enrichment for multiple lengths and apply multiple testing adjustment"""
     candidates = concat([
-        get_motifs_fisher(full_report[full_report["length"]==length])
+        get_motifs_fisher(
+            full_report[full_report["length"]==length],
+            collapse_reverse_complement=collapse_reverse_complement,
+        )
         for length in progressbar(
             unique(full_report["length"].values), unit="k",
             desc="Calculating enrichment",
@@ -274,7 +292,7 @@ def format_analysis(filtered_analysis, min_k, max_motifs):
         return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
@@ -287,7 +305,8 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
             base_count = count_fastx_bases(sequencefile)
         full_report = find_repeats(
             sequencefile, min_k, max_k, min_repeats, base_count,
-            jellyfish, jellyfish_hash_size, jobs, tempdir,
+            jellyfish, jellyfish_hash_size, collapse_reverse_complement,
+            jobs, tempdir,
         )
     if full_report is None:
         columns = [
@@ -296,7 +315,7 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
         ]
         print(*columns, sep="\t", file=file)
     else:
-        analysis = analyze_repeats(full_report)
+        analysis = analyze_repeats(full_report, collapse_reverse_complement)
         filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
         formatted_analysis = format_analysis(
             filtered_analysis, min_k, max_motifs,

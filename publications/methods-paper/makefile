@@ -1,4 +1,4 @@
-all: heterogeneity-of-telomeres-revealed-by-long-read-sequencing.pdf heterogeneity-of-telomeres-revealed-by-long-read-sequencing.docx
+all: heterogeneity-of-telomeres-revealed-by-long-read-sequencing.pdf
 
 %.pdf: %.tex
 	pdflatex $<
@@ -9,5 +9,5 @@ all: heterogeneity-of-telomeres-revealed-by-long-read-sequencing.pdf heterogenei
 	rm -f $(basename $<)-blx.bib $(basename $<).log $(basename $<).run.xml
 	rm -f $(basename $<).toc
 
-%.docx: %.tex
-	pandoc -s $< --bibliography=references.bib --csl=csl/springer-basic-brackets.csl -o $@
+%.odt: %.tex
+	./tex2office -i references.bib figures tables --svg heterogeneity-of-telomeres-revealed-by-long-read-sequencing.tex
