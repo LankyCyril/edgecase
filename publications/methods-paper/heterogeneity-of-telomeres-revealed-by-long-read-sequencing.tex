@@ -56,6 +56,9 @@
         Jared J. Luxton\textsuperscript{4,5},
         Jake Reed\textsuperscript{1},
         \\
+        Miles J. McKenna\textsuperscript{4,5},
+        Lynn Taylor\textsuperscript{4,5},
+        Kerry A. George\textsuperscript{4,5},
         Cem Meydan\textsuperscript{1,2,3},
         Susan M. Bailey\textsuperscript{4,5 *},
         Christopher E. Mason\textsuperscript{1,2,3,6 *}
@@ -128,7 +131,8 @@ providing average coverages of $\sim$5x, $\sim$9x, and $\sim$6x, respectively, b
 We performed \textit{de novo} repeat discovery in the supported regions for motifs of lengths 4 through 16 and identified motifs in repeat contexts that are statistically enriched in the three datasets.
 The majority of motifs were either the canonical TTAGGG / CCCTAA, its variation (e.g., TT\underline{G}GGG / CCC\underline{C}AA), or a duplet of variants, such as TTAGGGTTA\underline{G}GGG (\autoref{tab:repeatfinder_full}).
 CG-rich motifs were also observed on the \textit{p} arms.
-22 out of 27 (81.5\%) of these motifs were confirmed in independently generated human linked-read, short-read genomic, and short-read transcriptomic datasets (\autoref{tab:shortread_repeatfinder}).
+22 out of 27 (81.5\%) of these motifs were confirmed in independently generated human short-read and linked-read genomic datasets (\hyperref[sec:supp_methods]{Supplementary methods}, \autoref{tab:shortread_repeatfinder}).
+% ?? out of ?? (??.?\%) of these motifs were confirmed in independently generated human linked-read, short-read genomic, and short-read transcriptomic datasets (\hyperref[sec:supp_methods]{Supplementary methods}, \autoref{tab:shortread_repeatfinder}).
 When the entire candidate PacBio CCS sequences were considered, the top enriched motif (TTAGGG) explained 87.7\% of the telomeric component on the \textit{q} arms, and its reverse complement (CCCTAA) explained 50.9\% of the \textit{p} arm telomeric component, while all enriched motifs combined explained 89.3\% and 52.3\%, respectively.
 \autoref{fig:hg002_densityplot_q_arm} visualizes the locations of top four enriched motifs on the \textit{q} arm of the HG002 dataset; only the arms covered by at least 20 reads are displayed.
 Plots for other datasets and arms are available as supplementary figures: \autoref{fig:hg002_densityplot_p_arm} visualizes the motifs on the \textit{p} arm of the HG002 dataset, \autoref{fig:hg001_densityplots} and \autoref{fig:hg005_densityplots} visualize datasets HG001 and HG005 respectively.
@@ -140,14 +144,6 @@ Sequences of telomeric reads clustered by relative pairwise Levenshtein distance
 We examined the \textit{q} arms of the HG002 dataset to investigate this heterogeneity, as they provided the deepest coverage (\autoref{tab:telomeric_read_counts}), and found that, on 12 out of the 15 arms, reads clustered into two prominent groups per arm when maximizing the Bayesian information criterion \cite{bic} (see \hyperref[sec:methods]{Materials and Methods}).
 Pairwise distances between the reads within these clusters were significantly lower than those for out-of-cluster pairings, implying that distinct telomeric haplotypes are present.
 To quantify the differences between putative haplotypes, we calculated silhouette scores \cite{silhouette} for these clusterings (\autoref{tab:levenshtein-q_arm}), and generated motif density plots for the four chromosome arms with the highest such scores to visualize the differences in haplotypes (\autoref{fig:levenshtein_q_arm}).
-
-%\subsection*{Telomeric heterogeneity is evident in short, linked and long read sequencing of human subjects and cell lines}
-%\addcontentsline{toc}{subsection}{Telomeric heterogeneity is evident in short, linked and long read sequencing of human subjects and cell lines}
-%\textcolor{WCM}{Catch-all for PacBio CHM, astronaut Illumina and 10X} \\
-%\textcolor{WCM}{Motif variation present in all samples including real humans} \\
-%\textcolor{WCM}{Diplotypes or even triplotypes in telomeres of CHM, possibly astronauts. Mole diplotype is fine, cite paper that mentioned telo LD.}
-%\textcolor{WCM}{Illumina serves as proximal} \\
-%\textcolor{WCM}{OR BETTER: 10X serves as haplotype resolution}
 
 \section*{Discussion} \addcontentsline{toc}{section}{Discussion}
 Repeat-rich, low-complexity regions of the human genome such as telomeres have been historically recalcitrant to full mapping and annotation \cite{miga2015}, mainly due to the alignment challenge they pose and to the read lengths required to span such areas \cite{ngslowcomplexity}.
@@ -229,9 +225,6 @@ Levenshtein distances of all within-cluster pairings and of all out-of-cluster p
 Distinct clusters of reads within the same chromosome arm (adjusted Mann-Whitney U \textit{p}-value below 0.05) were reported as putative haplotypes.
 As the HG002 dataset was combined from two sequencing experiments, we investigated the provenance of reads in these haplotypes; reads from both sequencing experiments contributed to each haplotype with an average $\sim$1:2 ratio (\autoref{tab:hg002_haplotype_assignment}).
 
-%\subsection*{Proximal Illumina OR BETTER haplotypic 10X in astronauts}
-%\addcontentsline{toc}{subsection}{Proximal Illumina OR BETTER haplotypic 10X in astronauts}
-
 \section*{Availability and implementation} \addcontentsline{toc}{section}{Availability and implementation}
 The software for identification of telomeric reads, \textit{de novo} discovery of repeat motifs, haplotype inference and motif density visualization was implemented in Python and is freely available at \\ \href{https://github.com/lankycyril/edgecase}{github.com/lankycyril/edgecase}.
 
@@ -255,6 +248,7 @@ the NSF (1840275).
 \section*{Author contributions} \addcontentsline{toc}{section}{Author contributions}
 S.M.B. and C.E.M. conceived the study.
 K.G., J.F., and C.E.M. developed the framework and analyzed the data.
+D.Bu., J.J.L., M.J.M., L.T., and K.A.G. participated in sample collection and processing.
 D.Be., D.Bu., J.J.L, J.R., and C.M. analyzed the data.
 All authors edited the manuscript.
 
@@ -318,12 +312,26 @@ The authors declare no relevant conflict of interest.
 \singlespacing
 \addcontentsline{toc}{section}{Supplementary materials}
 \begin{center}
-    \Large{\textbf{Haplotype Diversity and Sequence Heterogeneity of Human Telomeres}}
+    \LARGE{\textbf{Haplotype Diversity and Sequence Heterogeneity of Human Telomeres}}
     \\~\\
     \small{Kirill Grigorev, Jonathan Foox \textit{et al.}}
-\end{center}
 \section*{Supplementary materials}
+\end{center}
 \doublespacing
+
+\subsection*{Supplementary methods} \addcontentsline{toc}{subsection}{Supplementary methods} \label{sec:supp_methods}
+
+We generated four whole-genome Illumina datasets (mean coverage $\sim$104x)
+and three linked-read 10X datasets (mean coverage $\sim$28x)
+for one individual at different timepoints aboard the International Space Station (ISS),
+and one additional linked-read 10X dataset (coverage $\sim$47x) for another individual aboard the ISS.
+From these whole-genome datasets, candidate telomeric short reads were selected using \textit{Telomerecat} \cite{telomerecat},
+and enriched repeated motifs were discovered \textit{de novo} with the method described in \hyperref[sec:methods]{Materials and Methods}.
+\textit{p}-values were combined with the Mudholkar-George method \cite{george} within each technology (Illumina, 10X Chromium),
+and the Bonferroni multiple testing correction was applied.
+Motifs that were significantly enriched (adjusted \textit{p}-value below the cutoff of 0.05) in the datasets produced by all three technologies (PacBio, Illumina, 10X Chromium), with respect to reverse-complemented equivalence, were reported (\autoref{tab:shortread_repeatfinder}).
+
+\pagebreak
 
 \subsection*{Supplementary figures} \addcontentsline{toc}{subsection}{Supplementary figures} \label{sec:supp_figs}
 
