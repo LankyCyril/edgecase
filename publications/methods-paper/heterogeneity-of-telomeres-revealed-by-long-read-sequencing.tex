@@ -128,7 +128,7 @@ providing average coverages of $\sim$5x, $\sim$9x, and $\sim$6x, respectively, b
 We performed \textit{de novo} repeat discovery in the supported regions for motifs of lengths 4 through 16 and identified motifs in repeat contexts that are statistically enriched in the three datasets.
 The majority of motifs were either the canonical TTAGGG / CCCTAA, its variation (e.g., TT\underline{G}GGG / CCC\underline{C}AA), or a duplet of variants, such as TTAGGGTTA\underline{G}GGG (\autoref{tab:repeatfinder_full}).
 CG-rich motifs were also observed on the \textit{p} arms.
-\textcolor{WCM}{??\% (?? of ??)} of these motifs, including the top \textcolor{WCM}{??} enriched on both arms, were confirmed in independently generated human linked-read, short-read genomic, and short-read transcriptomic datasets (\textcolor{WCM}{Table S?}).
+22 out of 27 (81.5\%) of these motifs were confirmed in independently generated human linked-read, short-read genomic, and short-read transcriptomic datasets (\autoref{tab:shortread_repeatfinder}).
 When the entire candidate PacBio CCS sequences were considered, the top enriched motif (TTAGGG) explained 87.7\% of the telomeric component on the \textit{q} arms, and its reverse complement (CCCTAA) explained 50.9\% of the \textit{p} arm telomeric component, while all enriched motifs combined explained 89.3\% and 52.3\%, respectively.
 \autoref{fig:hg002_densityplot_q_arm} visualizes the locations of top four enriched motifs on the \textit{q} arm of the HG002 dataset; only the arms covered by at least 20 reads are displayed.
 Plots for other datasets and arms are available as supplementary figures: \autoref{fig:hg002_densityplot_p_arm} visualizes the motifs on the \textit{p} arm of the HG002 dataset, \autoref{fig:hg001_densityplots} and \autoref{fig:hg005_densityplots} visualize datasets HG001 and HG005 respectively.
@@ -386,6 +386,7 @@ The authors declare no relevant conflict of interest.
 
 \subsection*{Supplementary tables} \addcontentsline{toc}{subsection}{Supplementary tables}
 \input{tables/telomeric-read-counts.tex}
+\input{tables/shortread-repeatfinder.tex}
 \input{tables/HG002-haplotype-assignment.tex}
 
 \end{document}
