@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 from pysam import AlignmentFile, FastxFile
 from re import finditer, IGNORECASE
 from os import path
-from edgecaselib.util import get_executable, progressbar
+from edgecaselib.util import get_executable, progressbar, revcomp
 from edgecaselib.formats import filter_bam
 from functools import lru_cache
 from subprocess import check_output
@@ -56,7 +56,7 @@ __docopt_converters__ = [
 ]
 
 __docopt_tests__ = {
-    lambda min_k, max_k: 0 < min_k < max_k: "not satisfied: 0 < m < M",
+    lambda min_k, max_k: 0 < min_k <= max_k: "not satisfied: 0 < m <= M",
     lambda min_repeats: min_repeats > 0: "--min-repeats must be integer > 0",
 }
 
@@ -133,6 +133,14 @@ def lowest_alpha_inversion(kmer):
     return min(kmer[i:]+kmer[:i] for i in range(len(kmer)))
 
 
+@lru_cache(maxsize=None)
+def lowest_collapsed_revcomp_alpha_inversion(kmer):
+    """Get alphabetically lowest inversion of kmer regardless of strand (e.g., for TTAGGG will return AACCCT)"""
+    return min(
+        lowest_alpha_inversion(kmer), lowest_alpha_inversion(revcomp(kmer)),
+    )
+
+
 def custom_alpha_inversion(motif):
     """Get inversion of motif that looks closest to canonical (e.g., for AGGGTTC will return TTCAGGG)"""
     a, c, g, t = [motif.count(letter) for letter in "ACGT"]
@@ -164,13 +172,16 @@ def safe_fisher_exact(count, total_candidate_count, med, total_background_count)
         return 1
 
 
-def get_motifs_fisher(single_length_report):
+def get_motifs_fisher(single_length_report, collapse_reverse_complement=False):
     """Analyze repeat enrichment given the same motif length"""
     lengths = unique(single_length_report["length"].values)
     if len(lengths) != 1:
         raise ValueError("`get_motifs_fisher`: multiple lengths found")
     fishery = single_length_report.copy()
-    fishery["motif"] = fishery["kmer"].apply(lowest_alpha_inversion)
+    fishery["motif"] = fishery["kmer"].apply(
+        lowest_collapsed_revcomp_alpha_inversion if collapse_reverse_complement
+        else lowest_alpha_inversion
+    )
     fishery_groupby = fishery[["motif", "count", "abundance"]].groupby(
         "motif", as_index=False,
     )
@@ -195,10 +206,13 @@ def get_motifs_fisher(single_length_report):
     return candidates
 
 
-def analyze_repeats(full_report, adj="bonferroni"):
+def analyze_repeats(full_report, collapse_reverse_complement=False, adj="bonferroni"):
     """Analyze repeat enrichment for multiple lengths and apply multiple testing adjustment"""
     candidates = concat([
-        get_motifs_fisher(full_report[full_report["length"]==length])
+        get_motifs_fisher(
+            full_report[full_report["length"]==length],
+            collapse_reverse_complement=collapse_reverse_complement,
+        )
         for length in progressbar(
             unique(full_report["length"].values), unit="k",
             desc="Calculating enrichment",
@@ -301,7 +315,7 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
         ]
         print(*columns, sep="\t", file=file)
     else:
-        analysis = analyze_repeats(full_report)
+        analysis = analyze_repeats(full_report, collapse_reverse_complement)
         filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
         formatted_analysis = format_analysis(
             filtered_analysis, min_k, max_motifs,

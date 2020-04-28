@@ -648,6 +648,32 @@ rule repeatfinder_shortread:
     """
 
 
+SHORTREAD_10X_SAMPLES = [
+    "Subject_1_1", "Subject_1_2", "Subject_1_3", "Subject_2",
+]
+SHORTREAD_ILLUMINA_SAMPLES = [
+    "A", "B", "C", "D",
+]
+
+
+def repeatfinder_combined_input(w):
+    if w.technology == "10X":
+        mask = "data/datasets/NASA/10X/{}/{}-telbam-repeatfinder.tsv"
+        samples = SHORTREAD_10X_SAMPLES
+    elif w.technology == "Illumina":
+        mask = "data/datasets/NASA/Illumina/{}/{}-telbam-repeatfinder.tsv"
+        samples = SHORTREAD_ILLUMINA_SAMPLES
+    else:
+        raise ValueError("technology='{}'".format(w.technology))
+    return [mask.format(sample, sample) for sample in samples]
+
+
+rule repeatfinder_combined:
+    """Combine shortread repeatfinder results per-technology (RNA-seq [TODO], Illumina, 10X)"""
+    input: repeatfinder_combined_input
+    output: tsv="data/datasets/NASA/{technology}/{technology}-repeatfinder.tsv"
+
+
 # Retained for documentation/historical purposes:
 # include: "../../publications/methods-paper/snakefiles/old-shortread.snake"
 # include: "../../publications/methods-paper/snakefiles/bootstraps.snake"
