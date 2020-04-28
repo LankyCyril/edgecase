@@ -624,6 +624,30 @@ rule giab_entropies:
             print("{:03d}\t{:.6f}\t{:.6f}".format(int(q*100), qval, wqval))
 
 
+rule telbam_to_fasta:
+    """Extracts reads in FASTA format from telbams for shortread-only repeatfinder"""
+    input: bam="data/datasets/NASA/{technology}/{subject}/{subject}-telbam.bam"
+    output: fa="data/datasets/NASA/{technology}/{subject}/{subject}-telbam.fa"
+    threads: 4
+    shell: """
+        samtools collate -@{threads} \
+            -o {input.bam}-collated {input.bam} {input.bam}-collation-temp
+        samtools fasta -n -F3844 {input.bam}-collated > {output.fa}
+        rm -f {input.bam}-collated
+    """
+
+
+rule repeatfinder_shortread:
+    """Runs repeatfinder in --collapse-reverse-complement mode on short read data"""
+    input: fa="data/datasets/NASA/{technology}/{subject}/{subject}-telbam.fa"
+    output: tsv="data/datasets/NASA/{technology}/{subject}/{subject}-telbam-repeatfinder.tsv"
+    threads: 4
+    shell: """
+        ./edgecase repeatfinder -j {threads} -C -s 8G \
+            -m 4 -M 16 -P 1.1 --fmt fastx {input.fa} > {output.tsv}
+    """
+
+
 # Retained for documentation/historical purposes:
 # include: "../../publications/methods-paper/snakefiles/old-shortread.snake"
 # include: "../../publications/methods-paper/snakefiles/bootstraps.snake"

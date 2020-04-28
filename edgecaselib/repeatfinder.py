@@ -18,7 +18,8 @@ __doc__ = """edgeCase repeatfinder: de novo repeat discovery
 Usage: {0} repeatfinder [-m integer] [-M integer] [-r integer] [-P float]
        {1}              [--jellyfish filename] [--jellyfish-hash-size string]
        {1}              [-n integer] [-j integer] [-f flagspec] [-g flagspec]
-       {1}              [-F flagspec] [-q integer] [--fmt string] <sequencefile>
+       {1}              [-F flagspec] [-q integer] [--fmt string]
+       {1}              [--collapse-reverse-complement] <sequencefile>
 
 Output:
     TSV-formatted file with statistics describing enriched motifs
@@ -36,6 +37,7 @@ Options:
     -s, --jellyfish-hash-size [string]  jellyfish initial hash size [default: 2G]
     -n, --max-motifs [integer]          maximum number of motifs to report
     -j, --jobs [integer]                number of jellyfish jobs (parallel threads) [default: 1]
+    -C, --collapse-reverse-complement   collapse counts of reverse complement motifs
 
 Input filtering options:
     -f, --flags [flagspec]              process only entries with all these sam flags present [default: 0]
@@ -91,7 +93,7 @@ def count_fastx_bases(sequencefile, pattern=r'[acgt]', flags=IGNORECASE, desc="C
         )
 
 
-def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish, jellyfish_hash_size, jobs, tempdir):
+def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
     k_iterator = progressbar(
@@ -99,11 +101,13 @@ def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish,
     )
     for k in k_iterator:
         db = path.join(tempdir, "{}.db".format(k))
-        search_k = str(k * min_repeats)
-        check_output([
+        jellyfish_count_options = [
             jellyfish, "count", "-t", str(jobs), "-s", jellyfish_hash_size,
-            "-L", "0", "-m", search_k, "-o", db, sequencefile,
-        ])
+            "-L", "0", "-m", str(k * min_repeats)
+        ]
+        if collapse_reverse_complement:
+            jellyfish_count_options += ["-C"]
+        check_output(jellyfish_count_options + ["-o", db, sequencefile])
         tsv = path.join(tempdir, "{}.tsv".format(k))
         check_output([
             jellyfish, "dump", "-c", "-t", "-L", "0",
@@ -274,7 +278,7 @@ def format_analysis(filtered_analysis, min_k, max_motifs):
         return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
@@ -287,7 +291,8 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, m
             base_count = count_fastx_bases(sequencefile)
         full_report = find_repeats(
             sequencefile, min_k, max_k, min_repeats, base_count,
-            jellyfish, jellyfish_hash_size, jobs, tempdir,
+            jellyfish, jellyfish_hash_size, collapse_reverse_complement,
+            jobs, tempdir,
         )
     if full_report is None:
         columns = [
