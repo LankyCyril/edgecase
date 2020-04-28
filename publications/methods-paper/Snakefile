@@ -19,6 +19,7 @@ from functools import reduce, partial
 sys_path.insert(0, getcwd())
 from edgecaselib.formats import load_kmerscan, PAPER_PALETTE, PAPER_PALETTE_RC
 from edgecaselib.util import progressbar, natsorted_chromosomes
+from edgecaselib.repeatfinder import lowest_collapsed_revcomp_alpha_inversion
 
 
 PACBIO_NAME_TO_SAMPLE = {
@@ -336,23 +337,18 @@ rule giab_repeats:
             arm=["p_arm", "q_arm"]
         )
     output:
-        giab_merged_p_arm="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm.tsv",
-        giab_merged_q_arm="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm.tsv"
+        giab_merged_p_arm="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm-unadjusted.tsv",
+        giab_merged_q_arm="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm-unadjusted.tsv"
     run:
         p_arm_report, p_arm_subjects = load_repeatfinder(input.giab, "p_arm")
         q_arm_report, q_arm_subjects = load_repeatfinder(input.giab, "q_arm")
         assert set(p_arm_subjects) == set(q_arm_subjects)
         subjects = p_arm_subjects
-        merged_report = concat([p_arm_report, q_arm_report], axis=0)
+        merged_report = concat([p_arm_report, q_arm_report], axis=0).dropna()
         p_ilocs = list(range(1, len(input.giab), 2))
-        george = merged_report.iloc[:,p_ilocs].fillna(1).apply(
+        merged_report["mgpval"] = merged_report.iloc[:,p_ilocs].fillna(1).apply(
             lambda r: combine_pvalues(r, method="mudholkar_george")[1], axis=1,
         )
-        merged_report["mgp_adjusted"] = Series(
-            data=multipletests(george, method="bonferroni")[1],
-            index=george.index,
-        )
-        merged_report = merged_report[merged_report["mgp_adjusted"]<.05]
         merged_report.index.name = "#motif"
         merged_report = merged_report[sorted(
             c for c in merged_report.columns if not c.endswith("p")
@@ -656,7 +652,7 @@ SHORTREAD_ILLUMINA_SAMPLES = [
 ]
 
 
-def repeatfinder_combined_input(w):
+def shortread_repeatfinder_combined_input(w):
     if w.technology == "10X":
         mask = "data/datasets/NASA/10X/{}/{}-telbam-repeatfinder.tsv"
         samples = SHORTREAD_10X_SAMPLES
@@ -668,10 +664,67 @@ def repeatfinder_combined_input(w):
     return [mask.format(sample, sample) for sample in samples]
 
 
-rule repeatfinder_combined:
+rule shortread_repeatfinder_combined:
     """Combine shortread repeatfinder results per-technology (RNA-seq [TODO], Illumina, 10X)"""
-    input: repeatfinder_combined_input
-    output: tsv="data/datasets/NASA/{technology}/{technology}-repeatfinder.tsv"
+    input: shortread_repeatfinder_combined_input
+    output: tsv="data/datasets/NASA/{technology}/{technology}-repeatfinder-unadjusted.tsv"
+    run:
+        rfs = [
+            read_csv(tsv, sep="\t", usecols=(0, 4, 5), escapechar="#").rename(
+                columns={
+                    "abundance": tsv.split("/")[-1].split("-")[0],
+                    "p": tsv.split("/")[-1].split("-")[0]+" p",
+                }
+            )
+            for tsv in input
+        ]
+        merged_report = concat(
+            [rf.set_index("monomer") for rf in rfs], axis=1,
+        ).dropna()
+        merged_report["mgpval"] = merged_report.iloc[:,1::2].fillna(1).apply(
+            lambda r: combine_pvalues(r, method="mudholkar_george")[1], axis=1,
+        )
+        #george = merged_report.iloc[:,p_ilocs].fillna(1).apply(
+        #    lambda r: combine_pvalues(r, method="mudholkar_george")[1], axis=1,
+        #)
+        #merged_report["mgp_adjusted"] = Series(
+        #    data=multipletests(george, method="bonferroni")[1],
+        #    index=george.index,
+        #)
+        #merged_report = merged_report[merged_report["mgp_adjusted"]<.05]
+        merged_report.index.name = "#motif"
+        merged_report = merged_report[sorted(
+            c for c in merged_report.columns if not c.endswith("p")
+        )]
+        merged_report.to_csv(output.tsv, sep="\t")
+
+
+rule all_platform_repeatfinder_adjusted:
+    input:
+        giab_p="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm-unadjusted.tsv",
+        giab_q="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm-unadjusted.tsv",
+        illumina="data/datasets/NASA/Illumina/Illumina-repeatfinder-unadjusted.tsv",
+        chromium="data/datasets/NASA/10X/10X-repeatfinder-unadjusted.tsv",
+    output:
+        giab_p="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm.tsv",
+        giab_q="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm.tsv",
+        illumina="data/datasets/NASA/Illumina/Illumina-repeatfinder.tsv",
+        chromium="data/datasets/NASA/10X/10X-repeatfinder.tsv",
+    run:
+        pvals = concat(
+            [read_csv(tsv, sep="\t")["mgpval"] for tsv in input], axis=0,
+        )
+        p_adjusted = multipletests(pvals, method="bonferroni")[1]
+        bonferroni_lookup = {p: padj for p, padj in zip(pvals, p_adjusted)}
+        for dataset, tsv in input.items():
+            rf = read_csv(tsv, sep="\t")
+            rf["p_adjusted"] = rf["mgpval"].map(bonferroni_lookup)
+            rf = rf.drop(columns="mgpval")
+            rf["#motif"] = rf["#motif"].apply( # fix old repeatfinder motifs
+                lambda m: m*int(ceil(4/len(m))) if len(m) < 4 else m
+            )
+            rf = rf[rf["p_adjusted"]<.05]
+            rf.to_csv(output[dataset], sep="\t", index=False)
 
 
 # Retained for documentation/historical purposes:
