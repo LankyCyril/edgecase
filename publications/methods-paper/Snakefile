@@ -18,8 +18,9 @@ from functools import reduce, partial
 
 sys_path.insert(0, getcwd())
 from edgecaselib.formats import load_kmerscan, PAPER_PALETTE, PAPER_PALETTE_RC
-from edgecaselib.util import progressbar, natsorted_chromosomes
+from edgecaselib.util import progressbar, natsorted_chromosomes, revcomp
 from edgecaselib.repeatfinder import lowest_collapsed_revcomp_alpha_inversion
+from edgecaselib.repeatfinder import custom_alpha_inversion
 
 
 PACBIO_NAME_TO_SAMPLE = {
@@ -725,6 +726,45 @@ rule all_platform_repeatfinder_adjusted:
             )
             rf = rf[rf["p_adjusted"]<.05]
             rf.to_csv(output[dataset], sep="\t", index=False)
+
+
+rule all_platform_repeatfinder_intersected:
+    input:
+        giab_p="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm.tsv",
+        giab_q="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm.tsv",
+        illumina="data/datasets/NASA/Illumina/Illumina-repeatfinder.tsv",
+        chromium="data/datasets/NASA/10X/10X-repeatfinder.tsv",
+    output:
+        tsv="data/datasets/NASA/repeatfinder-intersected-with-GIAB.tsv"
+    run:
+        get_cmc = lambda tsv: set(read_csv(tsv, sep="\t")["#motif"].apply(
+            lowest_collapsed_revcomp_alpha_inversion
+        ))
+        common_motifs_collapsed = (
+            (get_cmc(input.giab_p) | get_cmc(input.giab_q)) &
+            get_cmc(input.illumina) &
+            get_cmc(input.chromium)
+        )
+        def resubset(tsv, name):
+            rf = read_csv(tsv, sep="\t", index_col=0)
+            rf.index = rf.index.map(lowest_collapsed_revcomp_alpha_inversion)
+            rf = rf.reindex(common_motifs_collapsed)
+            rf["median"] = rf.iloc[:,:-1].median(axis=1)
+            rf = rf.iloc[:,[-1,-2]]
+            rf.columns = [name+" median abundance", name+" adjusted p-value"]
+            rf.index = rf.index.map(revcomp).map(custom_alpha_inversion)
+            return rf
+        shortread_rf = concat([
+                resubset(input.illumina, "illumina"),
+                resubset(input.chromium, "chromium")
+            ],
+            axis=1
+        )
+        shortread_rf.sort_values(
+            by="chromium median abundance", ascending=False,
+        ).to_csv(
+            output.tsv, sep="\t",
+        )
 
 
 # Retained for documentation/historical purposes:
