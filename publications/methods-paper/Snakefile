@@ -469,7 +469,7 @@ rule densityplot:
         shell_flags, _ = get_sam_flags(wildcards.arm)
         shell("""
             ./edgecase densityplot --palette paper -x {params.index} \
-                {shell_flags} -z {input.dat} > {output.pdf}
+                --title ' ' {shell_flags} -z {input.dat} > {output.pdf}
         """)
 
 
