@@ -11,10 +11,8 @@ from itertools import chain
 from base64 import b64encode
 
 # Example: ./tex2office -i references.bib figures tables paper.tex
-# TODO: formatting of references
 # TODO: formatting of tables
 # TODO: quality of converted PNGs (SVGs are fine)
-# TODO: textsuperscript
 
 
 BIBREGEX = r'bibliography|bibtex|biblatex|addbibresource'
@@ -162,6 +160,7 @@ def simplify_html(basename, workdir, debug):
     iter_unwanted_tags = chain(
         soup.find_all(text=lambda t: isinstance(t, Comment)),
         soup.find_all("hr"),
+        soup.find_all("dt"), # to be replaced with <li>s
     )
     for unwanted_tag in iter_unwanted_tags:
         unwanted_tag.extract()
@@ -273,10 +272,20 @@ def adjust_PICs(soup, workdir, request_svg, print_area_width, print_area_height,
     return soup
 
 
-def soffice_convert(soup, basename, workdir, to, debug, prefix="converted"):
+def fix_bib(html_in, html_out):
+    with open(html_in, mode="rt") as mess:
+        with open(html_out, mode="wt") as nomess:
+            for line in map(str.strip, mess):
+                line = sub(r'<dl', "<ol", line)
+                line = sub(r'</dl', "</ol", line)
+                line = sub(r'</dl', "</ol", line)
+                line = sub(r'<dd', "<li", line)
+                line = sub(r'</dd', "</li", line)
+                print(line, file=nomess)
+
+
+def soffice_convert(workdir, to, debug, prefix):
     """Convert soup to ODT/DOCX with LibreOffice (soffice)"""
-    with open(path.join(workdir, prefix+".html"), mode="wt") as html:
-        print(soup, file=html)
     if to == "odt":
         soffice_command = [
             "soffice", "--headless", "--convert-to",
@@ -294,7 +303,7 @@ def soffice_convert(soup, basename, workdir, to, debug, prefix="converted"):
     return prefix + "." + to
 
 
-def main(args, TempDir):
+def main(args, TempDir, prefix="converted"):
     """Dispatches data and arguments to subroutines"""
     with TempDir() as workdir:
         basename = prepare_source(
@@ -314,9 +323,14 @@ def main(args, TempDir):
         soup_with_base64 = to_base64(
             soup_with_PIC_fix, workdir, args.debug,
         )
-        document = soffice_convert(
-            soup_with_base64, basename, workdir, args.to, args.debug,
+        html_with_messy_bib = path.join(workdir, "messy-"+prefix+".html")
+        with open(html_with_messy_bib, mode="wt") as html:
+            print(soup_with_base64, file=html)
+        fix_bib(
+            path.join(workdir, "messy-"+prefix+".html"),
+            path.join(workdir, prefix+".html"),
         )
+        document = soffice_convert(workdir, args.to, args.debug, prefix=prefix)
         final_document = sub(r'\.tex', "", args.tex) + "." + args.to
         call(["cp", path.join(workdir, document), final_document])
     return 0
