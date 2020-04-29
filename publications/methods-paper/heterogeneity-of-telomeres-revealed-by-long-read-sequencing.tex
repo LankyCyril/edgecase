@@ -248,7 +248,7 @@ the NSF (1840275).
 \section*{Author contributions} \addcontentsline{toc}{section}{Author contributions}
 S.M.B. and C.E.M. conceived the study.
 K.G., J.F., and C.E.M. developed the framework and analyzed the data.
-D.Bu., J.J.L., M.J.M., L.T., and K.A.G. participated in sample collection and processing.
+D.Bu., J.J.L., M.J.M., L.T., and K.A.G. participated in collection and processing of the ISS samples.
 D.Be., D.Bu., J.J.L, J.R., and C.M. analyzed the data.
 All authors edited the manuscript.
 
@@ -329,7 +329,8 @@ and one additional linked-read 10X dataset (coverage $\sim$47x) for another indi
 From these datasets, candidate telomeric short reads were selected using \textit{Telomerecat} \cite{telomerecat},
 and enriched repeated motifs were discovered \textit{de novo} with the method described in \hyperref[sec:methods]{Materials and Methods}.
 \textit{p}-values were combined with the Mudholkar-George method \cite{george} within each technology (Illumina, 10X),
-and the Bonferroni multiple testing correction was applied.
+and the Bonferroni multiple testing correction was applied
+(note: the Bonferroni correction was applied simultaneously to the \textit{p}-values for the motifs in PacBio reads (\autoref{tab:repeatfinder_full}) and for the motifs in short and linked reads).
 Motifs that were significantly enriched (adjusted \textit{p}-value below the cutoff of 0.05) in the datasets produced by all three technologies (PacBio, Illumina, 10X), with respect to reverse-complemented equivalence, were reported (\autoref{tab:shortread_repeatfinder}).
 
 \pagebreak
