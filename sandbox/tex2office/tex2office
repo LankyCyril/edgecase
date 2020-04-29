@@ -106,6 +106,10 @@ def prepare_source(tex, workdir, replace_fonts, debug, basename="source"):
             for line in map(str.strip, tex_in):
                 if line in replace_fonts:
                     print(PXFONTS, file=tex_out)
+                elif search(r'^\s*\\\\%rem\s*$', line):
+                    continue
+                elif search(r'\\\\%rem', line):
+                    print(sub(r'\\\\%rem', " ", line), file=tex_out)
                 else:
                     print(line, file=tex_out)
     return basename
