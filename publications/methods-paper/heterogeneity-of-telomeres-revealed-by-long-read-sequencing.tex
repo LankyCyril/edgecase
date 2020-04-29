@@ -131,11 +131,11 @@ providing average coverages of $\sim$5x, $\sim$9x, and $\sim$6x, respectively, b
 We performed \textit{de novo} repeat discovery in the supported regions for motifs of lengths 4 through 16 and identified motifs in repeat contexts that are statistically enriched in the three datasets.
 The majority of motifs were either the canonical TTAGGG / CCCTAA, its variation (e.g., TT\underline{G}GGG / CCC\underline{C}AA), or a duplet of variants, such as TTAGGGTTA\underline{G}GGG (\autoref{tab:repeatfinder_full}).
 CG-rich motifs were also observed on the \textit{p} arms.
-22 out of 27 (81.5\%) of these motifs were confirmed in independently generated human short-read and linked-read genomic datasets (\hyperref[sec:supp_methods]{Supplementary methods}, \autoref{tab:shortread_repeatfinder}).
+The top enriched motif (TTAGGG / CCCTAA) explained 43.3\%\textendash{}54.4\% of the telomeric repeat content on the \textit{q} arms, and 10.0\%\textendash{}22.7\% on the \textit{p} arms, while overall, four motifs on the \textit{q} arms and three motifs on the \textit{p} arms each explained at least 0.5\% of the repeat content.
+These top motifs, as well as 15 less enriched ones, were confirmed in independently generated human short-read and linked-read genomic datasets (\hyperref[sec:supp_methods]{Supplementary methods}, \autoref{tab:shortread_repeatfinder}).
 % ?? out of ?? (??.?\%) of these motifs were confirmed in independently generated human linked-read, short-read genomic, and short-read transcriptomic datasets (\hyperref[sec:supp_methods]{Supplementary methods}, \autoref{tab:shortread_repeatfinder}).
-When the entire candidate PacBio CCS sequences were considered, the top enriched motif (TTAGGG) explained 87.7\% of the telomeric component on the \textit{q} arms, and its reverse complement (CCCTAA) explained 50.9\% of the \textit{p} arm telomeric component, while all enriched motifs combined explained 89.3\% and 52.3\%, respectively.
-\autoref{fig:hg002_densityplot_q_arm} visualizes the locations of top four enriched motifs on the \textit{q} arm of the HG002 dataset; only the arms covered by at least 20 reads are displayed.
-Plots for other datasets and arms are available as supplementary figures: \autoref{fig:hg002_densityplot_p_arm} visualizes the motifs on the \textit{p} arm of the HG002 dataset, \autoref{fig:hg001_densityplots} and \autoref{fig:hg005_densityplots} visualize datasets HG001 and HG005 respectively.
+\autoref{fig:hg002_densityplot_q_arm} visualizes the locations of the top four enriched motifs on the \textit{q} arm of the HG002 dataset; only the arms covered by at least 20 reads are displayed.
+Plots for other datasets and arms are available as supplementary figures: \autoref{fig:hg002_densityplot_p_arm} visualizes the top three motifs on the \textit{p} arm of the HG002 dataset, \autoref{fig:hg001_densityplots} and \autoref{fig:hg005_densityplots} visualize datasets HG001 and HG005 respectively.
 Reads on each arm agreed on the locations of different motifs within any given 10 bp window (the median of normalized Shannon entropy was 0.000 for all data, and the 3rd quartile was 0.166, 0.074, and 0.211 for the three datasets, respectively, \autoref{fig:entropy}), indicating that locations of the variations are colinear among reads and are not a result of sequencing errors.
 
 \subsection*{Long-read sequencing resolves human telomeric haplotypes}
@@ -281,7 +281,7 @@ The authors declare no relevant conflict of interest.
     Only the arms covered by at least 20 reads are displayed.
     Shaded boxes span the mapped regions of the genome.
     Motif densities are plotted as stacked area charts; ribbons surrounding area boundaries represent the 95\% confidence interval of bootstrap.
-    Top four enriched motifs are plotted in color; pale tinted areas represent the density of any other motifs and non-repeating sequences (absence of enriched motifs).
+    Top four enriched motifs (contributing to at least 0.5\% of the repeat content) are plotted in color; pale tinted areas represent the density of any other motifs and non-repeating sequences (absence of enriched motifs).
     Absolute genomic coordinates are given in Mbp on the specific reference contigs the reads mapped to (for example, for chr5, reads mapped to the 500 Kbp-long subtelomeric assembly \mbox{5qtel\_1-500K\_1\_12\_12}).
     Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
 }
@@ -348,20 +348,19 @@ Motifs that were significantly enriched (adjusted \textit{p}-value below the cut
 \clearpage \pagebreak
 
 \begin{figure}[ht!] \centering
-\includegraphics[height=.9\textheight,width=\textwidth,keepaspectratio]{figures/HG002-densityplot-p_arm.pdf}
+\includegraphics[height=.9\textheight,width=\textwidth,keepaspectratio]{figures/threemotifp/HG002-densityplot-p_arm-threemotifp.pdf}
 \caption{
-    Motif densities at ends of chromosomal \textit{p} arms of the HG002 dataset.
+    Densities of top three enriched motifs (contributing to at least 0.5\% of the repeat content) at ends of chromosomal \textit{p} arms of the HG002 dataset.
     Only the arms covered by at least 20 reads are displayed.
     Genomic coordinates are given in Mbp.
     Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
-    The density of the CCGCG motif falls below the resolution of visual detection in the telomeric tract, but is also present in the subtelomeric region.
 }
 \label{fig:hg002_densityplot_p_arm}
 \end{figure}
 \clearpage \pagebreak
 
 \begin{figure}[ht!] \centering
-\includegraphics[height=.95\textheight,width=\textwidth,keepaspectratio]{figures/HG001-densityplots.pdf}
+\includegraphics[height=.95\textheight,width=\textwidth,keepaspectratio]{figures/threemotifp/HG001-densityplots-threemotifp.pdf}
 \caption{
     Motif densities at ends of chromosomal (A) \textit{p} and (B) \textit{q} arms of the HG001 dataset.
     Only the arms covered by at least 20 reads are displayed.
@@ -372,7 +371,7 @@ Motifs that were significantly enriched (adjusted \textit{p}-value below the cut
 \clearpage \pagebreak
 
 \begin{figure}[ht!] \centering
-\includegraphics[height=.95\textheight,width=\textwidth,keepaspectratio]{figures/HG005-densityplots.pdf}
+\includegraphics[height=.95\textheight,width=\textwidth,keepaspectratio]{figures/threemotifp/HG005-densityplots-threemotifp.pdf}
 \caption{
     Motif densities at ends of chromosomal (A) \textit{p} and (B) \textit{q} arms of the HG005 dataset.
     Only the arms covered by at least 20 reads are displayed.
