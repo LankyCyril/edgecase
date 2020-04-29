@@ -161,6 +161,9 @@ def simplify_html(basename, workdir, debug):
     )
     for unwanted_tag in iter_unwanted_tags:
         unwanted_tag.extract()
+    for tag in soup.find_all("sup"):
+        tag.attrs = {} # remove class="textsuperscript", only ruins things
+        tag.string = tag.string # remove nested spans in superscripts
     return soup
 
 
