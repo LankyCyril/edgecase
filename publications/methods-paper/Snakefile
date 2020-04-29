@@ -338,8 +338,8 @@ rule giab_repeats:
             arm=["p_arm", "q_arm"]
         )
     output:
-        giab_merged_p_arm="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm-unadjusted.tsv",
-        giab_merged_q_arm="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm-unadjusted.tsv"
+        giab_merged_p_arm=temp("data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm-unadjusted.tsv"),
+        giab_merged_q_arm=temp("data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm-unadjusted.tsv"),
     run:
         p_arm_report, p_arm_subjects = load_repeatfinder(input.giab, "p_arm")
         q_arm_report, q_arm_subjects = load_repeatfinder(input.giab, "q_arm")
