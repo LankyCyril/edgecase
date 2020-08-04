@@ -3,7 +3,7 @@ from regex import compile
 from re import split, search, IGNORECASE
 from shutil import which
 from os import path, access, X_OK
-from functools import partial
+from functools import partial, lru_cache
 from tqdm import tqdm
 
 
@@ -13,6 +13,7 @@ MAINCHROMS_T2T = {"chrX_fixedBionanoSV_centromereV3"}
 
 ALPHABET = list("ACGT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
+COMPLEMENT_PATTERN = compile(r'|'.join(COMPLEMENTS.keys()))
 MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}
 MOTIF_COMPLEMENT_PATTERN = compile(r'|'.join(MOTIF_COMPLEMENTS.keys()))
 
@@ -30,6 +31,17 @@ def validate_motif(motif):
     return (search(r'^[ACGT\[\]\.]*$', motif, flags=IGNORECASE) is not None)
 
 
+@lru_cache(maxsize=None)
+def revcomp(sequence, ignorecase=True):
+    """Reverse-complement a sequence"""
+    if ignorecase:
+        matcher = lambda match: COMPLEMENTS[match.group().upper()]
+    else:
+        matcher = lambda match: COMPLEMENTS[match.group()]
+    return COMPLEMENT_PATTERN.sub(matcher, sequence[::-1])
+
+
+@lru_cache(maxsize=None)
 def motif_revcomp(motif, ignorecase=True):
     """Reverse-complement a regex-like motif; only allows a subset of regex syntax (ACGT, dot, square brackets)"""
     if ignorecase:

@@ -8,3 +8,7 @@ jupyter
 *.log
 *.aux
 publications/astronaut-telomeres-paper
+publications/methods-paper/figures/*-.png
+publications/methods-paper/figures/*/*-.png
+publications/methods-paper/figures/*.svg
+publications/methods-paper/figures/*/*.svg
