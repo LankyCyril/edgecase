@@ -114,7 +114,6 @@ positional arguments:
 optional arguments:
   -x X, --index X            location of the reference .ecx index (REQUIRED)
   -f f, --flags f            process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g        process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F      process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q      process only entries with MAPQ >= Q (default: 0)
   -m M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
@@ -147,7 +146,6 @@ positional arguments:
 optional arguments:
   -x X, --index X        location of the reference .ecx index (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -t ?, --target ?       an ECX flag (cut relative to reference) or 'cigar' (default: tract_anchor)
@@ -172,7 +170,6 @@ positional arguments:
 
 optional arguments:
   -f f, --flags f             process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g         process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F       process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q       process only entries with MAPQ >= Q (default: 0)
   --fmt ?                     format of input file(s) (default: sam)
@@ -207,7 +204,6 @@ positional arguments:
 optional arguments:
   --motif-file M         file with repeated motif sequences (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -w W, --window-size W  size of the rolling window (default: 100)
@@ -243,7 +239,6 @@ positional arguments:
 
 optional arguments:
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   --kmerscanner-file ?   kmerscanner file (optional, for use with --output-dir)
@@ -281,7 +276,6 @@ positional arguments:
 optional arguments:
   -x X, --index X        location of the reference .ecx index (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -z, --gzipped          input is gzipped (must specify if any of -qfF present) (default: False)

@@ -408,10 +408,10 @@ def kmerscanner_input(w):
 def get_sam_flags(arm):
     if arm == "q_arm":
         shell_flags = "-f {} -F 3844".format(IS_Q_TRACT_ANCHOR)
-        samfilters = [IS_Q_TRACT_ANCHOR, 65535, 3844, 0]
+        samfilters = [IS_Q_TRACT_ANCHOR, 3844, 0]
     elif arm == "p_arm":
         shell_flags = "-f {} -F {}".format(TRACT_ANCHOR, IS_Q_3844)
-        samfilters = [TRACT_ANCHOR, 65535, IS_Q_3844, 0]
+        samfilters = [TRACT_ANCHOR, IS_Q_3844, 0]
     else:
         raise ValueError("Unknown `arm`: '{}'".format(arm))
     return shell_flags, samfilters

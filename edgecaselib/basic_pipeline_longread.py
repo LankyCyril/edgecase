@@ -89,13 +89,13 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
     tailpuller_sam = get_filename("tailpuller.sam")
     with open(tailpuller_sam, mode="wt") as sam:
         tailpuller.main(
-            bam, index, flags=0, flags_any=65535, flag_filter=3844,
+            bam, index, flags=0, flag_filter=3844,
             min_quality=min_quality, max_read_length=max_read_length, file=sam,
         )
     tailchopper_sam = get_filename("tailchopper.sam")
     with open(tailchopper_sam, mode="wt") as sam:
         tailchopper.main(
-            tailpuller_sam, index, target=target, flags=target, flags_any=65535,
+            tailpuller_sam, index, target=target, flags=target,
             flag_filter=3844, min_quality=min_quality, file=sam,
         )
     for arm, f, F in [("p", target, "is_q|3840"), ("q", target+"|is_q", 3840)]:
@@ -103,7 +103,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
         with open(repeatfinder_tsv, mode="wt") as tsv:
             repeatfinder.main(
                 tailchopper_sam, fmt="sam",
-                flags=f, flags_any=65535, flag_filter=F,
+                flags=f, flag_filter=F,
                 min_quality=min_quality, min_k=min_k, max_k=max_k,
                 max_motifs=max_motifs, max_p_adjusted=max_p_adjusted,
                 no_context=False, jellyfish=jellyfish, min_repeats=2,
@@ -112,7 +112,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
         kmerscanner_dat = get_filename("kmerscanner-{}_arm.dat.gz".format(arm))
         with gzopen(kmerscanner_dat, mode="wt") as dat:
             kmerscanner.main(
-                tailpuller_sam, flags=f, flags_any=65535, flag_filter=F,
+                tailpuller_sam, flags=f, flag_filter=F,
                 min_quality=min_quality, motif_file=repeatfinder_tsv,
                 head_test=None, tail_test=None, cutoff=None, num_reads=None,
                 window_size=window_size, jobs=jobs, file=dat,
@@ -126,7 +126,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
                     plot_title = "{}, {} arm".format(title, arm)
                 densityplot.main(
                     kmerscanner_dat, gzipped=True, index=index, flags=f,
-                    flags_any=65535, flag_filter=F, min_quality=min_quality,
+                    flag_filter=F, min_quality=min_quality,
                     bin_size=window_size, n_boot=n_boot, exploded=False,
                     zoomed_in=False, palette=palette, title=plot_title,
                     file=pdf,

@@ -80,10 +80,8 @@ def entry_filters_ok(entry_flag, entry_mapq, integer_samfilters):
         return (
             # -f, flags (all must be present):
             (entry_flag & integer_samfilters[0] == integer_samfilters[0]) and
-            # -g, flags_any (at least one must be present):
-            (entry_flag & integer_samfilters[1] != 0) and
             # -F, flag_filter (all must be absent):
-            (entry_flag & integer_samfilters[2] == 0)
+            (entry_flag & integer_samfilters[1] == 0)
         )
 
 

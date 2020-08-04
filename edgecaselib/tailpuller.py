@@ -12,8 +12,8 @@ from numpy import isnan, inf
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 
-Usage: {0} tailpuller -x filename [-f flagspec] [-g flagspec] [-F flagspec]
-       {1}            [-q integer] [-m integer] <bam>
+Usage: {0} tailpuller -x filename [-f flagspec] [-F flagspec] [-q integer]
+       {1}            [-m integer] <bam>
 
 Output:
     SAM-formatted file with reads overhanging anchors defined in index
@@ -29,7 +29,6 @@ Options:
 
 Input filtering options:
     -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
-    -g, --flags-any [flagspec]        process only entries with any of these sam flags present [default: 65535]
     -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]       process only entries with this MAPQ or higher [default: 0]
 """
@@ -126,10 +125,10 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
             )
 
 
-def main(bam, index, flags, flags_any, flag_filter, min_quality, max_read_length, file=stdout, **kwargs):
+def main(bam, index, flags, flag_filter, min_quality, max_read_length, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
-    samfilters = [flags, flags_any, flag_filter, min_quality]
+    samfilters = [flags, flag_filter, min_quality]
     with AlignmentFile(bam) as bam_data:
         reflens = dict(zip(bam_data.references, bam_data.lengths))
         print(str(bam_data.header).rstrip("\n"), file=file)
