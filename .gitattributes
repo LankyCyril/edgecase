@@ -1,2 +1,1 @@
-publications/methods-paper/heterogeneity-of-telomeres-revealed-by-long-read-sequencing.tex -linguist-detectable
-publications/poster-2019/grigorev-poster.tex -linguist-detectable
+*.tex -linguist-detectable
