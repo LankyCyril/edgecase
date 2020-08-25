@@ -114,7 +114,6 @@ positional arguments:
 optional arguments:
   -x X, --index X            location of the reference .ecx index (REQUIRED)
   -f f, --flags f            process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g        process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F      process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q      process only entries with MAPQ >= Q (default: 0)
   -m M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
@@ -147,7 +146,6 @@ positional arguments:
 optional arguments:
   -x X, --index X        location of the reference .ecx index (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -t ?, --target ?       an ECX flag (cut relative to reference) or 'cigar' (default: tract_anchor)
@@ -172,15 +170,14 @@ positional arguments:
 
 optional arguments:
   -f f, --flags f             process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g         process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F       process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q       process only entries with MAPQ >= Q (default: 0)
   --fmt ?                     format of input file(s) (default: sam)
   -m ?, --min-k ?             smallest target repeat length (default: 4)
   -M ?, --max-k ?             largest target repeat length (default: 16)
+  -r R, --min-repeats R       minimum number of consecutive repeats (default: 2)
   -n ?, --max-motifs ?        maximum number of motifs to report (default: None)
   -P ?, --max-p-adjusted ?    cutoff adjusted p-value (default: 0.05)
-  --no-context                allow single interspersed instances of kmers (default: False)
   --jellyfish ?               jellyfish binary (unless in $PATH) (default: None)
   --jellyfish-hash-size ?     jellyfish initial hash size (default: 2G)
   -j J, --jobs J              number of jellyfish jobs (parallel threads) (default: 1)
@@ -193,10 +190,7 @@ Relies on [jellyfish](http://www.genome.umd.edu/jellyfish.html) to count
 *k*-mers. If *edgeCase* has been installed with the Conda method (by creating
 an environment from *environment.yaml*), *jellyfish* is already installed and no
 special action is needed. Otherwise, it needs to be installed manually and, if
-not in $PATH, supplied with the *--jellyfish* option.  
-By default, only finds motifs in repeating contexts (e.g., treats motifs ACGT
-and ACGTT as completely distinct). This can be overridden with *--no-context*
-(to make ACGTT count towards both itself and ACGT).
+not in $PATH, supplied with the *--jellyfish* option.
 
 
 ### kmerscanner
@@ -210,7 +204,6 @@ positional arguments:
 optional arguments:
   --motif-file M         file with repeated motif sequences (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -w W, --window-size W  size of the rolling window (default: 100)
@@ -246,7 +239,6 @@ positional arguments:
 
 optional arguments:
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   --kmerscanner-file ?   kmerscanner file (optional, for use with --output-dir)
@@ -284,7 +276,6 @@ positional arguments:
 optional arguments:
   -x X, --index X        location of the reference .ecx index (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -z, --gzipped          input is gzipped (must specify if any of -qfF present) (default: False)

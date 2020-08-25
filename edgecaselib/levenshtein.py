@@ -21,6 +21,41 @@ from glob import glob
 from re import search
 
 
+__warning__ = """The `levenshtein` subprogram is in development!
+Pairwise distance computation is O(n^2) and is not suited for large scale
+experiments."""
+
+__doc__ = """edgeCase levenshtein: clustering of telomeric reads by distance
+
+Usage: {0} levenshtein [-m integer] [-o dirname] [--kmerscanner-file filename]
+       {1}             [-f flagspec] [-F flagspec] [-q integer] <sequencedata>
+
+Output:
+    * TSV-formatted file with statistics describing identified clusters;
+    * optionally (with --output-dir set) PDF files with clustermaps;
+    * optionally (with --output-dir and --kmerscanner-file set) kmerscanner
+      files for each identified clustering
+
+Positional arguments:
+    <sequencedata>                     name of input BAM/SAM file or directory with precomputed distances
+
+Options:
+    -m, --min-cluster-size [integer]   minimum cluster size to consider [default: 5]
+    -o, --output-dir [dirname]         output directory for clustermaps and per-haplotype SAM files
+    --kmerscanner-file [filename]      kmerscanner file (optional, for use with --output-dir)
+
+Input filtering options:
+    -f, --flags [flagspec]             process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]       process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]        process only entries with this MAPQ or higher [default: 0]
+"""
+
+__docopt_converters__ = [
+    lambda min_quality:
+        None if (min_quality is None) else int(min_quality),
+]
+
+
 CLUSTERMAP_FIGSIZE = (10, 10)
 CLUSTERMAP_CMAP = "viridis_r"
 CLUSTERMAP_VMAX = .15
@@ -34,7 +69,7 @@ def load_bam_as_dict(alignment, samfilters):
     for entry in filter_bam(alignment, samfilters, desc="Reading BAM"):
         bam_dict[entry.reference_name][entry.qname] = (
             entry.reference_start,
-            dna2int(entry.seq[entry.query_alignment_start:]).astype(uint8)
+            dna2int(entry.seq[entry.query_alignment_start:]).astype(uint8),
         )
     return bam_dict
 
@@ -82,7 +117,7 @@ def get_relative_read_ld(sra, A, srb, B, return_bases=False):
 def calculate_chromosome_lds(chrom, entries):
     """Calculate pairwise relative levenshtein distances between all reads mapping to one chromosome"""
     lds = DataFrame(
-        data=nan, columns=sorted(entries.keys()), index=sorted(entries.keys())
+        data=nan, columns=sorted(entries.keys()), index=sorted(entries.keys()),
     )
     read_iterator = progressbar(entries.items(), desc=chrom, unit="read")
     for aname, (sra, A) in read_iterator:
@@ -102,7 +137,7 @@ def generate_clustermap(lds, metric="euclidean", method="ward", cmap=CLUSTERMAP_
     try:
         cm = clustermap(
             data=lds, metric=metric, method=method,
-            cmap=cmap, vmin=0, vmax=vmax, figsize=CLUSTERMAP_FIGSIZE
+            cmap=cmap, vmin=0, vmax=vmax, figsize=CLUSTERMAP_FIGSIZE,
         )
     except (ValueError, ModuleNotFoundError):
         return None
@@ -123,8 +158,7 @@ def loglikelihood(*, n, m, f, v, k):
 def cluster_loglikelihood(*, cluster, dataset_size, n_features, k):
     """Calculate log likelihood for subcluster of a cluster"""
     return loglikelihood(
-        n=dataset_size, m=cluster.shape[0],
-        f=n_features, v=cluster.var(), k=k
+        n=dataset_size, m=cluster.shape[0], f=n_features, v=cluster.var(), k=k,
     )
 
 
@@ -142,7 +176,7 @@ def information_criterion(lds, labels, kind):
     return penalty + sum(
         cluster_loglikelihood(
             cluster=lds.loc[labels==label].values,
-            dataset_size=n, n_features=f, k=k
+            dataset_size=n, n_features=f, k=k,
         )
         for label in unique_labels
     )
@@ -155,7 +189,8 @@ def get_mwu_pval(lds, ingroup_visual_indexer):
     ingroup = lds.mask(~ingroup_indexer).values.flatten()
     outgroup = lds.mask(~outgroup_indexer).values.flatten()
     u, p = mannwhitneyu(
-        ingroup[~isnan(ingroup)], outgroup[~isnan(outgroup)], alternative="less"
+        ingroup[~isnan(ingroup)], outgroup[~isnan(outgroup)],
+        alternative="less",
     )
     return p
 
@@ -205,15 +240,15 @@ def generate_kmerscanner_file(kmerscanner_file, names, labels, output_dir, chrom
         data=[list(names), list(labels)], index=["#name", "label"]
     ).T
     haplo_dat = merge(
-        kmerscanner_dat, name_to_label.dropna(), on="#name", how="inner"
+        kmerscanner_dat, name_to_label.dropna(), on="#name", how="inner",
     )
     haplo_dat["chrom"] = haplo_dat.apply(
         lambda row: "{}:haplotype {}".format(row["chrom"], int(row["label"])),
-        axis=1
+        axis=1,
     )
     haplo_dat.drop(columns="label").to_csv(
         path.join(output_dir, chrom+".dat.gz"), compression="gzip",
-        sep="\t", index=False
+        sep="\t", index=False,
     )
 
 
@@ -221,7 +256,7 @@ def generate_report(report_rows, adj="bonferroni"):
     """Convert raw report to DataFrame and calculate adjusted p-values"""
     report = DataFrame(
         data=report_rows,
-        columns=["#chrom", "cluster_count", "silhouette_score", "p"]
+        columns=["#chrom", "cluster_count", "silhouette_score", "p"],
     )
     report["cluster_count"] = report["cluster_count"].astype(int)
     report["p_adjusted"] = multipletests(report["p"], method=adj)[1]
@@ -232,25 +267,25 @@ def draw_square(start, end, ax):
     """Draw fancy frame from (start, start) to (end, end)"""
     xy = (start, start)
     width = end - start + 1
-    ax.add_patch(
-        Rectangle(xy, width, width, fill=False, lw=5, ec="white", clip_on=False)
-    )
-    ax.add_patch(
-        Rectangle(xy, width, width, fill=False, lw=1, ec="black", clip_on=False)
-    )
+    ax.add_patch(Rectangle(
+        xy, width, width, fill=False, lw=5, ec="white", clip_on=False,
+    ))
+    ax.add_patch(Rectangle(
+        xy, width, width, fill=False, lw=1, ec="black", clip_on=False,
+    ))
 
 
 def apply_mask(cm, labels):
     """Draw rectangles around within-cluster pairings"""
     labeled_names = Series(index=cm.data.index, data=labels)
     ordered_labeled_names = labeled_names.loc[cm.data2d.index].to_frame(
-        name="label"
+        name="label",
     )
     ordered_labeled_names["position"] = range(len(ordered_labeled_names))
     labels_groupby = ordered_labeled_names.groupby("label")
     starts, ends = (
         labels_groupby.min().iloc[:,0],
-        labels_groupby.max().iloc[:,0]
+        labels_groupby.max().iloc[:,0],
     )
     for start, end in zip(starts, ends):
         draw_square(start, end, cm.ax_heatmap)
@@ -260,29 +295,29 @@ def generate_pdf(cm, silh_score, labels, output_dir, chrom, cmap=CLUSTERMAP_CMAP
     """Annotate clustermap figure and save to file"""
     cm.ax_col_dendrogram.clear()
     cm.ax_col_dendrogram.imshow(
-        vstack([linspace(0, 1, 256)]*2), aspect="auto", cmap=cmap
+        vstack([linspace(0, 1, 256)]*2), aspect="auto", cmap=cmap,
     )
     gp = cm.ax_col_dendrogram.get_position()
     cm.ax_col_dendrogram.set(
         position=[
             gp.x0*.25+gp.x1*.75, gp.y0*.5+gp.y1*.46, gp.x1*.1-gp.x0*.1, .015
         ],
-        zorder=float("inf")
+        zorder=float("inf"),
     )
     cm.ax_col_dendrogram.text(
-        x=-672, y=.8, va="center", ha="left", fontsize=19, s="Distance:  0"
+        x=-672, y=.8, va="center", ha="left", fontsize=19, s="Distance:  0",
     )
     cm.ax_col_dendrogram.text(
-        x=272, y=.8, va="center", ha="left", fontsize=19, s="{}+".format(vmax)
+        x=272, y=.8, va="center", ha="left", fontsize=19, s="{}+".format(vmax),
     )
     cm.ax_col_dendrogram.set_axis_off()
     silh_text = "N/A" if isnan(silh_score) else "{:.3f}".format(silh_score)
     cm.ax_col_dendrogram.text(
         x=-672, y=3, va="top", ha="left", fontsize=19,
-        s="Silhouette score: "+silh_text
+        s="Silhouette score: "+silh_text,
     )
     cm.ax_col_dendrogram.text(
-        x=-672, y=-4.9, va="top", ha="left", fontsize=19, s=chrom
+        x=-672, y=-4.9, va="top", ha="left", fontsize=19, s=chrom,
     )
     if matplotlib_version == "3.1.1": # stackoverflow.com/a/58165593
         bottom, top = cm.ax_heatmap.get_ylim()
@@ -298,15 +333,8 @@ def hide_stats_warnings(state=True):
         filterwarnings("ignore", message="invalid value encountered")
         filterwarnings(
             "ignore",
-            message="looks suspiciously like an uncondensed distance matrix"
+            message="looks suspiciously like an uncondensed distance matrix",
         )
-        msg1 = "the levenshtein subprogram is in development!"
-        msg2 = (
-            "pairwise distance computation is O(n^2) " +
-            "and not suited for large scale experiments"
-        )
-        print("WARNING:", msg1, file=stderr)
-        print("WARNING:", msg2, file=stderr)
     else:
         resetwarnings()
 
@@ -324,7 +352,7 @@ def process_levenshtein_input(sequencedata, samfilters, output_dir):
     elif path.isdir(sequencedata):
         tsv_iterator = progressbar(
             glob(path.join(sequencedata, "*-matrix.tsv")),
-            desc="Clustering", unit="chromsome"
+            desc="Clustering", unit="chromsome",
         )
         for tsv in tsv_iterator:
             chrom_matcher = search(r'([^/]+)-matrix\.tsv', tsv)
@@ -341,28 +369,28 @@ def process_levenshtein_input(sequencedata, samfilters, output_dir):
         raise IOError("Unknown type of input")
 
 
-def main(sequencedata, min_cluster_size, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
+def main(sequencedata, min_cluster_size, kmerscanner_file, output_dir, flags, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
     switch_backend("pdf")
     hide_stats_warnings(True)
     report_rows = []
     input_iterator = process_levenshtein_input(
-        sequencedata, [flags, flags_any, flag_filter, min_quality], output_dir
+        sequencedata, [flags, flag_filter, min_quality], output_dir,
     )
     for chrom, lds in input_iterator:
         cm = generate_clustermap(lds)
         if cm is not None:
             labels, k, silh_score, pval = get_clusters(
-                lds, cm.dendrogram_row.linkage, min_cluster_size
+                lds, cm.dendrogram_row.linkage, min_cluster_size,
             )
             if labels is not None:
                 if output_dir:
                     generate_pdf(
-                        cm, silh_score, labels, output_dir, chrom
+                        cm, silh_score, labels, output_dir, chrom,
                     )
                     if kmerscanner_file:
                         generate_kmerscanner_file(
                             kmerscanner_file, lds.index, labels,
-                            output_dir, chrom
+                            output_dir, chrom,
                         )
             else:
                 warn_about_unsupported_hierarchy(chrom)

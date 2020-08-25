@@ -1,4 +1,5 @@
 from sys import stdout
+from os import path
 from edgecaselib.formats import load_index, filter_bam
 from pysam import AlignmentFile
 from functools import reduce
@@ -6,7 +7,45 @@ from operator import __or__
 from copy import deepcopy
 from edgecaselib.util import progressbar
 from itertools import chain
-from numpy import isnan
+from numpy import isnan, inf
+
+
+__doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
+
+Usage: {0} tailpuller -x filename [-f flagspec] [-F flagspec] [-q integer]
+       {1}            [-m integer] <bam>
+
+Output:
+    SAM-formatted file with reads overhanging anchors defined in index
+
+Positional arguments:
+    <bam>                             name of input BAM/SAM file; must have a .bai index
+
+Required options:
+    -x, --index [filename]            location of the reference .ecx index
+
+Options:
+    -m, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
+
+Input filtering options:
+    -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]       process only entries with this MAPQ or higher [default: 0]
+"""
+
+__docopt_converters__ = [
+    lambda min_quality:
+        None if (min_quality is None) else int(min_quality),
+    lambda max_read_length:
+        inf if (max_read_length is None) else int(max_read_length),
+]
+
+__docopt_tests__ = {
+    lambda bam:
+        path.isfile(bam + ".bai"): "BAM index (.bai) not found",
+    lambda max_read_length:
+        max_read_length > 0: "--max-read-length below 0",
+}
 
 
 def get_terminal_pos(entry, cigarpos):
@@ -58,7 +97,7 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
     """Subset bam_data to a region where reads of interest can occur"""
     if chrom not in reflens:
         return []
-    elif max_read_length is None:
+    elif (max_read_length is None) or (max_read_length == inf):
         return bam_data.fetch(chrom, None, None)
     else:
         p_innermost_pos = ecxfd[chrom][5]["pos"].max() + max_read_length
@@ -86,10 +125,10 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
             )
 
 
-def main(bam, index, flags, flags_any, flag_filter, min_quality, max_read_length, file=stdout, **kwargs):
+def main(bam, index, flags, flag_filter, min_quality, max_read_length, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
-    samfilters = [flags, flags_any, flag_filter, min_quality]
+    samfilters = [flags, flag_filter, min_quality]
     with AlignmentFile(bam) as bam_data:
         reflens = dict(zip(bam_data.references, bam_data.lengths))
         print(str(bam_data.header).rstrip("\n"), file=file)
