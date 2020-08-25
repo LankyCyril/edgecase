@@ -103,7 +103,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
         with open(repeatfinder_tsv, mode="wt") as tsv:
             repeatfinder.main(
                 tailchopper_sam, fmt="sam",
-                flags=f, flag_filter=F,
+                flags=f, flag_filter=F, collapse_reverse_complement=False,
                 min_quality=min_quality, min_k=min_k, max_k=max_k,
                 max_motifs=max_motifs, max_p_adjusted=max_p_adjusted,
                 no_context=False, jellyfish=jellyfish, min_repeats=2,
