@@ -112,7 +112,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
         kmerscanner_dat = get_filename("kmerscanner-{}_arm.dat.gz".format(arm))
         with gzopen(kmerscanner_dat, mode="wt") as dat:
             kmerscanner.main(
-                tailpuller_sam, flags=f, flag_filter=F,
+                tailpuller_sam, fmt="sam", flags=f, flag_filter=F,
                 min_quality=min_quality, motif_file=repeatfinder_tsv,
                 head_test=None, tail_test=None, cutoff=None, num_reads=None,
                 window_size=window_size, jobs=jobs, file=dat,
