@@ -1,7 +1,4 @@
-name = haplotype-diversity-and-sequence-heterogeneity-of-human-telomeres
-
-pdf: $(name).pdf submission/$(name)-SUPPLEMENTAL.pdf
-all: $(name).pdf submission/$(name)-SUPPLEMENTAL.pdf submission/$(name).odt
+all: heterogeneity-of-telomeres-revealed-by-long-read-sequencing.pdf
 
 %.pdf: %.tex
 	pdflatex $<
@@ -10,20 +7,7 @@ all: $(name).pdf submission/$(name)-SUPPLEMENTAL.pdf submission/$(name).odt
 	pdflatex $<
 	rm -f $(basename $<).aux $(basename $<).bbl $(basename $<).blg
 	rm -f $(basename $<)-blx.bib $(basename $<).log $(basename $<).run.xml
-	rm -f $(basename $<).toc $(basename $<).bcf
+	rm -f $(basename $<).toc
 
-submission/%.pdf: %.tex
-	pdflatex $<
-	bibtex $(basename $<)
-	pdflatex $<
-	pdflatex $<
-	rm -f $(basename $<).aux $(basename $<).bbl $(basename $<).blg
-	rm -f $(basename $<)-blx.bib $(basename $<).log $(basename $<).run.xml
-	rm -f $(basename $<).toc $(basename $<).bcf
-	mkdir -p submission
-	mv $(basename $<).pdf $@
-
-submission/%.odt: %.tex
-	mkdir -p submission
-	./tex2office -i references.bib figures tables --svg $<
-	mv $(basename $<).odt $@
+%.odt: %.tex
+	./tex2office -i references.bib figures tables --svg heterogeneity-of-telomeres-revealed-by-long-read-sequencing.tex

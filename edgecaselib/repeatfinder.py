@@ -17,8 +17,8 @@ __doc__ = """edgeCase repeatfinder: de novo repeat discovery
 
 Usage: {0} repeatfinder [-m integer] [-M integer] [-r integer] [-P float]
        {1}              [--jellyfish filename] [--jellyfish-hash-size string]
-       {1}              [-n integer] [-j integer] [-f flagspec] [-F flagspec]
-       {1}              [-q integer] [--fmt string]
+       {1}              [-n integer] [-j integer] [-f flagspec] [-g flagspec]
+       {1}              [-F flagspec] [-q integer] [--fmt string]
        {1}              [--collapse-reverse-complement] <sequencefile>
 
 Output:
@@ -41,6 +41,7 @@ Options:
 
 Input filtering options:
     -f, --flags [flagspec]              process only entries with all these sam flags present [default: 0]
+    -g, --flags-any [flagspec]          process only entries with any of these sam flags present [default: 65535]
     -F, --flag-filter [flagspec]        process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]         process only entries with this MAPQ or higher [default: 0]
 """
@@ -291,12 +292,12 @@ def format_analysis(filtered_analysis, min_k, max_motifs):
         return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
         if manager == AlignmentFile: # will need to convert SAM to fastx
-            samfilters = [flags, flag_filter, min_quality]
+            samfilters = [flags, flags_any, flag_filter, min_quality]
             sequencefile, base_count = convert_input(
                 sequencefile, manager, tempdir, samfilters,
             )
