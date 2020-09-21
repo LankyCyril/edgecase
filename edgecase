@@ -20,7 +20,6 @@ Commmands (<command>):
 
 Combined "pipeline" commands:
     basic-pipeline-longread  extract candidate long reads, discover motifs, plot
-    basic-pipeline           synonym for basic-pipeline-longread
 
 Development area:
     levenshtein              cluster long reads by edit distance

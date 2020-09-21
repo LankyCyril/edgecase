@@ -30,6 +30,40 @@ $ pip install pandas matplotlib seaborn tqdm regex pysam
 $ ./edgecase
 ```
 
+## Version history
+
+#### 2020-08-25
+
+* Interface updates:
+    * all subroutines:
+        * removed flawed option `--flags-any` (`-g`)
+    * tailchopper:
+        * fixed the error that led to CIGAR strings being dropped
+    * kmerscanner:
+        * can now accept both BAM and Fastx input (option `--fmt`)
+    * repeatfinder:
+        * accepts option `--collapse-reverse-complement` (`-C`), which works
+          similarly to option `-C` of jellyfish (count reverse complement motifs
+          together)
+        * better coerces motifs in the output into human-friendly inversions
+    * densityplot:
+        * accepts option `--n-boot` to specify number of bootstrap rounds
+          for plotting confidence intervals
+    * basic-pipeline-longread:
+        * a new subroutine that runs all invididual subroutines in order
+* Refactoring and internal updates:
+    * all subroutines:
+        * switched from `argparse` to `docopt`
+        * improved code style
+    * kmerscanner:
+        * function `get_circular_pattern()` accepts parameter `repeats`
+          (currently it is always set to 2)
+* Other updates:
+    * paper drafts
+* TODO:
+    * update README
+    * kmerscanner: remove obsolete options (`--head-test`, `--tail-test`,
+      `--cutoff`) and associated warning messages
 
 ## Input data and formats
 
