@@ -498,7 +498,7 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
 def interpret_target(samfilters):
     """For non-exploded densityplots, infer which arm to plot and which anchor to center around"""
     flags2set = lambda f: set(explain_sam_flags(interpret_flags(f)).split("|"))
-    potential_target_anchors = {"tract_anchor", "ucsc_mask_anchor", "fork"}
+    potential_target_anchors = {"tract_anchor", "mask_anchor", "fork"}
     flags, flag_filter, _ = samfilters
     if "is_q" in (flags2set(flags) - flags2set(flag_filter)):
         is_q = True

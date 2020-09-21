@@ -76,7 +76,7 @@ __docopt_tests__ = {
     lambda max_read_length:
         max_read_length > 0: "--max-read-length below 0",
     lambda target:
-        target in {"ucsc_mask_anchor", "fork", "tract_anchor"}:
+        target in {"mask_anchor", "fork", "tract_anchor"}:
             "unknown value of --target",
     lambda min_k, max_k:
         0 < min_k < max_k: "not satisfied: 0 < m < M",

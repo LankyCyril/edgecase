@@ -36,7 +36,7 @@ __docopt_converters__ = [
 
 __docopt_tests__ = {
     lambda target:
-        target in {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}:
+        target in {"mask_anchor", "fork", "tract_anchor", "cigar"}:
             "unknown value of --target",
 }
 

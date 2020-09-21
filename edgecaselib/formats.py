@@ -16,7 +16,7 @@ from operator import __or__
 ALL_SAM_FLAGS = [
     "paired", "mapped_proper_pair", "unmapped", "mate_unmapped", "rev",
     "mate_rev", "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
-    "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
+    "mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
 FLAG_COLORS = {0x1000: "gray", 0x2000: "blueviolet", 0x4000: "red"}

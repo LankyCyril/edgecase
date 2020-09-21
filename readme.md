@@ -112,7 +112,7 @@ secondary          | 256   | 0x0100    | SAM specification flag
 qcfail             | 512   | 0x0200    | SAM specification flag
 pcrdup             | 1024  | 0x0400    | SAM specification flag
 supp               | 2048  | 0x0800    | SAM specification flag
-ucsc_mask_anchor   | 4096  | 0x1000    | edgeCase-specific flag; added during pipeline
+mask_anchor        | 4096  | 0x1000    | edgeCase-specific flag; added during pipeline
 fork               | 8192  | 0x2000    | edgeCase-specific flag; added during pipeline
 tract_anchor       | 16384 | 0x4000    | edgeCase-specific flag; added during pipeline
 is_q               | 32768 | 0x8000    | edgeCase-specific flag; added during pipeline
@@ -187,7 +187,7 @@ optional arguments:
 
 Truncates reads in the tailpuller file either to soft/hard-clipped ends (when
 --target is "cigar"), or to sequences extending past given anchor (when
---target is "tract_anchor", "fork", or "ucsc_mask_anchor").
+--target is "tract_anchor", "fork", or "mask_anchor").
 
 **NB**: outputs a SAM file with unmapped reads (sets the 0x0004 bit in the
 flag), but *retains the original mapping position*; do *not* use this value for
@@ -337,6 +337,6 @@ of the surrounding reference coordinates should be included: *PAPER_LEFT_SPAN*
 and *PAPER_RIGHT_SPAN*.
 
 Annotates the anchors from the ECX with dashed lines:
-* ucsc_mask_anchor == gray,
+* mask_anchor == gray,
 * fork == blueviolet,
 * tract_anchor == red.
