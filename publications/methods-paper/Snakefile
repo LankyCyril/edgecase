@@ -1,11 +1,12 @@
 from pandas import read_fwf
 from io import StringIO
+from functools import partial
 
 HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
 DATA_DIR = "data/datasets/GIAB-2020"
 MAX_READ_LENGTH = 100000
 
-datasets = read_fwf(StringIO(str.strip("""
+DATASETS = read_fwf(StringIO(str.strip("""
 group           subject  dataset
 NA12878         HG001    11kb
 AshkenazimTrio  HG002    10kb
@@ -23,25 +24,61 @@ ChineseTrio     HG007    15kb_20kb
 ChineseTrio     HG007    hifi_google
 """)))
 
-datasets["subject_pacbio_path"] = datasets.apply(
-    lambda row: "{}/PacBio/{}/{}/".format(DATA_DIR, *row[:2]), axis=1,
+DATASETS["subject_pacbio_path"] = DATASETS.apply(
+    lambda row: "{}/PacBio/{}/{}".format(DATA_DIR, *row[:2]), axis=1,
 )
-datasets["dataset_pacbio_path"] = datasets.apply(
-    lambda row: "{}/PacBio/{}/{}/{}/".format(DATA_DIR, *row[:3]), axis=1,
+DATASETS["dataset_pacbio_path"] = DATASETS.apply(
+    lambda row: "{}/PacBio/{}/{}/{}".format(DATA_DIR, *row[:3]), axis=1,
 )
+
+wildcard_constraints:
+    group="[^/]+", subject="[^/]+", dataset="[^/]+", name="[^/]+",
 
 
 rule tailpuller:
     input:
-        ecx=HG38EXT_ECX,
-        bam=DATA_DIR+"/PacBio/{subpath}/wgs.bam",
-        bai=DATA_DIR+"/PacBio/{subpath}/wgs.bam.bai",
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/wgs.bam",
+        bai=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/wgs.bam.bai",
     output:
-        bam=DATA_DIR+"/PacBio/{subpath}/tailpuller.bam",
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
     params:
         max_read_length=MAX_READ_LENGTH,
     shell: """
         ./edgecase tailpuller \
-            -x {input.ecx} -m {params.max_read_length} -F3844 {input.bam} \
+            -x {HG38EXT_ECX} -m {params.max_read_length} -F3844 {input.bam} \
         | samtools view -bh > {output.bam}
     """
+
+rule tailchopper:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
+    output:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailchopper.bam",
+    shell: """
+        ./edgecase tailchopper -x {HG38EXT_ECX} -t tract_anchor {input.bam} \
+        | samtools view -bh > {output.bam}
+    """
+
+def bam_combiner(w):
+    return [f"{pacbio_path}/{w.name}.bam" for pacbio_path in DATASETS.loc[
+        (DATASETS["group"]==w.group) & (DATASETS["subject"]==w.subject),
+        "dataset_pacbio_path",
+    ]]
+rule combined_bam:
+    input: bams=bam_combiner,
+    output: bam=DATA_DIR+"/PacBio/{group}/{subject}/{name}.bam",
+    params: sam=DATA_DIR+"/PacBio/{group}/{subject}/{name}.sam",
+    run:
+        shell("samtools view -H {input.bams[0]} > {params.sam}")
+        for bam in input.bams:
+            shell("samtools view {bam} >> {params.sam}")
+        shell("samtools view -bh {params.sam} > {output.bam}")
+        shell("rm {params.sam}")
+
+
+rule combined_tailpuller:
+    input: {spp+"/tailpuller.bam" for spp in DATASETS["subject_pacbio_path"]}
+
+
+rule combined_tailchopper:
+    input: {spp+"/tailchopper.bam" for spp in DATASETS["subject_pacbio_path"]}
