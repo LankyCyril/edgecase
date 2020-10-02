@@ -82,3 +82,36 @@ rule combined_tailpuller:
 
 rule combined_tailchopper:
     input: {spp+"/tailchopper.bam" for spp in DATASETS["subject_pacbio_path"]}
+
+
+rule repeatfinder:
+    input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailchopper.bam",
+    output: tsv=DATA_DIR+"/PacBio/{group}/{subject}/repeatfinder-{arm}.tsv",
+    params: s="4G", min_k=4, max_k=16, max_p_adjusted=1.1,
+    threads: 12,
+    run:
+        if wildcards.arm == "p_arm":
+            flags = "-F 'is_q|3844'"
+        elif wildcards.arm == "q_arm":
+            flags = "-f is_q -F 3844"
+        else:
+            raise ValueError("wildcards.arm", wildcards.arm)
+        shell("""
+            ./edgecase repeatfinder -j {threads} -s {params.s} \
+                -m {params.min_k} -M {params.max_k} -P {params.max_p_adjusted} \
+                {flags} {input.bam} > {output.tsv}
+        """)
+
+
+rule repeatfinder_all:
+    input:
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/repeatfinder-p_arm.tsv"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/repeatfinder-q_arm.tsv"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
