@@ -1,6 +1,9 @@
-from pandas import read_fwf
+from pandas import read_fwf, read_csv, concat
 from io import StringIO
-from functools import partial
+from re import sub, escape
+from statsmodels.stats.multitest import multipletests
+from scipy.stats import combine_pvalues, entropy
+
 
 HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
 DATA_DIR = "data/datasets/GIAB-2020"
@@ -74,14 +77,10 @@ rule combined_bam:
             shell("samtools view {bam} >> {params.sam}")
         shell("samtools view -bh {params.sam} > {output.bam}")
         shell("rm {params.sam}")
-
-
-rule combined_tailpuller:
-    input: {spp+"/tailpuller.bam" for spp in DATASETS["subject_pacbio_path"]}
-
-
-rule combined_tailchopper:
-    input: {spp+"/tailchopper.bam" for spp in DATASETS["subject_pacbio_path"]}
+rule combined_bams:
+    input:
+        p={spp+"/tailpuller.bam" for spp in DATASETS["subject_pacbio_path"]},
+        c={spp+"/tailchopper.bam" for spp in DATASETS["subject_pacbio_path"]},
 
 
 rule repeatfinder:
@@ -115,3 +114,43 @@ rule repeatfinder_all:
             for _, (group, subject)
             in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
         ],
+    output:
+        p_arm=DATA_DIR+"/PacBio/repeatfinder-p_arm.tsv",
+        q_arm=DATA_DIR+"/PacBio/repeatfinder-q_arm.tsv",
+    run:
+        pivot_p = dict(index="#monomer", columns="subject", values="p")
+        pivot_a = dict(index="#monomer", columns="subject", values="abundance")
+        arm_rfs, combined_p_as_list = {}, []
+        for arm in "p_arm", "q_arm":
+            arm_rf_as_list = []
+            for tsv in getattr(input, arm):
+                sample_rf = read_csv(tsv, sep="\t", usecols=(0,4,5))
+                rpath = sub(r'^'+escape(DATA_DIR)+r'/PacBio/', "", tsv)
+                sample_rf["group"], sample_rf["subject"], *_ = rpath.split("/")
+                arm_rf_as_list.append(sample_rf)
+            arm_rf = concat(arm_rf_as_list)
+            arm_rf_by_p = arm_rf[pivot_p.values()].pivot(**pivot_p).fillna(1)
+            mg = lambda row: combine_pvalues(row, method="mudholkar_george")[1]
+            arm_combined_p = arm_rf_by_p.apply(mg, axis=1).fillna(1).to_frame(
+                name="combined_p",
+            )
+            arm_combined_p["arm"] = arm
+            arm_rfs[arm] = arm_rf
+            combined_p_as_list.append(arm_combined_p)
+        combined_p = concat(combined_p_as_list)
+        mt_kws = dict(pvals=combined_p["combined_p"], method="bonferroni")
+        combined_p["combined_p_adjusted"] = multipletests(**mt_kws)[1]
+        for arm, arm_rf in arm_rfs.items():
+            arm_rf_wide = concat([
+                arm_rf[pivot_a.values()].pivot(**pivot_a).fillna(0),
+                combined_p.loc[combined_p["arm"]==arm, ["combined_p_adjusted"]],
+            ], axis=1)
+            condition = (arm_rf_wide["combined_p_adjusted"]<.05)
+            arm_rf_wide_filtered = arm_rf_wide[condition].copy()
+            abund_mean = arm_rf_wide_filtered.iloc[:,:-1].mean(axis=1)
+            arm_rf_wide_filtered["mean"] = abund_mean
+            arm_rf_wide_final = (
+                arm_rf_wide_filtered.sort_values(by="mean", ascending=False)
+                .drop(columns="mean")
+            )
+            arm_rf_wide_final.to_csv(getattr(output, arm), sep="\t")
