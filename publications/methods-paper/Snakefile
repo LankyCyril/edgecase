@@ -1,0 +1,47 @@
+from pandas import read_fwf
+from io import StringIO
+
+HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
+DATA_DIR = "data/datasets/GIAB-2020"
+MAX_READ_LENGTH = 100000
+
+datasets = read_fwf(StringIO(str.strip("""
+group           subject  dataset
+NA12878         HG001    11kb
+AshkenazimTrio  HG002    10kb
+AshkenazimTrio  HG002    15kb
+AshkenazimTrio  HG002    15kb_20kb
+AshkenazimTrio  HG003    15kb
+AshkenazimTrio  HG003    15kb_20kb
+AshkenazimTrio  HG004    15kb
+AshkenazimTrio  HG004    15kb_20kb
+AshkenazimTrio  HG004    15kb_21kb
+ChineseTrio     HG005    11kb
+ChineseTrio     HG006    15kb_20kb
+ChineseTrio     HG006    hifi_google
+ChineseTrio     HG007    15kb_20kb
+ChineseTrio     HG007    hifi_google
+""")))
+
+datasets["subject_pacbio_path"] = datasets.apply(
+    lambda row: "{}/PacBio/{}/{}/".format(DATA_DIR, *row[:2]), axis=1,
+)
+datasets["dataset_pacbio_path"] = datasets.apply(
+    lambda row: "{}/PacBio/{}/{}/{}/".format(DATA_DIR, *row[:3]), axis=1,
+)
+
+
+rule tailpuller:
+    input:
+        ecx=HG38EXT_ECX,
+        bam=DATA_DIR+"/PacBio/{subpath}/wgs.bam",
+        bai=DATA_DIR+"/PacBio/{subpath}/wgs.bam.bai",
+    output:
+        bam=DATA_DIR+"/PacBio/{subpath}/tailpuller.bam",
+    params:
+        max_read_length=MAX_READ_LENGTH,
+    shell: """
+        ./edgecase tailpuller \
+            -x {input.ecx} -m {params.max_read_length} -F3844 {input.bam} \
+        | samtools view -bh > {output.bam}
+    """
