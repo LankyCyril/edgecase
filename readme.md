@@ -30,6 +30,40 @@ $ pip install pandas matplotlib seaborn tqdm regex pysam
 $ ./edgecase
 ```
 
+## Version history
+
+#### 2020-08-25
+
+* Interface updates:
+    * all subroutines:
+        * removed flawed option `--flags-any` (`-g`)
+    * tailchopper:
+        * fixed the error that led to CIGAR strings being dropped
+    * kmerscanner:
+        * can now accept both BAM and Fastx input (option `--fmt`)
+    * repeatfinder:
+        * accepts option `--collapse-reverse-complement` (`-C`), which works
+          similarly to option `-C` of jellyfish (count reverse complement motifs
+          together)
+        * better coerces motifs in the output into human-friendly inversions
+    * densityplot:
+        * accepts option `--n-boot` to specify number of bootstrap rounds
+          for plotting confidence intervals
+    * basic-pipeline-longread:
+        * a new subroutine that runs all invididual subroutines in order
+* Refactoring and internal updates:
+    * all subroutines:
+        * switched from `argparse` to `docopt`
+        * improved code style
+    * kmerscanner:
+        * function `get_circular_pattern()` accepts parameter `repeats`
+          (currently it is always set to 2)
+* Other updates:
+    * paper drafts
+* TODO:
+    * update README
+    * kmerscanner: remove obsolete options (`--head-test`, `--tail-test`,
+      `--cutoff`) and associated warning messages
 
 ## Input data and formats
 
@@ -78,7 +112,7 @@ secondary          | 256   | 0x0100    | SAM specification flag
 qcfail             | 512   | 0x0200    | SAM specification flag
 pcrdup             | 1024  | 0x0400    | SAM specification flag
 supp               | 2048  | 0x0800    | SAM specification flag
-ucsc_mask_anchor   | 4096  | 0x1000    | edgeCase-specific flag; added during pipeline
+mask_anchor        | 4096  | 0x1000    | edgeCase-specific flag; added during pipeline
 fork               | 8192  | 0x2000    | edgeCase-specific flag; added during pipeline
 tract_anchor       | 16384 | 0x4000    | edgeCase-specific flag; added during pipeline
 is_q               | 32768 | 0x8000    | edgeCase-specific flag; added during pipeline
@@ -114,7 +148,6 @@ positional arguments:
 optional arguments:
   -x X, --index X            location of the reference .ecx index (REQUIRED)
   -f f, --flags f            process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g        process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F      process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q      process only entries with MAPQ >= Q (default: 0)
   -m M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
@@ -147,7 +180,6 @@ positional arguments:
 optional arguments:
   -x X, --index X        location of the reference .ecx index (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -t ?, --target ?       an ECX flag (cut relative to reference) or 'cigar' (default: tract_anchor)
@@ -155,7 +187,7 @@ optional arguments:
 
 Truncates reads in the tailpuller file either to soft/hard-clipped ends (when
 --target is "cigar"), or to sequences extending past given anchor (when
---target is "tract_anchor", "fork", or "ucsc_mask_anchor").
+--target is "tract_anchor", "fork", or "mask_anchor").
 
 **NB**: outputs a SAM file with unmapped reads (sets the 0x0004 bit in the
 flag), but *retains the original mapping position*; do *not* use this value for
@@ -172,7 +204,6 @@ positional arguments:
 
 optional arguments:
   -f f, --flags f             process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g         process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F       process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q       process only entries with MAPQ >= Q (default: 0)
   --fmt ?                     format of input file(s) (default: sam)
@@ -207,7 +238,6 @@ positional arguments:
 optional arguments:
   --motif-file M         file with repeated motif sequences (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -w W, --window-size W  size of the rolling window (default: 100)
@@ -243,7 +273,6 @@ positional arguments:
 
 optional arguments:
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   --kmerscanner-file ?   kmerscanner file (optional, for use with --output-dir)
@@ -281,7 +310,6 @@ positional arguments:
 optional arguments:
   -x X, --index X        location of the reference .ecx index (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -z, --gzipped          input is gzipped (must specify if any of -qfF present) (default: False)
@@ -309,6 +337,6 @@ of the surrounding reference coordinates should be included: *PAPER_LEFT_SPAN*
 and *PAPER_RIGHT_SPAN*.
 
 Annotates the anchors from the ECX with dashed lines:
-* ucsc_mask_anchor == gray,
+* mask_anchor == gray,
 * fork == blueviolet,
 * tract_anchor == red.

@@ -7,8 +7,8 @@ from edgecaselib.util import progressbar
 
 __doc__ = """edgeCase tailchopper: selection of overhanging heads/tails of reads
 
-Usage: {0} tailchopper -x filename [-t targetspec] [-f flagspec] [-g flagspec]
-       {1}             [-F flagspec] [-q integer] <bam>
+Usage: {0} tailchopper -x filename [-t targetspec] [-f flagspec] [-F flagspec]
+       {1}             [-q integer] <bam>
 
 Output:
     SAM-formatted file with tails of candidate reads overhanging anchors defined
@@ -25,7 +25,6 @@ Options:
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
-    -g, --flags-any [flagspec]    process only entries with any of these sam flags present [default: 65535]
     -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
 """
@@ -37,7 +36,7 @@ __docopt_converters__ = [
 
 __docopt_tests__ = {
     lambda target:
-        target in {"ucsc_mask_anchor", "fork", "tract_anchor", "cigar"}:
+        target in {"mask_anchor", "fork", "tract_anchor", "cigar"}:
             "unknown value of --target",
 }
 
@@ -59,22 +58,18 @@ def get_cigar_clip_length(entry, prime):
         )
 
 
-def update_aligned_segment(entry, map_pos, unalign=True, start=None, end=None):
+def update_aligned_segment(entry, map_pos, start=None, end=None):
     """Update sequence, cigar, quality string in-place"""
     if (end is not None) and (start is not None) and (end < start):
         start, end = end, start
     qualities_substring = entry.query_qualities[start:end]
     entry.query_sequence = entry.query_sequence[start:end]
-    if unalign:
-        entry.flag |= 4
-        entry.cigarstring, entry.tags = None, []
+    if entry.query_sequence:
+        entry.cigarstring = str(len(entry.query_sequence)) + "S"
     else:
-        if entry.query_sequence:
-            entry.cigarstring = str(len(entry.query_sequence)) + "S"
-        else:
-            entry.cigarstring = None
-        if map_pos is not None:
-            entry.reference_start += map_pos
+        entry.cigarstring = None
+    if map_pos is not None:
+        entry.reference_start += map_pos
     entry.query_qualities = qualities_substring
 
 
@@ -160,7 +155,7 @@ def relative_chopper(entry, ecx, integer_target):
     if len(anchor_positions) > 1:
         raise ValueError("Ambiguous index entry: {}".format(anchor_positions))
     elif len(anchor_positions) == 0:
-        update_aligned_segment(entry, 0, 0)
+        update_aligned_segment(entry, None, 0, 0)
         error = "No anchor data in index"
     else:
         anchor_pos = anchor_positions.iloc[0]
@@ -179,7 +174,7 @@ def relative_chopper(entry, ecx, integer_target):
     return entry, error
 
 
-def main(bam, index, flags, flags_any, flag_filter, min_quality, target, file=stdout, **kwargs):
+def main(bam, index, flags, flag_filter, min_quality, target, file=stdout, **kwargs):
     """Interpret arguments and dispatch data to subroutines"""
     if target == "cigar":
         chopper, integer_target = cigar_chopper, None
@@ -188,10 +183,10 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, file=st
     ecx = load_index(index)
     with AlignmentFile(bam) as alignment:
         print(str(alignment.header).rstrip("\n"), file=file)
-        samfilters = [flags, flags_any, flag_filter, min_quality]
         n_skipped = 0
         bam_iterator = progressbar(
-            filter_bam(alignment, samfilters), desc="Chopping", unit="read",
+            filter_bam(alignment, [flags, flag_filter, min_quality]),
+            desc="Chopping", unit="read",
         )
         for entry in bam_iterator:
             if entry.query_sequence:
@@ -204,5 +199,9 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, file=st
                     n_skipped += 1
     if n_skipped:
         print(n_skipped, "reads skipped", file=stderr)
-    print("WARNING: legacy mapping positions (POS) retained;", file=stderr)
-    print("         do not use POS for analyses!", file=stderr)
+    warnings = [
+        "WARNING: Read mapping positions were adjusted and retained;",
+        "         this is needed to comply with the SAM spec.",
+        "         Do not use these positions for analyses outside of edgeCase!"
+    ]
+    print("\n".join(warnings), file=stderr)

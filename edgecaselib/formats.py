@@ -16,7 +16,7 @@ from operator import __or__
 ALL_SAM_FLAGS = [
     "paired", "mapped_proper_pair", "unmapped", "mate_unmapped", "rev",
     "mate_rev", "1stmate", "2ndmate", "secondary", "qcfail", "pcrdup", "supp",
-    "ucsc_mask_anchor", "fork", "tract_anchor", "is_q"
+    "mask_anchor", "fork", "tract_anchor", "is_q"
 ]
 
 FLAG_COLORS = {0x1000: "gray", 0x2000: "blueviolet", 0x4000: "red"}
@@ -80,10 +80,8 @@ def entry_filters_ok(entry_flag, entry_mapq, integer_samfilters):
         return (
             # -f, flags (all must be present):
             (entry_flag & integer_samfilters[0] == integer_samfilters[0]) and
-            # -g, flags_any (at least one must be present):
-            (entry_flag & integer_samfilters[1] != 0) and
             # -F, flag_filter (all must be absent):
-            (entry_flag & integer_samfilters[2] == 0)
+            (entry_flag & integer_samfilters[1] == 0)
         )
 
 

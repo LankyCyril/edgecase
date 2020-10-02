@@ -17,7 +17,7 @@ __doc__ = """edgeCase kmerscanner: calculation of motif densities
 Usage: {0} kmerscanner [-j integer] --motif-file filename
        {1}             [-w integer] [-n integer]
        {1}             [-c float] [--head-test integer] [--tail-test integer]
-       {1}             [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
+       {1}             [-f flagspec] [-F flagspec] [-q integer]
        {1}             [--fmt string] <sequencefile>
 
 Output:
@@ -40,7 +40,6 @@ Options:
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
-    -g, --flags-any [flagspec]    process only entries with any of these sam flags present [default: 65535]
     -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
 """
@@ -212,7 +211,7 @@ def interpret_arguments(fmt, head_test, tail_test, cutoff, motif_file):
     return manager, motif_patterns, total_abundance
 
 
-def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
     manager, motif_patterns, total_abundance = interpret_arguments(
         fmt, head_test, tail_test, cutoff, motif_file,
@@ -222,7 +221,7 @@ def main(sequencefile, fmt, flags, flags_any, flag_filter, min_quality, motif_fi
     with manager(sequencefile) as entry_iterator:
         scanner = pattern_scanner(
             entry_iterator, motif_patterns=motif_patterns,
-            samfilters=[flags, flags_any, flag_filter, min_quality],
+            samfilters=[flags, flag_filter, min_quality],
             fmt=fmt, window_size=window_size,
             head_test=head_test, tail_test=tail_test,
             cutoff=cutoff, num_reads=num_reads, jobs=jobs,

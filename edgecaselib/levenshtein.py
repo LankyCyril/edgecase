@@ -28,8 +28,7 @@ experiments."""
 __doc__ = """edgeCase levenshtein: clustering of telomeric reads by distance
 
 Usage: {0} levenshtein [-m integer] [-o dirname] [--kmerscanner-file filename]
-       {1}             [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
-       {1}             <sequencedata>
+       {1}             [-f flagspec] [-F flagspec] [-q integer] <sequencedata>
 
 Output:
     * TSV-formatted file with statistics describing identified clusters;
@@ -47,7 +46,6 @@ Options:
 
 Input filtering options:
     -f, --flags [flagspec]             process only entries with all these sam flags present [default: 0]
-    -g, --flags-any [flagspec]         process only entries with any of these sam flags present [default: 65535]
     -F, --flag-filter [flagspec]       process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]        process only entries with this MAPQ or higher [default: 0]
 """
@@ -371,12 +369,12 @@ def process_levenshtein_input(sequencedata, samfilters, output_dir):
         raise IOError("Unknown type of input")
 
 
-def main(sequencedata, min_cluster_size, kmerscanner_file, output_dir, flags, flags_any, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
+def main(sequencedata, min_cluster_size, kmerscanner_file, output_dir, flags, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
     switch_backend("pdf")
     hide_stats_warnings(True)
     report_rows = []
     input_iterator = process_levenshtein_input(
-        sequencedata, [flags, flags_any, flag_filter, min_quality], output_dir,
+        sequencedata, [flags, flag_filter, min_quality], output_dir,
     )
     for chrom, lds in input_iterator:
         cm = generate_clustermap(lds)

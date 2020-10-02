@@ -20,7 +20,7 @@ __doc__ = """edgeCase densityplot: visualization of motif densities
 Usage: {0} densityplot -x filename [-b integer] [-e] [--zoomed-in]
        {1}             [--palette palettespec] [--title string]
        {1}             [--n-boot integer]
-       {1}             [-f flagspec] [-g flagspec] [-F flagspec] [-q integer]
+       {1}             [-f flagspec] [-F flagspec] [-q integer]
        {1}             [-z] <dat>
 
 Output:
@@ -43,7 +43,6 @@ Options:
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
-    -g, --flags-any [flagspec]    process only entries with any of these sam flags present [default: 65535]
     -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
 """
@@ -175,7 +174,7 @@ def chromosome_exploded_motif_plot(binned_density_dataframe, ecx, chrom, max_map
                 pos, -.2, 1.2, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4,
             )
     axs[0, 0].set(
-        title="{}\n-f={} -g={} -F={} -q={}".format(title, *samfilters),
+        title="{}\n-f={} -F={} -q={}".format(title, *samfilters),
     )
     return page
 
@@ -499,8 +498,8 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
 def interpret_target(samfilters):
     """For non-exploded densityplots, infer which arm to plot and which anchor to center around"""
     flags2set = lambda f: set(explain_sam_flags(interpret_flags(f)).split("|"))
-    potential_target_anchors = {"tract_anchor", "ucsc_mask_anchor", "fork"}
-    flags, _, flag_filter, _ = samfilters
+    potential_target_anchors = {"tract_anchor", "mask_anchor", "fork"}
+    flags, flag_filter, _ = samfilters
     if "is_q" in (flags2set(flags) - flags2set(flag_filter)):
         is_q = True
     elif "is_q" in (flags2set(flag_filter) - flags2set(flags)):
@@ -570,9 +569,9 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
-def main(dat, gzipped, index, flags, flags_any, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, file=stdout.buffer, **kwargs):
+def main(dat, gzipped, index, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, file=stdout.buffer, **kwargs):
     """Dispatch data to subroutines"""
-    samfilters = [flags, flags_any, flag_filter, min_quality]
+    samfilters = [flags, flag_filter, min_quality]
     target_anchor, is_q, palette, legend, title = interpret_arguments(
         palette, exploded, zoomed_in, samfilters, title, dat,
     )
