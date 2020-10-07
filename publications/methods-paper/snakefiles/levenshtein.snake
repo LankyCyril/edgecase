@@ -32,3 +32,21 @@ rule trio_kmerscanner:
             ./edgecase kmerscanner --motif-file {input.tsv} -w 10 \
                 {flags} {input.bam} | gzip -2 > {output.dat}
         """)
+
+
+rule trio_levenshtein:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/tailpuller.bam",
+        dat=DATA_DIR+"/PacBio/{group}/kmerscanner-{arm}.dat.gz",
+    output:
+        tsv=DATA_DIR+"/PacBio/{group}/haplotypes/levenshtein-{arm}.tsv",
+    params:
+        directory=DATA_DIR+"/PacBio/{group}/haplotypes",
+    run:
+        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+        shell("""
+            mkdir {params.directory} 2>/dev/null || :
+            ./edgecase levenshtein {flags} --kmerscanner-file {input.dat} \
+                --output-dir {params.directory} {input.bam} \
+                > {output.tsv}
+        """)
