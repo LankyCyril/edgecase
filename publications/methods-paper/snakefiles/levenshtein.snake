@@ -23,16 +23,12 @@ rule trio_tailpuller:
 rule trio_kmerscanner:
     input:
         bam=DATA_DIR+"/PacBio/{group}/tailpuller.bam",
-        tsv=DATA_DIR+"/PacBio/repeatfinder-{arm}.tsv",
+        tsv=DATA_DIR+"/PacBio/repeatfinder-{arm}-plottable.tsv",
     output:
         dat=DATA_DIR+"/PacBio/{group}/kmerscanner-{arm}.dat.gz",
-    params:
-        tsv=DATA_DIR+"/PacBio/{group}/repeatfinder-{arm}.tsv",
     run:
         flags = get_sam_flags(wildcards.arm, target="tract_anchor")
         shell("""
-            sed -E 's/#monomer/#motif/g' {input.tsv} > {params.tsv};
-            ./edgecase kmerscanner --motif-file {params.tsv} -w 10 \
-                {flags} {input.bam} | gzip -2 > {output.dat};
-            rm -f {params.tsv}
+            ./edgecase kmerscanner --motif-file {input.tsv} -w 10 \
+                {flags} {input.bam} | gzip -2 > {output.dat}
         """)
