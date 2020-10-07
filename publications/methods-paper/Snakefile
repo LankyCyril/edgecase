@@ -187,10 +187,15 @@ rule plottable_repeats:
     params: n=4
     run:
         for arm in "p_arm", "q_arm":
-            rf = read_csv(getattr(input, arm), sep="\t").rename(
-                columns={"#monomer": "#motif"},
+            rf = read_csv(getattr(input, arm), sep="\t")
+            top_rf = rf.rename(columns={"#monomer": "#motif"})[:params.n].copy()
+            top_rf["abundance"] = (
+                top_rf.drop(columns=["#motif", "p_adjusted"], errors="ignore")
+                .mean(axis=1)
             )
-            rf[:params.n].to_csv(getattr(output, arm), sep="\t", index=False)
+            top_rf[["#motif", "abundance"]].to_csv(
+                getattr(output, arm), sep="\t", index=False,
+            )
 
 
 rule kmerscanner_unfiltered:
