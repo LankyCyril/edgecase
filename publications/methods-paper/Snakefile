@@ -8,6 +8,7 @@ from scipy.stats import combine_pvalues, entropy
 HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
 DATA_DIR = "data/datasets/GIAB-2020"
 MAX_READ_LENGTH = 100000
+MIN_PLOT_COVERAGE = 25
 
 DATASETS = read_fwf(StringIO(str.strip("""
 group           subject  dataset
@@ -39,6 +40,23 @@ make_pvals_worse = lambda p: p if p != 0 else SMALLEST_P_VALUE
 
 wildcard_constraints:
     group="[^/]+", subject="[^/]+", dataset="[^/]+", name="[^/]+",
+
+
+def get_sam_flags(arm, target=None):
+    if target:
+        if arm == "p_arm":
+            return "-f '{}' -F 'is_q|3844'".format(target)
+        elif arm == "q_arm":
+            return "-f 'is_q|{}' -F 3844".format(target)
+        else:
+            raise ValueError("arm", arm)
+    else:
+        if arm == "p_arm":
+            return "-F 'is_q|3844'"
+        elif arm == "q_arm":
+            return "-f is_q -F 3844"
+        else:
+            raise ValueError("arm", arm)
 
 
 rule tailpuller:
@@ -92,12 +110,7 @@ rule repeatfinder:
     params: s="4G", min_k=4, max_k=16, max_p_adjusted=1.1,
     threads: 12,
     run:
-        if wildcards.arm == "p_arm":
-            flags = "-F 'is_q|3844'"
-        elif wildcards.arm == "q_arm":
-            flags = "-f is_q -F 3844"
-        else:
-            raise ValueError("wildcards.arm", wildcards.arm)
+        flags = get_sam_flags(wildcards.arm)
         shell("""
             ./edgecase repeatfinder -j {threads} -s {params.s} \
                 -m {params.min_k} -M {params.max_k} -P {params.max_p_adjusted} \
@@ -178,3 +191,47 @@ rule plottable_repeats:
                 columns={"#monomer": "#motif"},
             )
             rf[:params.n].to_csv(getattr(output, arm), sep="\t", index=False)
+
+
+rule kmerscanner_unfiltered:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/tailpuller.bam",
+        tsv=DATA_DIR+"/PacBio/repeatfinder-{arm}-plottable.tsv",
+    output:
+        dat=temp(DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}-unfiltered.dat.gz"),
+    run:
+        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+        shell("""
+            ./edgecase kmerscanner --motif-file {input.tsv} \
+                {flags} {input.bam} | gzip -2 > {output.dat}
+        """)
+
+
+rule kmerscanner_filtered:
+    input: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}-unfiltered.dat.gz",
+    output: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}.dat.gz",
+    params: min_reads=MIN_PLOT_COVERAGE,
+    run:
+        raw_densities = read_csv(input.dat, sep="\t")
+        chromosome_counter = raw_densities[["#name", "chrom"]].drop_duplicates()
+        chromosome_counts = chromosome_counter["chrom"].value_counts()
+        indexer = (chromosome_counts>=params.min_reads)
+        chromosomes_to_keep = chromosome_counts[indexer].index
+        filtered_densities = raw_densities[
+            raw_densities["chrom"].isin(chromosomes_to_keep)
+        ]
+        filtered_densities.to_csv(
+            output.dat, compression="gzip", sep="\t", index=False,
+        )
+
+
+rule densityplot:
+    input: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}.dat.gz",
+    output: pdf=DATA_DIR+"/PacBio/{group}/{subject}/densityplot-{arm}.pdf",
+    run:
+        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+        shell("""
+            ./edgecase densityplot \
+                -x {HG38EXT_ECX} --palette paper --title ' ' {flags} \
+                -z {input} > {output}
+        """)
