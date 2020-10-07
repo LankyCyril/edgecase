@@ -268,3 +268,24 @@ rule densityplot_all:
             for _, (group, subject)
             in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
         ],
+
+
+def trio_tailpuller_input(w):
+    return {
+        subject: f"{DATA_DIR}/PacBio/{w.group}/{subject}/tailpuller.bam"
+        for subject in set(DATASETS.loc[DATASETS["group"]==w.group, "subject"])
+    }
+rule trio_tailpuller:
+    input: unpack(trio_tailpuller_input),
+    output: bam=DATA_DIR+"/PacBio/{group}/tailpuller.bam",
+    params: sam=DATA_DIR+"/PacBio/{group}/tailpuller.sam", flags="-f0x4000",
+    run:
+        first_bam = next(iter(input))
+        shell("samtools view -H {first_bam} > {params.sam}")
+        for subject, bam in input.items():
+            shell("""
+                samtools view {params.flags} {bam} \
+                    | sed -E 's/^/{subject}:/g' >> {params.sam}
+            """)
+        shell("samtools view -bh {params.sam} > {output.bam}")
+        shell("rm {params.sam}")
