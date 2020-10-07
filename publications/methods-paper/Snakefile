@@ -3,6 +3,8 @@ from io import StringIO
 from re import sub, escape
 from statsmodels.stats.multitest import multipletests
 from scipy.stats import combine_pvalues, entropy
+from gzip import open as gzopen
+from matplotlib.pyplot import subplots, switch_backend
 
 
 HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
@@ -234,9 +236,35 @@ rule densityplot:
     input: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}.dat.gz",
     output: pdf=DATA_DIR+"/PacBio/{group}/{subject}/densityplot-{arm}.pdf",
     run:
-        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
-        shell("""
-            ./edgecase densityplot \
-                -x {HG38EXT_ECX} --palette paper --title ' ' {flags} \
-                -z {input} > {output}
-        """)
+        with gzopen(input.dat, mode="rt") as dat:
+            for i, _ in enumerate(dat):
+                if i > 0:
+                    kmerscan_empty = False
+                    break
+            else:
+                kmerscan_empty = True
+        if kmerscan_empty:
+            switch_backend("Agg")
+            figure, ax = subplots()
+            figure.savefig(output.pdf, bbox_inches="tight")
+        else:
+            flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+            shell("""
+                ./edgecase densityplot \
+                    -x {HG38EXT_ECX} --palette paper --title ' ' {flags} \
+                    -z {input} > {output}
+            """)
+
+
+rule densityplot_all:
+    input:
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-p_arm.pdf"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-q_arm.pdf"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
