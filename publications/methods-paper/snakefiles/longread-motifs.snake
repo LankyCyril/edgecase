@@ -1,0 +1,102 @@
+from pandas import read_csv, concat
+from re import sub, escape
+from scipy.stats import combine_pvalues
+
+
+make_pvals_worse = lambda p: p if p != 0 else SMALLEST_P_VALUE
+
+
+rule tailpuller:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/wgs.bam",
+        bai=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/wgs.bam.bai",
+    output:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
+    params:
+        max_read_length=MAX_READ_LENGTH,
+    shell: """
+        ./edgecase tailpuller \
+            -x {HG38EXT_ECX} -m {params.max_read_length} -F3844 {input.bam} \
+        | samtools view -bh > {output.bam}
+    """
+
+rule tailchopper:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
+    output:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailchopper.bam",
+    shell: """
+        ./edgecase tailchopper -x {HG38EXT_ECX} -t tract_anchor {input.bam} \
+        | samtools view -bh > {output.bam}
+    """
+
+def bam_combiner(w):
+    return [f"{pacbio_path}/{w.name}.bam" for pacbio_path in DATASETS.loc[
+        (DATASETS["group"]==w.group) & (DATASETS["subject"]==w.subject),
+        "dataset_pacbio_path",
+    ]]
+
+rule combined_bam:
+    input: bams=bam_combiner,
+    output: bam=DATA_DIR+"/PacBio/{group}/{subject}/{name}.bam",
+    params: sam=DATA_DIR+"/PacBio/{group}/{subject}/{name}.sam",
+    run:
+        shell("samtools view -H {input.bams[0]} > {params.sam}")
+        for bam in input.bams:
+            shell("samtools view {bam} >> {params.sam}")
+        shell("samtools view -bh {params.sam} > {output.bam}")
+        shell("rm {params.sam}")
+
+rule combined_bams:
+    input:
+        p={spp+"/tailpuller.bam" for spp in DATASETS["subject_pacbio_path"]},
+        c={spp+"/tailchopper.bam" for spp in DATASETS["subject_pacbio_path"]},
+
+
+rule repeatfinder:
+    input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailchopper.bam",
+    output: tsv=DATA_DIR+"/PacBio/{group}/{subject}/repeatfinder-{arm}.tsv",
+    params: s="4G", min_k=4, max_k=16, max_p_adjusted=1.1,
+    threads: 12,
+    run:
+        flags = get_sam_flags(wildcards.arm)
+        shell("""
+            ./edgecase repeatfinder -j {threads} -s {params.s} \
+                -m {params.min_k} -M {params.max_k} -P {params.max_p_adjusted} \
+                {flags} {input.bam} > {output.tsv}
+        """)
+
+
+rule repeatfinder_all:
+    input:
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/repeatfinder-p_arm.tsv"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/repeatfinder-q_arm.tsv"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+    output:
+        p_arm=DATA_DIR+"/PacBio/repeatfinder-p_arm-unadjusted.tsv",
+        q_arm=DATA_DIR+"/PacBio/repeatfinder-q_arm-unadjusted.tsv",
+    run:
+        pivot_p = dict(index="#monomer", columns="subject", values="p")
+        pivot_a = dict(index="#monomer", columns="subject", values="abundance")
+        for arm in "p_arm", "q_arm":
+            arm_rf_as_list = []
+            for tsv in getattr(input, arm):
+                sample_rf = read_csv(tsv, sep="\t", usecols=(0,4,5))
+                rpath = sub(r'^'+escape(DATA_DIR)+r'/PacBio/', "", tsv)
+                sample_rf["group"], sample_rf["subject"], *_ = rpath.split("/")
+                arm_rf_as_list.append(sample_rf)
+            arm_rf = concat(arm_rf_as_list)
+            arm_rf["p"] = arm_rf["p"].apply(make_pvals_worse)
+            arm_rf_by_p = arm_rf[pivot_p.values()].pivot(**pivot_p).fillna(1)
+            arm_rf_by_a = arm_rf[pivot_a.values()].pivot(**pivot_a).fillna(0)
+            assert (arm_rf_by_p.index == arm_rf_by_a.index).all()
+            mg = lambda row: combine_pvalues(row, method="mudholkar_george")[1]
+            arm_rf_by_a["p"] = arm_rf_by_p.apply(mg, axis=1).fillna(1)
+            arm_rf_by_a.to_csv(getattr(output, arm), sep="\t")
