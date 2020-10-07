@@ -9,22 +9,25 @@ MIN_PLOT_COVERAGE = 25
 SMALLEST_P_VALUE = 5e-324
 
 DATASETS = read_fwf(StringIO(str.strip("""
-group           subject  dataset
-NA12878         HG001    11kb
-AshkenazimTrio  HG002    10kb
-AshkenazimTrio  HG002    15kb
-AshkenazimTrio  HG002    15kb_20kb
-AshkenazimTrio  HG003    15kb
-AshkenazimTrio  HG003    15kb_20kb
-AshkenazimTrio  HG004    15kb
-AshkenazimTrio  HG004    15kb_20kb
-AshkenazimTrio  HG004    15kb_21kb
-ChineseTrio     HG005    11kb
-ChineseTrio     HG006    15kb_20kb
-ChineseTrio     HG006    hifi_google
-ChineseTrio     HG007    15kb_20kb
-ChineseTrio     HG007    hifi_google
+group           subject  dataset      priority
+NA12878         HG001    11kb         1
+AshkenazimTrio  HG002    10kb         1
+AshkenazimTrio  HG002    15kb         1
+AshkenazimTrio  HG002    15kb_20kb    1
+AshkenazimTrio  HG003    15kb         1
+AshkenazimTrio  HG003    15kb_20kb    2
+AshkenazimTrio  HG004    15kb         1
+AshkenazimTrio  HG004    15kb_21kb    1
+ChineseTrio     HG005    11kb         1
+ChineseTrio     HG006    15kb_20kb    1
+ChineseTrio     HG006    hifi_google  1
+ChineseTrio     HG007    15kb_20kb    1
+ChineseTrio     HG007    hifi_google  1
 """)))
+
+"""Fully cannibalized datasets:
+AshkenazimTrio  HG004    15kb_20kb
+"""
 
 DATASETS["subject_pacbio_path"] = DATASETS.apply(
     lambda row: "{}/PacBio/{}/{}".format(DATA_DIR, *row[:2]), axis=1,
