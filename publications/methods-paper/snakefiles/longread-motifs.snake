@@ -66,11 +66,6 @@ rule combined_bam:
         shell("samtools view -bh {params.sam} > {output.bam}")
         shell("rm {params.sam}")
 
-rule combined_bams:
-    input:
-        p={spp+"/tailpuller.bam" for spp in DATASETS["subject_pacbio_path"]},
-        c={spp+"/tailchopper.bam" for spp in DATASETS["subject_pacbio_path"]},
-
 
 rule repeatfinder:
     input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailchopper.bam",
