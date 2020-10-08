@@ -60,6 +60,12 @@ DAT_HEADER = [
     "clip_5prime", "clip_3prime", "density",
 ]
 
+BOTTLENECK_WARNING = (
+    "Warning: no head/tail testing options selected; regardless of " +
+    "the number of jobs (-j/--jobs), this will likely be " +
+    "bottlenecked by disk writing speeds"
+)
+
 
 def get_circular_pattern(motif, repeats=2):
     """Convert motif into circular regex pattern (e.g., r'TCGA|CGAT|GATC|ATCG' for TCGA)"""
@@ -189,13 +195,13 @@ def interpret_arguments(fmt, head_test, tail_test, cutoff, motif_file):
             message = "Warning: head/tail test has no effect without --cutoff"
             print(message, file=stderr)
     elif (head_test is None) and (tail_test is None) and (cutoff is None):
-        message = (
-            "Warning: no head/tail testing options selected; regardless of " +
-            "the number of jobs (-j/--jobs), this will likely be " +
-            "bottlenecked by disk writing speeds"
-        )
-        print(message, file=stderr)
+        print(BOTTLENECK_WARNING, file=stderr)
     motif_data = read_csv(motif_file, sep="\t", escapechar="#")
+    if "motif" not in motif_data.columns:
+        if "monomer" in motif_data.columns:
+            motif_data = motif_data.rename(columns={"monomer": "motif"})
+        else:
+            raise KeyError("No motif column found in motif file")
     if "length" not in motif_data.columns:
         motif_data["length"] = motif_data["motif"].apply(lambda m: len(m))
     motif_data = motif_data.sort_values(by="length", ascending=False)
