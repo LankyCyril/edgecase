@@ -1,4 +1,5 @@
 from pandas import read_csv, concat
+from pysam import AlignmentFile
 from re import sub, escape
 from scipy.stats import combine_pvalues
 
@@ -13,11 +14,11 @@ rule tailpuller:
     output:
         bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
     params:
-        max_read_length=MAX_READ_LENGTH,
+        max_read_length=MAX_READ_LENGTH, flags="-f0x4000"
     shell: """
         ./edgecase tailpuller \
             -x {HG38EXT_ECX} -m {params.max_read_length} -F3844 {input.bam} \
-        | samtools view -bh > {output.bam}
+        | samtools view -bh {params.flags} > {output.bam}
     """
 
 rule tailchopper:
@@ -42,8 +43,26 @@ rule combined_bam:
     params: sam=DATA_DIR+"/PacBio/{group}/{subject}/{name}.sam",
     run:
         shell("samtools view -H {input.bams[0]} > {params.sam}")
-        for bam in input.bams:
-            shell("samtools view {bam} >> {params.sam}")
+        visited_entries = set()
+        selection = DATASETS.loc[
+            (DATASETS["subject"]==wildcards.subject),
+            ["priority", "dataset", "dataset_pacbio_path"],
+        ]
+        iterator = selection.sort_values(by="priority").iterrows()
+        for _, (_, dataset, dataset_pacbio_path) in iterator:
+            filename = f"{dataset_pacbio_path}/{wildcards.name}.bam"
+            with AlignmentFile(filename) as bam:
+                with open(params.sam, mode="at") as sam:
+                    for entry in bam:
+                        entry_identifier = "{} {} {}".format(
+                            entry.qname, entry.seq, entry.qual,
+                        )
+                        if entry_identifier not in visited_entries:
+                            visited_entries.add(entry_identifier)
+                            modified_entry = "{}:{}".format(
+                                dataset, entry.tostring(),
+                            )
+                            print(modified_entry, file=sam)
         shell("samtools view -bh {params.sam} > {output.bam}")
         shell("rm {params.sam}")
 
