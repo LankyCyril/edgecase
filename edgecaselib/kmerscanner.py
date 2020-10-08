@@ -1,7 +1,7 @@
 from sys import stdout, stderr
-from regex import compile, IGNORECASE
 from numpy import zeros, array, cumsum, nan
 from multiprocessing import Pool
+from edgecaselib.util import get_circular_pattern
 from edgecaselib.formats import filter_bam
 from edgecaselib.tailchopper import get_cigar_clip_length
 from pysam import AlignmentFile, FastxFile
@@ -65,19 +65,6 @@ BOTTLENECK_WARNING = (
     "the number of jobs (-j/--jobs), this will likely be " +
     "bottlenecked by disk writing speeds"
 )
-
-
-def get_circular_pattern(motif, repeats=2):
-    """Convert motif into circular regex pattern (e.g., r'TCGA|CGAT|GATC|ATCG' for TCGA)"""
-    atom_pattern = compile(r'[ACGT.]|\[[ACGT]+\]', flags=IGNORECASE)
-    atoms = atom_pattern.findall(motif)
-    if "".join(atoms) != motif:
-        raise ValueError("Could not parse motif: {}".format(motif))
-    repeated_inversions = {
-        "".join(atoms[i:] + atoms[:i]) * repeats
-        for i in range(len(atoms))
-    }
-    return compile(r'|'.join(repeated_inversions), flags=IGNORECASE)
 
 
 def get_edge_density(entry, pattern, head_test, tail_test):

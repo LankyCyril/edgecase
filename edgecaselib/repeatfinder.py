@@ -3,8 +3,8 @@ from tempfile import TemporaryDirectory
 from pysam import AlignmentFile, FastxFile
 from os import path
 from edgecaselib.util import get_executable, progressbar, revcomp
+from edgecaselib.util import get_circular_pattern
 from edgecaselib.formats import filter_bam
-from edgecaselib.kmerscanner import get_circular_pattern
 from functools import lru_cache
 from subprocess import check_output
 from pandas import read_csv, concat
