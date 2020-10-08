@@ -51,7 +51,7 @@ __docopt_converters__ = [
     lambda max_k: int(max_k),
     lambda min_repeats: int(min_repeats),
     lambda max_p_adjusted: float(max_p_adjusted),
-    lambda max_motifs: int(max_motifs),
+    lambda max_motifs: None if (max_motifs is None) else int(max_motifs),
     lambda jobs: int(jobs),
 ]
 

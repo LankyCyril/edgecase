@@ -207,14 +207,18 @@ def plot_exploded_densities(densities, ecx, title, samfilters, file=stdout.buffe
 
 def stack_motif_densities(binned_density_dataframe):
     """Prepare densities for plotting the stacked area chart; return normal order but stack from bottom"""
-    if "abundance" in binned_density_dataframe.columns:
-        motif_order = binned_density_dataframe[["motif", "abundance"]] \
-            .drop_duplicates().sort_values(by="abundance") \
-            ["motif"].drop_duplicates().values
+    if "fraction_explained" in binned_density_dataframe.columns:
+        motif_order = (
+            binned_density_dataframe[["motif", "fraction_explained"]]
+            .drop_duplicates().sort_values(by="fraction_explained")["motif"]
+            .drop_duplicates().values
+        )
     else:
-        motif_order = binned_density_dataframe[["motif", "total_count"]] \
-            .drop_duplicates().sort_values(by="total_count") \
-            ["motif"].drop_duplicates().values
+        motif_order = (
+            binned_density_dataframe[["motif", "n_matches"]]
+            .drop_duplicates().sort_values(by="n_matches")["motif"]
+            .drop_duplicates().values
+        )
     skinny_bdf = binned_density_dataframe[
         ["name", "motif"] + list(binned_density_dataframe.columns[9:])
     ]

@@ -56,7 +56,7 @@ __docopt_converters__ = [
 
 
 DAT_HEADER = [
-    "#name", "flag", "chrom", "pos", "mapq", "motif", "abundance",
+    "#name", "flag", "chrom", "pos", "mapq", "motif", "fraction_explained",
     "clip_5prime", "clip_3prime", "density",
 ]
 
@@ -195,18 +195,18 @@ def interpret_arguments(fmt, head_test, tail_test, cutoff, motif_file):
     motif_patterns = OrderedDict([
         [motif, get_circular_pattern(motif)] for motif in motif_data["motif"]
     ])
-    if "abundance" in motif_data.columns:
-        total_abundance = dict(zip(
-            motif_data["motif"], motif_data["abundance"]
+    if "fraction_explained" in motif_data.columns:
+        total_n_matches = dict(zip(
+            motif_data["motif"], motif_data["fraction_explained"]
         ))
     else:
-        total_abundance = {m: nan for m in motif_data["motif"]}
-    return manager, motif_patterns, total_abundance
+        total_n_matches = {m: nan for m in motif_data["motif"]}
+    return manager, motif_patterns, total_n_matches
 
 
 def main(sequencefile, fmt, flags, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, window_size, num_reads, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
-    manager, motif_patterns, total_abundance = interpret_arguments(
+    manager, motif_patterns, total_n_matches = interpret_arguments(
         fmt, head_test, tail_test, cutoff, motif_file,
     )
     print(*DAT_HEADER, sep="\t", file=file)
@@ -226,7 +226,7 @@ def main(sequencefile, fmt, flags, flag_filter, min_quality, motif_file, head_te
                     meta_fields = [
                         entry.query_name, entry.flag, entry.reference_name,
                         entry.reference_start, entry.mapping_quality,
-                        motif, total_abundance[motif],
+                        motif, total_n_matches[motif],
                         get_cigar_clip_length(entry, 5),
                         get_cigar_clip_length(entry, 3),
                     ]
