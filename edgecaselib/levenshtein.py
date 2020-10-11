@@ -4,7 +4,8 @@ from numba import njit
 from pysam import AlignmentFile
 from edgecaselib.formats import filter_bam
 from numpy import zeros, array, uint32, uint8, log, nan, pi, isnan, allclose
-from numpy import linspace, vstack, concatenate, unique, tile, triu
+from numpy import linspace, vstack, unique, tile, triu, triu_indices
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
 from edgecaselib.util import progressbar
 from pandas import Series, DataFrame, read_csv, merge
@@ -27,8 +28,9 @@ experiments."""
 
 __doc__ = """edgeCase levenshtein: clustering of telomeric reads by distance
 
-Usage: {0} levenshtein [-m integer] [-o dirname] [--kmerscanner-file filename]
-       {1}             [-f flagspec] [-F flagspec] [-q integer] <sequencedata>
+Usage: {0} levenshtein [-j integer] [-m integer] [-o dirname]
+       {1}             [-f flagspec] [-F flagspec] [-q integer]
+       {1}             [--kmerscanner-file filename] <sequencedata>
 
 Output:
     * TSV-formatted file with statistics describing identified clusters;
@@ -40,6 +42,7 @@ Positional arguments:
     <sequencedata>                     name of input BAM/SAM file or directory with precomputed distances
 
 Options:
+    -j, --jobs [integer]               number of jobs to run in parallel [default: 1]
     -m, --min-cluster-size [integer]   minimum cluster size to consider [default: 5]
     -o, --output-dir [dirname]         output directory for clustermaps and per-haplotype SAM files
     --kmerscanner-file [filename]      kmerscanner file (optional, for use with --output-dir)
@@ -53,6 +56,8 @@ Input filtering options:
 __docopt_converters__ = [
     lambda min_quality:
         None if (min_quality is None) else int(min_quality),
+    lambda jobs: int(jobs),
+    lambda min_cluster_size: int(min_cluster_size),
 ]
 
 
@@ -92,8 +97,10 @@ def ld(v, w):
     return dp[m, n]
 
 
-def get_relative_read_ld(sra, A, srb, B, return_bases=False):
+def get_relative_read_ld(aname, bname, adata, bdata):
     """Calculate relative levenshtein distance between overlapping parts of two reads"""
+    sra, A = adata
+    srb, B = bdata
     if sra < srb:
         _A, _B = A[srb-sra:], B
     elif sra > srb:
@@ -103,32 +110,36 @@ def get_relative_read_ld(sra, A, srb, B, return_bases=False):
     overlap_length = min(len(_A), len(_B))
     _A, _B = _A[:overlap_length], _B[:overlap_length]
     if overlap_length > 0:
-        distance = ld(_A, _B) / overlap_length
-        if return_bases:
-            bases = concatenate([_A, _B])
-        else:
-            bases = zeros(shape=0)
+        return aname, bname, ld(_A, _B) / overlap_length
     else:
-        distance = 1
-        bases = zeros(shape=0)
-    return distance, overlap_length, bases
+        return aname, bname, 1
 
 
-def calculate_chromosome_lds(chrom, entries):
+def calculate_chromosome_lds(chrom, entries, jobs):
     """Calculate pairwise relative levenshtein distances between all reads mapping to one chromosome"""
-    lds = DataFrame(
-        data=nan, columns=sorted(entries.keys()), index=sorted(entries.keys()),
-    )
-    read_iterator = progressbar(entries.items(), desc=chrom, unit="read")
-    for aname, (sra, A) in read_iterator:
-        for bname, (srb, B) in entries.items():
-            if aname == bname:
-                distance = 0
-            elif not isnan(lds.loc[aname, bname]):
-                distance = lds.loc[bname, aname]
-            else:
-                distance, *_ = get_relative_read_ld(sra, A, srb, B)
+    names = sorted(entries.keys())
+    lds = DataFrame(data=nan, columns=names, index=names)
+    name_pairs = [
+        (names[i], names[j])
+        for i, j in list(zip(*triu_indices(len(names), 1)))
+    ]
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        jobs = [
+            pool.submit(
+                get_relative_read_ld,
+                aname, bname, entries[aname], entries[bname],
+            )
+            for aname, bname in name_pairs
+        ]
+        iterator = progressbar(
+            as_completed(jobs), desc=chrom, unit="pair", total=len(jobs),
+        )
+        for job in iterator:
+            aname, bname, distance = job.result()
             lds.loc[aname, bname] = distance
+            lds.loc[bname, aname] = distance
+    for aname in names:
+        lds.loc[aname, aname] = 0
     return lds.fillna(1)
 
 
@@ -339,13 +350,13 @@ def hide_stats_warnings(state=True):
         resetwarnings()
 
 
-def process_levenshtein_input(sequencedata, samfilters, output_dir):
+def process_levenshtein_input(sequencedata, samfilters, output_dir, jobs):
     """Iterate over chromosomes and return pairwise levenshtein distances for reads mapped to them"""
     if path.isfile(sequencedata):
         with AlignmentFile(sequencedata) as alignment:
             bam_dict = load_bam_as_dict(alignment, samfilters)
         for chrom, entries in bam_dict.items():
-            lds = calculate_chromosome_lds(chrom, entries)
+            lds = calculate_chromosome_lds(chrom, entries, jobs)
             if output_dir:
                 lds.to_csv(path.join(output_dir, chrom+"-matrix.tsv"), sep="\t")
             yield chrom, lds
@@ -374,7 +385,7 @@ def main(sequencedata, min_cluster_size, kmerscanner_file, output_dir, flags, fl
     hide_stats_warnings(True)
     report_rows = []
     input_iterator = process_levenshtein_input(
-        sequencedata, [flags, flag_filter, min_quality], output_dir,
+        sequencedata, [flags, flag_filter, min_quality], output_dir, jobs,
     )
     for chrom, lds in input_iterator:
         cm = generate_clustermap(lds)
