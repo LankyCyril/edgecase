@@ -363,7 +363,7 @@ def process_levenshtein_input(sequencedata, samfilters, output_dir, jobs):
     elif path.isdir(sequencedata):
         tsv_iterator = progressbar(
             glob(path.join(sequencedata, "*-matrix.tsv")),
-            desc="Clustering", unit="chromsome",
+            desc="Clustering", unit="chromosome",
         )
         for tsv in tsv_iterator:
             chrom_matcher = search(r'([^/]+)-matrix\.tsv', tsv)
