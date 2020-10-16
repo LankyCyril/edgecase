@@ -37,7 +37,7 @@ DATASETS["dataset_pacbio_path"] = DATASETS.apply(
 )
 
 wildcard_constraints:
-    group="[^/]+", subject="[^/]+", dataset="[^/]+", name="[^/]+",
+    group="[^/]+", subject="[^/]+", dataset="[^/]+", name="[^/]+", kind="[^/]+",
 
 
 def get_sam_flags(arm, target=None):

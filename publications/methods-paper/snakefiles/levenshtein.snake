@@ -13,16 +13,16 @@ rule levenshtein:
         """)
 
 
-def trio_tailpuller_input(w):
+def trio_bam_input(w):
     return {
-        subject: f"{DATA_DIR}/PacBio/{w.group}/{subject}/tailpuller.bam"
+        subject: f"{DATA_DIR}/PacBio/{w.group}/{subject}/tail{w.kind}.bam"
         for subject in set(DATASETS.loc[DATASETS["group"]==w.group, "subject"])
     }
 
-rule trio_tailpuller:
-    input: unpack(trio_tailpuller_input),
-    output: bam=DATA_DIR+"/PacBio/{group}/tailpuller.bam",
-    params: sam=DATA_DIR+"/PacBio/{group}/tailpuller.sam", flags="-f0x4000",
+rule trio_bam:
+    input: unpack(trio_bam_input),
+    output: bam=DATA_DIR+"/PacBio/{group}/tail{kind}.bam",
+    params: sam=DATA_DIR+"/PacBio/{group}/tail{kind}.sam", flags="-f0x4000",
     run:
         first_bam = next(iter(input))
         shell("samtools view -H {first_bam} > {params.sam}")
@@ -35,15 +35,15 @@ rule trio_tailpuller:
         shell("rm {params.sam}")
 
 
-def all_tailpuller_input(w):
+def all_bam_input(w):
     return {
-        group: f"{DATA_DIR}/PacBio/{group}/tailpuller.bam"
+        group: f"{DATA_DIR}/PacBio/{group}/tail{w.kind}.bam"
         for group in set(DATASETS["group"])
     }
-rule all_tailpuller:
-    input: unpack(all_tailpuller_input),
-    output: bam=DATA_DIR+"/PacBio/tailpuller.bam",
-    params: sam=DATA_DIR+"/PacBio/tailpuller.sam", flags="-f0x4000",
+rule all_bam:
+    input: unpack(all_bam_input),
+    output: bam=DATA_DIR+"/PacBio/tail{kind}.bam",
+    params: sam=DATA_DIR+"/PacBio/tail{kind}.sam", flags="-f0x4000",
     run:
         first_bam = next(iter(input))
         shell("samtools view -H {first_bam} > {params.sam}")
