@@ -15,6 +15,9 @@ from pandas import concat
 from re import search
 
 
+buffer = getattr(stdout, "buffer", stdout)
+
+
 __doc__ = """edgeCase densityplot: visualization of motif densities
 
 Usage: {0} densityplot -x filename [-b integer] [-e] [--zoomed-in]
@@ -191,7 +194,7 @@ def make_decorated_densities_iterator(densities):
     )
 
 
-def plot_exploded_densities(densities, ecx, title, samfilters, file=stdout.buffer):
+def plot_exploded_densities(densities, ecx, title, samfilters, file=buffer):
     """Plot binned densities as line plots, one read at a time"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
@@ -458,7 +461,7 @@ def plot_density_scale(ax):
     )
 
 
-def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, file=stdout.buffer):
+def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, file=buffer):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
@@ -566,7 +569,7 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
-def main(dat, gzipped, index, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, file=stdout.buffer, **kwargs):
+def main(dat, gzipped, index, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
     target_anchor, is_q, palette, legend, title = interpret_arguments(
