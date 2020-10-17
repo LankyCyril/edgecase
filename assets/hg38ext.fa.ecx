@@ -1,5 +1,5 @@
 #flags:mask_anchor=4096;fork=8192;tract_anchor=16384
-#entry	rname	pos	pos+1	chromosome	rname	flag	prime	class	source	link	blacklist
+#entry	rname	pos	pos+1	chromosome	main_rname	flag	prime	class	source	link	blacklist
 0	chr1	10000	10001	chr1	chr1	4096	5	mask_anchor	hg38	-	-
 1	chr2	10000	10001	chr2	chr2	4096	5	mask_anchor	hg38	-	-
 2	chr3	10000	10001	chr3	chr3	4096	5	mask_anchor	hg38	-	-
