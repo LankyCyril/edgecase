@@ -1,26 +1,41 @@
-from pandas import concat
+from pandas import concat, MultiIndex
 from statsmodels.stats.multitest import multipletests
 from re import sub
+
+
+def load_multilevel_repeatfinder(tsv):
+    rf = read_csv(tsv, sep="\t", comment="#", header=[0,1])
+    rf.columns = MultiIndex.from_tuples((
+        [("#monomer", "#monomer")] + [
+            (a, "" if b.startswith("Unnamed") else b)
+            for (a, b) in list(rf.columns)[1:]
+        ]
+    ))
+    return rf
 
 
 rule adjust_all_repeatfinder:
     input:
         DATA_DIR+"/PacBio/repeatfinder-p_arm-unadjusted.tsv",
         DATA_DIR+"/PacBio/repeatfinder-q_arm-unadjusted.tsv",
+        DATA_DIR+"/NASA/10X/repeatfinder-unadjusted.tsv",
+        DATA_DIR+"/NASA/Illumina/repeatfinder-unadjusted.tsv",
     output:
         DATA_DIR+"/PacBio/repeatfinder-p_arm.tsv",
         DATA_DIR+"/PacBio/repeatfinder-q_arm.tsv",
+        DATA_DIR+"/NASA/10X/repeatfinder.tsv",
+        DATA_DIR+"/NASA/Illumina/repeatfinder.tsv",
     run:
-        pvals = concat([read_csv(tsv, sep="\t")["p"] for tsv in input], axis=0)
+        pvals = concat([
+            load_multilevel_repeatfinder(tsv)["p"] for tsv in input
+        ])
         p_adjusted = multipletests(pvals, method="bonferroni")[1]
         bonferroni_lookup = {p: padj for p, padj in zip(pvals, p_adjusted)}
         for tsv in input:
-            rf = read_csv(tsv, sep="\t")
+            rf = load_multilevel_repeatfinder(tsv)
             rf["p_adjusted"] = rf["p"].map(bonferroni_lookup)
             rf_filtered = rf[rf["p_adjusted"]<.05].drop(columns="p").copy()
-            rf_filtered["mean"] = (
-                rf_filtered.drop(columns="p_adjusted").mean(axis=1)
-            )
+            rf_filtered["mean"] = rf_filtered["score"].mean(axis=1)
             rf_sorted = rf_filtered.sort_values(by="mean", ascending=False)
             rf_sorted.drop(columns="mean").to_csv(
                 sub(r'-unadjusted', "", tsv), sep="\t", index=False,
