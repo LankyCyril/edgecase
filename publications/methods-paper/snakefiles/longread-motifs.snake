@@ -81,7 +81,7 @@ rule repeatfinder:
         """)
 
 
-rule repeatfinder_all:
+rule repeatfinder_all_pacbio:
     input:
         p_arm=[
             DATA_DIR+f"/PacBio/{group}/{subject}/repeatfinder-p_arm.tsv"
@@ -97,24 +97,30 @@ rule repeatfinder_all:
         p_arm=DATA_DIR+"/PacBio/repeatfinder-p_arm-unadjusted.tsv",
         q_arm=DATA_DIR+"/PacBio/repeatfinder-q_arm-unadjusted.tsv",
     run:
-        pivot_p = dict(
-            index="#monomer", columns="subject", values="p",
-        )
+        pivot_p = dict(index="#monomer", columns="subject", values="p")
+        pivot_s = dict(index="#monomer", columns="subject", values="score")
         pivot_f = dict(
             index="#monomer", columns="subject", values="fraction_explained",
         )
         for arm in "p_arm", "q_arm":
             arm_rf_as_list = []
             for tsv in getattr(input, arm):
-                sample_rf = read_csv(tsv, sep="\t", usecols=(0, 4, 5))
+                sample_rf = read_csv(tsv, sep="\t", usecols=(0, 3, 4, 5))
                 rpath = sub(r'^'+escape(DATA_DIR)+r'/PacBio/', "", tsv)
                 sample_rf["group"], sample_rf["subject"], *_ = rpath.split("/")
                 arm_rf_as_list.append(sample_rf)
             arm_rf = concat(arm_rf_as_list)
             arm_rf["p"] = arm_rf["p"].apply(make_pvals_worse)
             arm_rf_by_p = arm_rf[pivot_p.values()].pivot(**pivot_p).fillna(1)
-            arm_rf_by_a = arm_rf[pivot_f.values()].pivot(**pivot_f).fillna(0)
-            assert (arm_rf_by_p.index == arm_rf_by_a.index).all()
+            arm_rf_by_s = arm_rf[pivot_s.values()].pivot(**pivot_s).fillna(0)
+            arm_rf_by_f = arm_rf[pivot_f.values()].pivot(**pivot_f).fillna(0)
+            assert (arm_rf_by_p.index == arm_rf_by_f.index).all()
+            assert (arm_rf_by_p.index == arm_rf_by_s.index).all()
+            arm_rf_combined = concat(
+                {"score": arm_rf_by_s, "fraction_explained": arm_rf_by_f},
+                axis=1,
+            )
+            arm_rf_combined = arm_rf_combined[sorted(arm_rf_combined.columns)]
             mg = lambda row: combine_pvalues(row, method="mudholkar_george")[1]
-            arm_rf_by_a["p"] = arm_rf_by_p.apply(mg, axis=1).fillna(1)
-            arm_rf_by_a.to_csv(getattr(output, arm), sep="\t")
+            arm_rf_combined["p"] = arm_rf_by_p.apply(mg, axis=1).fillna(1)
+            arm_rf_combined.to_csv(getattr(output, arm), sep="\t")
