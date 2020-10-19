@@ -67,7 +67,7 @@ rule combined_bam:
         shell("rm {params.sam}")
 
 
-rule repeatfinder:
+rule repeatfinder_pacbio:
     input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailchopper.bam",
     output: tsv=DATA_DIR+"/PacBio/{group}/{subject}/repeatfinder-{arm}.tsv",
     params: s="4G", min_k=4, max_k=16, max_p_adjusted=1.1,

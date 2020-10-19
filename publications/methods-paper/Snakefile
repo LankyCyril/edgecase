@@ -3,7 +3,7 @@ from io import StringIO
 
 
 HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
-DATA_DIR = "data/datasets/GIAB-2020"
+DATA_DIR = "data/datasets/2020"
 MAX_READ_LENGTH = 100000
 MIN_PLOT_COVERAGE = 25
 SMALLEST_P_VALUE = 5e-324
@@ -58,6 +58,7 @@ def get_sam_flags(arm, target=None):
 
 
 include: "publications/methods-paper/snakefiles/longread-motifs.snake"
+include: "publications/methods-paper/snakefiles/shortread-motifs.snake"
 include: "publications/methods-paper/snakefiles/bonferroni.snake"
 include: "publications/methods-paper/snakefiles/densityplots.snake"
 include: "publications/methods-paper/snakefiles/levenshtein.snake"
