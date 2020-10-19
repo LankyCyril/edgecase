@@ -425,9 +425,9 @@ def add_legend(updated_palette, ax, exploded, is_q):
             Patch(label=motif, fc=color, ec="black", hatch=None, alpha=.7)
             for motif, color in reversed(updated_palette.items())
         ][::-1]
-        background_handle = [
-            Patch(label="other", fc=BGCOLOR, ec="black", hatch=None, alpha=.7)
-        ]
+        background_handle = [Patch(
+            label="background", fc=BGCOLOR, ec="black", hatch=None, alpha=.7,
+        )]
         if is_q:
             loc="upper left"
         else:
