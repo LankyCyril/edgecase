@@ -331,10 +331,7 @@ key-value sequence of "motif=color" and "legend=boolean", for example:
 Options *--exploded* and *--title* are deprecated.
 
 Option *--zoomed-in* plots taller figures, discards non-telomeric regions, and
-visualizes read coverage above each plot. With this option, two custom "debug"
-environment variables can be passed to *densityplot* that specify how much
-of the surrounding reference coordinates should be included: *PAPER_LEFT_SPAN*
-and *PAPER_RIGHT_SPAN*.
+visualizes read coverage above each plot.
 
 Annotates the anchors from the ECX with dashed lines:
 * mask_anchor == gray,
