@@ -29,15 +29,15 @@ DEFAULT_MOTIF_COLORS = [
 BGCOLOR = "#BBBBCA"
 
 PAPER_PALETTE = OrderedDict([
-    ("TTAGGG", "#117733"), ("TTGGGG", "#AA4499"), ("TTAGGGG", "#332288"),
+    ("TTAGGG", "#117733"), ("TTGGGG", "#AA4499"), ("TTAGGGG", "#88CCEE"),
     ("TGAGGG", "#DDCC77"), ("TCAGGG", "#44AA99"), ("TTAGGGTTAGGGG", "#EEEEEE"),
-    ("CGCGG", "#88CCEE"),
+    ("CGCGG", "#332288"),
 ])
 
 PAPER_PALETTE_RC = OrderedDict([
-    ("CCCTAA", "#117733"), ("CCCCAA", "#AA4499"), ("CCCCTAA", "#332288"),
+    ("CCCTAA", "#117733"), ("CCCCAA", "#AA4499"), ("CCCCTAA", "#88CCEE"),
     ("CCCTCA", "#DDCC77"), ("CCCTGA", "#44AA99"), ("CCCCTAACCCTAA", "#EEEEEE"),
-    ("CCGCG", "#88CCEE"),
+    ("CCGCG", "#332288"),
 ])
 
 
