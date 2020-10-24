@@ -38,6 +38,7 @@ DATASETS["dataset_pacbio_path"] = DATASETS.apply(
 
 wildcard_constraints:
     group="[^/]+", subject="[^/]+", dataset="[^/]+", name="[^/]+", kind="[^/]+",
+    arm="[pq]_arm",
 
 
 def get_sam_flags(arm, target=None):
@@ -62,6 +63,7 @@ include: "publications/methods-paper/snakefiles/shortread-support.snake"
 include: "publications/methods-paper/snakefiles/shortread-motifs.snake"
 include: "publications/methods-paper/snakefiles/bonferroni.snake"
 include: "publications/methods-paper/snakefiles/densityplots.snake"
+include: "publications/methods-paper/snakefiles/kmerscanner-all.snake"
 include: "publications/methods-paper/snakefiles/levenshtein.snake"
 
 
@@ -74,6 +76,20 @@ rule densityplot_all:
         ],
         q_arm=[
             DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-q_arm.pdf"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+
+
+rule kmerscanner_all_motifs_all_subjects:
+    input:
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/kmerscanner-all-p_arm.dat.gz"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/kmerscanner-all-q_arm.dat.gz"
             for _, (group, subject)
             in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
         ],

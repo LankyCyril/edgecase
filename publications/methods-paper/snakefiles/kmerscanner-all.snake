@@ -1,0 +1,23 @@
+rule repeatfinder_for_all_motifs:
+    input: tsv=DATA_DIR+"/PacBio/repeatfinder-{arm}.tsv",
+    output: tsv=temp(DATA_DIR+"/PacBio/repeatfinder-all-{arm}.tsv"),
+    run:
+        with open(input.tsv, mode="rt") as tsv_in:
+            with open(output.tsv, mode="wt") as tsv_out:
+                for i, line in enumerate(map(str.strip, tsv_in)):
+                    if i > 0:
+                        print("\t".join(line.split("\t")[:2]), file=tsv_out)
+
+
+rule kmerscanner_all_motifs:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/tailpuller.bam",
+        tsv=DATA_DIR+"/PacBio/repeatfinder-all-{arm}.tsv",
+    output:
+        dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-all-{arm}.dat.gz",
+    run:
+        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+        shell("""
+            ./edgecase kmerscanner --motif-file {input.tsv} -w 10 \
+                {flags} {input.bam} | gzip -2 > {output.dat}
+        """)
