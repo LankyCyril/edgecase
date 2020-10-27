@@ -36,7 +36,7 @@ Required options:
     -x, --index [filename]        location of the reference .ecx index
 
 Options:
-    -z, --gzipped                 input is gzipped (must specify if any of -qfF present
+    -z, --gzipped                 input is gzipped (must specify if any of -qfF present)
     -b, --bin-size [integer]      size of each bin in bp for visualization speedup [default: 100]
     --n-boot [integer]            number of bootstrap iterations for 95% confidence intervals [default: 1000]
     -e, --exploded                plot each read separately
