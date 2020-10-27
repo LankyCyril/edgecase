@@ -37,7 +37,7 @@ Required options:
 
 Options:
     -z, --gzipped                 input is gzipped (must specify if any of -qfF present)
-    -b, --bin-size [integer]      size of each bin in bp for visualization speedup [default: 100]
+    -b, --bin-size [integer]      size of each bin in bp (overrides bin size in <dat>)
     --n-boot [integer]            number of bootstrap iterations for 95% confidence intervals [default: 1000]
     -e, --exploded                plot each read separately
     --zoomed-in                   plot taller traces, cut off pre-anchor regions
@@ -51,7 +51,7 @@ Input filtering options:
 """
 
 __docopt_converters__ = [
-    lambda bin_size: int(bin_size),
+    lambda bin_size: None if bin_size is None else int(bin_size),
     lambda n_boot: int(n_boot),
 ]
 

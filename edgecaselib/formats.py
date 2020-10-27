@@ -6,6 +6,7 @@ from numpy import linspace, array, mean, concatenate, fromstring, full, vstack
 from numpy import nan, unique
 from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
+from re import search
 from tempfile import TemporaryDirectory
 from os import path
 from edgecaselib.util import progressbar
@@ -39,6 +40,11 @@ PAPER_PALETTE_RC = OrderedDict([
     ("CCCTCA", "#DDCC77"), ("CCCTGA", "#44AA99"), ("CCCCTAACCCTAA", "#EEEEEE"),
     ("CCGCG", "#332288"),
 ])
+
+KMERSCANNER_INCONSISTENT_NUMBER_OF_MOTIFS = (
+    "Inconsistent number of motifs in DAT; plotting of reads " +
+    "identified de novo with kmerscanner is not implemented"
+)
 
 
 class EmptyKmerscanError(ValueError):
@@ -173,7 +179,7 @@ def are_motifs_consistent(raw_densities):
         return True
 
 
-def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=True):
+def load_kmerscan(dat, gzipped, samfilters, bin_size=None, no_align=False, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
     if not any(samfilters): # all zero / None
         print("Loading DAT...", file=stderr, flush=True)
@@ -183,14 +189,18 @@ def load_kmerscan(dat, gzipped, samfilters, bin_size, no_align=False, each_once=
     if len(raw_densities) == 0:
         raise EmptyKmerscanError
     if not are_motifs_consistent(raw_densities):
-        raise NotImplementedError(
-            "Inconsistent number of motifs in DAT; plotting of reads " +
-            "identified de novo with kmerscanner is not implemented"
-        )
+        raise NotImplementedError(KMERSCANNER_INCONSISTENT_NUMBER_OF_MOTIFS)
+    bin_size_data = raw_densities.columns[-1]
+    raw_densities.rename(columns={bin_size_data: "density"}, inplace=True)
+    if bin_size is None:
+        bin_size_matcher = search(r'[0-9]+$', bin_size_data)
+        if bin_size_matcher:
+            bin_size = int(bin_size_matcher.group())
+        else:
+            raise ValueError("No bin size in DAT, user must specify")
     if each_once:
-        raw_densities["length"] = raw_densities["density"].apply(
-            lambda d: d.count(",")+1
-        )
+        count_commas = lambda d: d.count(",")+1
+        raw_densities["length"] = raw_densities["density"].apply(count_commas)
         groups = raw_densities[["name", "motif", "length"]].groupby(
             ["name", "motif"], as_index=False,
         ).max()

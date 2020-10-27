@@ -36,7 +36,7 @@ rule kmerscanner_unfiltered:
     run:
         flags = get_sam_flags(wildcards.arm, target="tract_anchor")
         shell("""
-            ./edgecase kmerscanner --motif-file {input.tsv} -w 10 \
+            ./edgecase kmerscanner --motif-file {input.tsv} -b 10 \
                 {flags} {input.bam} | gzip -2 > {output.dat}
         """)
 

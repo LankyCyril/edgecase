@@ -21,7 +21,7 @@ Positional arguments:
 
 Options:
     -z, --gzipped                 input is gzipped (must specify if any of -qfF present)
-    -b, --bin-size [integer]      size of each bin in bp [default: 10]
+    -b, --bin-size [integer]      size of each bin in bp (overrides bin size in <dat>)
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
@@ -30,7 +30,7 @@ Input filtering options:
 """
 
 __docopt_converters__ = [
-    lambda bin_size: int(bin_size),
+    lambda bin_size: None if bin_size is None else int(bin_size),
 ]
 
 

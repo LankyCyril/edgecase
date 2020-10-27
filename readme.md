@@ -313,7 +313,7 @@ optional arguments:
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -z, --gzipped          input is gzipped (must specify if any of -qfF present) (default: False)
-  -b B, --bin-size B     size of each bin in bp for visualization speedup (default: 100)
+  -b B, --bin-size B     size of each bin in bp (default: 10)
   --zoomed-in            plot taller traces, cut off pre-anchor regions (default: False)
   --palette ?            custom palette for plotting motifs (default: None)
   -e, --exploded         plot each read separately (default: False)

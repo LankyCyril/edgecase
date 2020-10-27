@@ -11,7 +11,7 @@ Usage: {0} basic-pipeline-longread -x filename -o dirname [--force] [-j integer]
        {1}                [-m integer] [-n integer] [--target targetspec]
        {1}                [-q integer] [--min-k integer] [--max-k integer]
        {1}                [--jellyfish filename] [--jellyfish-hash-size string]
-       {1}                [--max-p-adjusted float] [--window-size integer]
+       {1}                [--max-p-adjusted float] [--bin-size integer]
        {1}                [--n-boot integer] [--palette palettespec]
        {1}                [--title string] <bam>
 
@@ -43,7 +43,7 @@ Options:
     --max-p-adjusted [float]         cutoff adjusted p-value [default: .05]
     --jellyfish [filename]           jellyfish binary (unless in $PATH)
     --jellyfish-hash-size [string]   jellyfish initial hash size [default: 2G]
-    --window-size [integer]          size of the window (for kmerscanner and densityplot) [default: 100]
+    --bin-size [integer]             size of the window (for kmerscanner and densityplot) [default: 10]
     --n-boot [integer]               number of bootstrap iterations for plotting [default: 1000]
     --palette [palettespec]          custom palette for plotting motifs
     --title [string]                 title for the density plots
@@ -60,7 +60,7 @@ __docopt_converters__ = [
     lambda min_k: int(min_k),
     lambda max_k: int(max_k),
     lambda max_p_adjusted: float(max_p_adjusted),
-    lambda window_size: int(window_size),
+    lambda bin_size: int(bin_size),
     lambda n_boot: int(n_boot),
     lambda min_quality: None if (min_quality is None) else int(min_quality),
 ]
@@ -83,7 +83,7 @@ __docopt_tests__ = {
 }
 
 
-def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, window_size, n_boot, palette, title, min_quality, **kwargs):
+def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, bin_size, n_boot, palette, title, min_quality, **kwargs):
     """basic pipeline: select reads, find enriched motifs, plot"""
     get_filename = lambda fn: path.join(output_dir, fn)
     tailpuller_sam = get_filename("tailpuller.sam")
@@ -115,7 +115,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
                 tailpuller_sam, fmt="sam", flags=f, flag_filter=F,
                 min_quality=min_quality, motif_file=repeatfinder_tsv,
                 head_test=None, tail_test=None, cutoff=None, num_reads=None,
-                window_size=window_size, jobs=jobs, file=dat,
+                bin_size=bin_size, jobs=jobs, file=dat,
             )
         densityplot_pdf = get_filename("densityplot-{}_arm.pdf".format(arm))
         with open(densityplot_pdf, mode="wb") as pdf:
@@ -127,7 +127,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
                 densityplot.main(
                     kmerscanner_dat, gzipped=True, index=index, flags=f,
                     flag_filter=F, min_quality=min_quality,
-                    bin_size=window_size, n_boot=n_boot, exploded=False,
+                    bin_size=bin_size, n_boot=n_boot, exploded=False,
                     zoomed_in=False, palette=palette, title=plot_title,
                     file=pdf,
                 )
