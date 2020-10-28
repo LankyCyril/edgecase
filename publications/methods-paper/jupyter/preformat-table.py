@@ -55,17 +55,22 @@ def preformat_row(row):
         elif label in {"p", "p_adjusted"}:
             is_p = True
         if is_p:
-            if float(value) == 0.0:
-                yield r'<1e-300'
-            elif float(value) == 1.0:
-                yield "1.00"
+            try:
+                float_value = float(value)
+            except:
+                yield value.replace("_", r'\_')
             else:
-                yield format(float(value), ".2e")
+                if float(value) == 0.0:
+                    yield r'<1e-300'
+                elif float(value) == 1.0:
+                    yield "1.00"
+                else:
+                    yield format(float(value), ".2e")
         else:
             try:
                 float_value = float(value)
             except ValueError:
-                yield value
+                yield value.replace("_", r'\_')
             else:
                 yield format(float_value, ".6f")
 
