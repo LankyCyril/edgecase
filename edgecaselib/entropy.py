@@ -1,30 +1,27 @@
 from sys import stdout
-from edgecaselib.formats import load_index, load_kmerscan, interpret_flags
+from edgecaselib.formats import load_kmerscan
 from pandas import DataFrame, concat
 from scipy.stats import entropy
-from numpy import log
+from numpy import log, argsort, cumsum, interp
 from edgecaselib.util import progressbar
+from itertools import chain
 
 
 __doc__ = """edgeCase entropy: calculation of motif entropy among reads
 
-Usage: {0} entropy -x filename [-t targetspec] [-b integer] [-z]
-       {1}         [-f flagspec] [-F flagspec] [-q integer] <dat>
+Usage: {0} entropy [-b integer] [-f flagspec] [-F flagspec] [-q integer]
+       {1}         [-z] <dat>...
 
 Output:
     TSV file of entropy values and read coverage per bin,
     with coverage-weighted quantiles of entropy in a comment on first line
 
 Positional arguments:
-    <dat>                         name of input kmerscanner file
-
-Required options:
-    -x, --index [filename]        location of the reference .ecx index
+    <dat>                         name of input kmerscanner file(s)
 
 Options:
     -z, --gzipped                 input is gzipped (must specify if any of -qfF present)
     -b, --bin-size [integer]      size of each bin in bp (overrides bin size in <dat>)
-    -t, --target [targetspec]     an ECX flag past which to evaluate motifs [default: tract_anchor]
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
@@ -37,31 +34,10 @@ __docopt_converters__ = [
 ]
 
 
-def calculate_entropies(bdf, chrom, ecx, integer_target):
+def calculate_entropies(bdf):
     """Calculate entropies per binned density dataframe"""
-    flags = bdf["flag"].drop_duplicates()
-    is_q = set(flag & 0x8000 == 0x8000 for flag in flags)
-    if len(is_q) != 1:
-        raise ValueError(f"p- and q-arm reads mixed on {chrom} in DAT")
-    else:
-        prime = 3 if is_q.pop() else 5
-    anchors = ecx.loc[
-        ((ecx["rname"]==chrom) & (ecx["prime"]==prime) &
-        (ecx["flag"]==integer_target)), "pos"
-    ]
-    if len(anchors) == 0:
-        raise ValueError(f"No relevant {prime}-prime info on {chrom} in ECX")
-    elif len(anchors) > 1:
-        raise ValueError(f"Conflicting {prime}-prime info on {chrom} in ECX")
-    else:
-        anchor = anchors.iloc[0]
-    if prime == 3:
-        positions = [c for c in bdf.columns[9:] if c >= anchor]
-    else:
-        positions = [c for c in bdf.columns[9:] if c <= anchor]
-    bdf_sliced = bdf[list(bdf.columns[:9])+positions]
     per_read_modes = (
-        bdf_sliced.groupby("name")
+        bdf.groupby("name")
         .apply(lambda block: block.set_index("motif").iloc[:,8:].idxmax(axis=0))
         .dropna(how="all", axis=1)
     )
@@ -74,17 +50,31 @@ def calculate_entropies(bdf, chrom, ecx, integer_target):
     })
 
 
-def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, target, file=stdout, **kwargs):
+def weighted_quantile(points, weights, q):
+    """Calculate quantile `q` of `points`, weighted by `weights`"""
+    indsort = argsort(points.values)
+    spoints, sweights = points.values[indsort], weights.values[indsort]
+    sn = cumsum(sweights)
+    pn = (sn - sweights / 2) / sn[-1]
+    return interp(q, pn, spoints)
+
+
+def main(dat, gzipped, flags, flag_filter, min_quality, bin_size, file=stdout, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
-    ecx = load_index(index)
-    integer_target = interpret_flags(target)
-    densities = load_kmerscan(dat, gzipped, samfilters, bin_size)
+    kmerscans = [load_kmerscan(fn, gzipped, samfilters, bin_size) for fn in dat]
     entropies = concat(
-        calculate_entropies(bdf, chrom, ecx, integer_target)
-        for chrom, bdf in progressbar(
-            densities.items(), total=len(densities),
+        calculate_entropies(bdf) for bdf in progressbar(
+            chain(*(ks.values() for ks in kmerscans)),
             desc="Calculating entropies", unit="arm",
+            total=sum(len(ks) for ks in kmerscans),
         )
     )
+    quantiles = {
+        q: weighted_quantile(
+            entropies["#entropy"], entropies["coverage"]-1, q/100,
+        )
+        for q in progressbar(range(5, 101, 5), desc="Calculating quantiles")
+    }
+    print("#"+",".join(f"q{k}={v}" for k, v in quantiles.items()), file=file)
     entropies.to_csv(file, sep="\t", index=False)
