@@ -8,26 +8,20 @@ from collections import OrderedDict
 
 PDFS = [
     "haplotypes/5qtel_1-500K_1_12_12_rc.pdf",
-    "haplotypes/6qtel_1-500K_1_12_12_rc.pdf",
-    "haplotypes/chr7.pdf",
-    "haplotypes/chr8.pdf",
-    "haplotypes/chr11.pdf",
-    "haplotypes/chr12.pdf",
-    "haplotypes/14qtel_1-500K_1_12_12_rc.pdf",
-    "haplotypes/chr15.pdf",
+    "haplotypes/6qtel_1-500K_1_12_12_rc.pdf", "haplotypes/chr7.pdf",
+    "haplotypes/chr8.pdf", "haplotypes/chr11.pdf", "haplotypes/chr12.pdf",
+    "haplotypes/14qtel_1-500K_1_12_12_rc.pdf", "haplotypes/chr15.pdf",
     "haplotypes/16qtel_1-500K_1_12_12_rc.pdf",
-    "haplotypes/18qtel_1-500K_1_12_12_rc.pdf",
-    "haplotypes/chr19.pdf",
-    "haplotypes/chr21.pdf",
-    "haplotypes/chr22.pdf",
-    "haplotypes/chrX.pdf",
+    "haplotypes/18qtel_1-500K_1_12_12_rc.pdf", "haplotypes/chr19.pdf",
+    "haplotypes/chr21.pdf", "haplotypes/chr22.pdf", "haplotypes/chrX.pdf",
 ]
 
 
 TEX_LEGEND = r'''\begin{textblock}{13}($X,$Y)
 \includegraphics[width=$WIDTHin,keepaspectratio]{haplotypes/haplotypes-legend.pdf}
 \end{textblock}'''
-LEGEND_WIDTH = 6.181 / 1.5
+LEGEND_WIDTH = 4.5
+EXTRA_MARGIN = 3
 
 
 TEX_HEADER = r'''\documentclass{article}
@@ -64,7 +58,7 @@ def main(argv):
     combined_width = max(width for width, _ in pdf_sizes.values())
     combined_height = sum(height for _, height in pdf_sizes.values())
     header = (TEX_HEADER
-        .replace("$WIDTH", format(combined_width, ".3f"))
+        .replace("$WIDTH", format(combined_width+EXTRA_MARGIN, ".3f"))
         .replace("$HEIGHT", format(combined_height, ".3f"))
     )
     print(header)
@@ -79,7 +73,9 @@ def main(argv):
         y += height
     legend_section = (TEX_LEGEND
         .replace("$WIDTH", format(LEGEND_WIDTH, ".3f"))
-        .replace("$X", format(combined_width-LEGEND_WIDTH*1.05, ".3f"))
+        .replace("$X", format(
+            combined_width+EXTRA_MARGIN-LEGEND_WIDTH*1.05, ".3f",
+        ))
         .replace("$Y", "0")
     )
     print(legend_section)
