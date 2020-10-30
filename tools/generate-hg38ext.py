@@ -7,9 +7,14 @@ from urllib.request import urlretrieve
 from contextlib import contextmanager
 from binascii import hexlify
 from gzip import open as gzopen
-from tqdm import tqdm
 from itertools import chain
 from textwrap import fill
+
+try:
+    from tqdm import tqdm
+except ModuleNotFoundError:
+    def tqdm(it, *args, **kwargs):
+        return it
 
 
 USAGE = """usage:
@@ -17,6 +22,10 @@ USAGE = """usage:
     generate hg38ext.fa from local files
 {0} --remote
     download appropriate assemblies and generate hg38ext.fa
+
+NOTE! This tool prints the uncompressed FASTA to stdout. You should pipe it
+into a file, for example:
+{0} --remote > hg38ext.fa
 """
 
 NCBI_FTP_DIR = "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405"
