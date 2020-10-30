@@ -1,772 +1,95 @@
-from pandas import read_csv, concat, DataFrame, Series, merge
-from re import search
-from statsmodels.stats.multitest import multipletests
-from itertools import product, count, chain
-from numpy import array, arange, fromiter, full_like, uint32, concatenate, nan
-from numpy import sort, ceil, argsort, median, cumsum, interp
-from numpy import log as log2
-from glob import glob
-from os import path, getcwd
-from sys import path as sys_path
-from matplotlib.pyplot import switch_backend, subplots
-from seaborn import lineplot, heatmap
-from pysam import AlignmentFile, FastxFile
-from gzip import open as gzopen
-from collections import defaultdict, OrderedDict
-from scipy.stats import combine_pvalues, entropy
-from functools import reduce, partial
-
-sys_path.insert(0, getcwd())
-from edgecaselib.formats import load_kmerscan, PAPER_PALETTE, PAPER_PALETTE_RC
-from edgecaselib.util import progressbar, natsorted_chromosomes, revcomp
-from edgecaselib.repeatfinder import lowest_collapsed_revcomp_alpha_inversion
-from edgecaselib.repeatfinder import custom_alpha_inversion
+from pandas import read_fwf
+from io import StringIO
 
 
-PACBIO_NAME_TO_SAMPLE = {
-    "HG001": "HG001/HG001.RTG", "HG002": "HG002/HG002.10kb+15kb",
-    "HG005": "HG005/HG005.10x"
-}
-PAPER_PALETTES = {"p_arm": PAPER_PALETTE_RC, "q_arm": PAPER_PALETTE}
-IS_Q_TRACT_ANCHOR, TRACT_ANCHOR, IS_Q_3844 = 49152, 16384, 36612
-ENTROPY_W = 10
+HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
+DATA_DIR = "data/datasets/2020"
+MAX_READ_LENGTH = 100000
+MIN_PLOT_COVERAGE = 25
+SMALLEST_P_VALUE = 5e-324
+
+DATASETS = read_fwf(StringIO(str.strip("""
+group           subject  dataset      priority
+NA12878         HG001    11kb         1
+AshkenazimTrio  HG002    10kb         1
+AshkenazimTrio  HG002    15kb         1
+AshkenazimTrio  HG002    15kb_20kb    1
+AshkenazimTrio  HG003    15kb         1
+AshkenazimTrio  HG003    15kb_20kb    2
+AshkenazimTrio  HG004    15kb         1
+AshkenazimTrio  HG004    15kb_21kb    1
+ChineseTrio     HG005    11kb         1
+ChineseTrio     HG006    15kb_20kb    1
+ChineseTrio     HG006    hifi_google  1
+ChineseTrio     HG007    15kb_20kb    1
+ChineseTrio     HG007    hifi_google  1
+""")))
+
+"""Fully cannibalized datasets:
+AshkenazimTrio  HG004    15kb_20kb
+"""
+
+DATASETS["subject_pacbio_path"] = DATASETS.apply(
+    lambda row: "{}/PacBio/{}/{}".format(DATA_DIR, *row[:2]), axis=1,
+)
+DATASETS["dataset_pacbio_path"] = DATASETS.apply(
+    lambda row: "{}/PacBio/{}/{}/{}".format(DATA_DIR, *row[:3]), axis=1,
+)
+
+wildcard_constraints:
+    group="[^/]+", subject="[^/]+", dataset="[^/]+", name="[^/]+", kind="[^/]+",
+    arm="[pq]_arm",
 
 
-rule all:
-    input:
-        giab_full=expand(
-            "data/datasets/GIAB/PacBio/{sample}-densityplot-{arm}.pdf",
-            sample=PACBIO_NAME_TO_SAMPLE.values(), arm=["p_arm", "q_arm"]
-        ),
-        chm_full=expand(
-            "data/datasets/T2T/PacBio/sorted_pbhifi_t2t_CHM13hTERT-densityplot-{arm}.pdf",
-            arm=["p_arm", "q_arm"]
-        ),
-        giab_haplotypes=expand(
-            "data/datasets/GIAB/PacBio/{sample}-levenshtein-{arm}-densityplots.tar",
-            sample=PACBIO_NAME_TO_SAMPLE.values(), arm=["p_arm", "q_arm"]
-        ),
-        chm_haplotypes=expand(
-            "data/datasets/T2T/PacBio/sorted_pbhifi_t2t_CHM13hTERT-levenshtein-{arm}-densityplots.tar",
-            arm=["p_arm", "q_arm"]
-        ),
-    shell: "rm -f {input.giab_haplotypes} {input.chm_haplotypes} || :"
-
-
-rule telbam_to_fastq:
-    """Extracts reads in FASTQ format from telbams for: mapping to long reads; shortread-only analyses. Telbams come from previous analyses."""
-    input: bam="{prefix}-telbam.bam"
-    output: fq="{prefix}-telbam.fq.gz"
-    run:
-        namecounts, processed = defaultdict(lambda: count(1)), set()
-        get_name_repr = lambda en: "{}/{}".format(en, next(namecounts[en]))
-        with AlignmentFile(input.bam) as bam, gzopen(output.fq, "wt") as fq:
-            for entry in bam:
-                if (entry.qname, entry.seq) not in processed:
-                    processed.add((entry.qname, entry.seq))
-                    entry_repr = "@{}\n{}\n+\n{}".format(
-                        get_name_repr(entry.qname), entry.seq, entry.qual
-                    )
-                    print(entry_repr, file=fq)
-
-
-rule tailchopper_faidx:
-    """Creates a FASTA index (FAI) for mapping telbam FASTQs to long reads. Tailchopper BAMs come from previous analyses."""
-    input: bam="{prefix}-tailchopper.bam"
-    output: fa="{prefix}-tailchopper.fa", fai="{prefix}-tailchopper.fa.fai"
-    shell: """
-        samtools view -F3840 {input.bam} \
-            | bioawk -c sam '{{print ">"$qname; print $seq}}' > {output.fa}
-        samtools faidx {output.fa}
-    """
-
-
-def map_telbam_to_tailchopper_input(w):
-    fq_mask = "data/datasets/{}/Illumina/{}/{}-telbam.fq.gz"
-    fq = fq_mask.format(w.group, w.sample, w.sample)
-    fa_mask = "data/datasets/{}/PacBio/{}-tailchopper.fa"
-    fa = fa_mask.format(w.group, PACBIO_NAME_TO_SAMPLE[w.sample])
-    return dict(fq=fq, fa=fa, fai=fa+".fai")
-
-
-rule map_telbam_to_tailchopper:
-    """Maps telbam FASTQs (from telbam_to_fastq) to tailchopper FASTAs (from tailchopper_faidx)"""
-    input: unpack(map_telbam_to_tailchopper_input)
-    output: bam="data/datasets/{group}/Illumina/{sample}/{sample}-telbam2tailchopper.bam"
-    threads: 12
-    shell: """
-        n_multimap=1000000
-        minimap2 -t {threads} -ax sr \
-            --secondary=yes -p0 -N$n_multimap {input.fa} {input.fq} \
-        | samtools view -bh > {output.bam}
-    """ # n_multimap=$(cat {input.fai} | wc -l)
-
-
-def telbam_support_input(w):
-    ref_mask = "data/datasets/{}/PacBio/{}-tailchopper.bam"
-    ref = ref_mask.format(w.group, PACBIO_NAME_TO_SAMPLE[w.sample])
-    bam_mask = "data/datasets/{}/Illumina/{}/{}-telbam2tailchopper.bam"
-    bam = bam_mask.format(w.group, w.sample, w.sample)
-    return dict(ref=ref, bam=bam)
-
-
-rule telbam_support:
-    """Outputs stretches of long reads that are mapped by short telbam reads (from map_telbam_to_tailchopper)"""
-    input:
-        unpack(telbam_support_input)
-    output:
-        sam="data/datasets/{group}/Illumina/{sample}/{sample}-telbam-support.sam"
-    params:
-        cigar_regex=r'(^[0-9A-LN-Z]*[A-LN-Z]|^)([0-9]+M)[0-9A-LN-Z]*$',
-        min_match=50
-    run:
-        ref_covpos = defaultdict(set)
-        with AlignmentFile(input.bam) as bam:
-            for entry in progressbar(bam, desc="telbam input"):
-                cigar_match = search(params.cigar_regex, str(entry.cigarstring))
-                if cigar_match:
-                    start, end = entry.reference_start, entry.reference_end
-                    if end - start >= params.min_match:
-                        if end - start == int(cigar_match.group(2)[:-1]):
-                            covpos = set(range(start, end))
-                            ref_covpos[entry.reference_name] |= covpos
-        with AlignmentFile(input.ref) as ref, open(output.sam, "wt") as sam:
-            print(str(ref.header).rstrip("\n"), file=sam)
-            for ref_entry in progressbar(ref, desc="bam output"):
-                covpos = ref_covpos[ref_entry.qname]
-                if covpos:
-                    ref_seq_array = fromiter(ref_entry.seq, dtype="<U1")
-                    masked_seq_array = full_like(ref_seq_array, "N")
-                    ix = fromiter(covpos, dtype=int)
-                    masked_seq_array[ix] = ref_seq_array[ix]
-                    ref_entry.seq = "".join(masked_seq_array)
-                    print(ref_entry.to_string(), file=sam)
-
-
-def reindex_entry(entry, fix_tailchopper_mappos):
-    if not fix_tailchopper_mappos:
-        positions = (arange(0, len(entry.seq)) + entry.reference_start).tolist()
-    elif (entry.flag & 0x8000 == 0x8000):
-        positions = arange(0, len(entry.seq)).tolist()
-    else:
-        positions = arange(-len(entry.seq), 0).tolist()
-    return ["chrom", "is_q"] + positions
-
-
-def visualize_telbam_coverage(entry_support, chrom, is_q, fix_tailchopper_mappos, ax, mu=50, mu_visible=1000):
-    indexer = (entry_support["chrom"]==chrom) & (entry_support["is_q"]==is_q)
-    arm_support = entry_support[indexer].iloc[:,2:]
-    if len(arm_support) == 0:
-        ax.set(xticks=[], yticks=[])
-        return ax.twinx(), None
-    if fix_tailchopper_mappos:
-        if is_q:
-            support_columns = [c for c in arm_support.columns if c >= 0]
+def get_sam_flags(arm, target=None):
+    if target:
+        if arm == "p_arm":
+            return "-f '{}' -F 'is_q|3844'".format(target)
+        elif arm == "q_arm":
+            return "-f 'is_q|{}' -F 3844".format(target)
         else:
-            support_columns = [c for c in arm_support.columns if c < 0]
-        arm_support = arm_support[support_columns]
+            raise ValueError("arm", arm)
     else:
-        raise NotImplementedError("Fix known issue with tailchopper mappos!")
-    steps = range(int(ceil(arm_support.shape[1]/mu)))
-    blocks = (arm_support.iloc[:,i*mu:i*mu+mu].mean(axis=1) for i in steps)
-    row_order = arm_support.isnull().sum(axis=1).sort_values().index
-    mean_arm_support = concat(blocks, axis=1).loc[row_order]
-    heatmap(mean_arm_support, cmap="summer_r", cbar=False, ax=ax)
-    twinx = ax.twinx()
-    lineplot_kws = dict(
-        x=mean_arm_support.columns, y=mean_arm_support.sum(axis=0), ax=twinx
-    )
-    lineplot(**lineplot_kws, color="white", lw=5, alpha=.5)
-    lineplot(**lineplot_kws, color="#E10000", lw=1.5)
-    twinx.set(ylim=(0, len(arm_support)))
-    offset = arm_support.columns[::mu].to_series().abs().min()
-    get_mu_label = lambda t: arm_support.columns[::mu][int(t)] + offset
-    check_mu_label = lambda t: get_mu_label(t) % mu_visible < mu_visible / 5
-    xticklabels = [
-        get_mu_label(xt.get_text()) if check_mu_label(xt.get_text()) else ""
-        for xt in ax.get_xticklabels()
-    ]
-    ax.set(xticklabels=xticklabels, yticks=[])
-    return twinx, arm_support
+        if arm == "p_arm":
+            return "-F 'is_q|3844'"
+        elif arm == "q_arm":
+            return "-f is_q -F 3844"
+        else:
+            raise ValueError("arm", arm)
 
 
-def redecorate_support_and_save(axs, twinxs, chroms, figure, pdf, text_kws=dict(x=.02, y=.9, va="top", ha="left")):
-    ymax = max(max(ax.get_ylim()) for ax in chain(axs.flatten(), twinxs))
-    for ax in chain(axs.flatten(), twinxs):
-        ax.set(ylim=(0, ymax))
-    for i, chrom in enumerate(chroms):
-        axs[i,0].text(**text_kws, s=chrom, transform=axs[i,0].transAxes)
-    for ax in chain(axs[:,0], axs[:-1,1], twinxs[:-1]):
-        ax.set(yticks=[])
-    for ax in axs[:-1,:].flatten():
-        ax.set(xticks=[])
-    figure.savefig(pdf, bbox_inches="tight")
+include: "publications/methods-paper/snakefiles/longread-motifs.snake"
+include: "publications/methods-paper/snakefiles/shortread-support.snake"
+include: "publications/methods-paper/snakefiles/shortread-motifs.snake"
+include: "publications/methods-paper/snakefiles/bonferroni.snake"
+include: "publications/methods-paper/snakefiles/densityplots.snake"
+include: "publications/methods-paper/snakefiles/kmerscanner-all.snake"
+include: "publications/methods-paper/snakefiles/levenshtein.snake"
 
 
-def dna2bool(seq):
-    return array(list(seq.upper())).view(uint32) & 7 != 6
-
-
-def write_support_stats(telbam2tailchopper, telbam_fq, supported_bases, total_bases, coverages, txt):
-    with AlignmentFile(telbam2tailchopper) as tb2tc:
-        supporting_telbams = len(set(
-            e.qname for e in progressbar(tb2tc, desc="Calculating stats")
-            if e.flag & 4 == 0
-        ))
-    with FastxFile(telbam_fq) as fq:
-        total_telbams = sum(1 for _ in fq)
-    p_coverage = concatenate(coverages[False])
-    q_coverage = concatenate(coverages[True])
-    with open(txt, mode="wt") as txt_handle:
-        print("telbam_used", end="\t", file=txt_handle)
-        print(supporting_telbams, total_telbams, sep="\t", file=txt_handle)
-        print("bases_supported", end="\t", file=txt_handle)
-        print(supported_bases, total_bases, sep="\t", file=txt_handle)
-        print("median_coverage_[p,q]", end="\t", file=txt_handle)
-        print(median(p_coverage), median(q_coverage), sep="\t", file=txt_handle)
-        print("mean_coverage_[p,q]", end="\t", file=txt_handle)
-        print(p_coverage.mean(), q_coverage.mean(), sep="\t", file=txt_handle)
-
-
-rule telbam_support_coverage:
-    """Calculates and visualizes telbam support of long reads (from telbam_support)"""
+rule densityplot_all:
     input:
-        telbam_fq="data/datasets/{group}/Illumina/{sample}/{sample}-telbam.fq.gz",
-        telbam2tailchopper="data/datasets/{group}/Illumina/{sample}/{sample}-telbam2tailchopper.bam",
-        tb_support="data/datasets/{group}/Illumina/{sample}/{sample}-telbam-support.sam"
-    output:
-        pdf="data/datasets/{group}/Illumina/{sample}/{sample}-telbam-support.pdf",
-        txt="data/datasets/{group}/Illumina/{sample}/{sample}-telbam-support.txt"
-    params:
-        fix_tailchopper_mappos=True,
-        subplots_kws=dict(ncols=2, sharey=True, squeeze=False, gridspec_kw=dict(hspace=0, wspace=0))
-    run:
-        supported_bases, total_bases = 0, 0
-        with AlignmentFile(input.tb_support) as tb_support:
-            entry_support_as_list = []
-            for entry in filter(lambda e: e.flag & 3840 == 0, tb_support):
-                bool_seq = dna2bool(entry.seq)
-                total_bases += len(bool_seq)
-                supported_bases += sum(bool_seq)
-                meta = [entry.reference_name, entry.flag & 0x8000 == 0x8000]
-                entry_support_as_list.append(Series(
-                    name=entry.qname, data=meta+bool_seq.tolist(),
-                    index=reindex_entry(entry, params.fix_tailchopper_mappos)
-                ))
-            entry_support = concat(entry_support_as_list, axis=1, sort=True).T
-            support_cols = ["chrom", "is_q"] + sorted(entry_support.columns[2:])
-            entry_support = entry_support[support_cols]
-        chroms = natsorted_chromosomes(entry_support["chrom"].drop_duplicates())
-        switch_backend("pdf")
-        twinxs, figure, axs = [], *subplots(
-            nrows=len(chroms), figsize=(14, len(chroms)), **params.subplots_kws
-        )
-        coverages = {False: [], True: []}
-        for i, chrom in enumerate(progressbar(chroms, unit="chromosome")):
-            for j, is_q in enumerate([False, True]):
-                twinx, arm_support = visualize_telbam_coverage(
-                    entry_support, chrom=chrom, is_q=is_q, ax=axs[i,j],
-                    fix_tailchopper_mappos=params.fix_tailchopper_mappos
-                )
-                twinxs.append(twinx)
-                if arm_support is not None:
-                    coverages[is_q].append(arm_support.sum(axis=0).values)
-        redecorate_support_and_save(axs, twinxs, chroms, figure, output.pdf)
-        write_support_stats(
-            input.telbam2tailchopper, input.telbam_fq,
-            supported_bases, total_bases, coverages, output.txt
-        )
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-p_arm.pdf"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-q_arm.pdf"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
 
 
-def repeatfinder_input(w):
-    if w.group == "GIAB":
-        sample = "/".join([w.sample.split("/")[0], w.sample.split("/")[0]])
-        technology, postfix = "Illumina", "telbam-support.sam"
-    else:
-        sample, technology, postfix = w.sample, "PacBio", "tailchopper.bam"
-    return dict(sam="data/datasets/{}/{}/{}-{}".format(
-        w.group, technology, sample, postfix
-    ))
-
-
-rule repeatfinder:
-    """Runs edgecase repeatfinder on any PacBio sample. Outputs of relevance to the paper:
-        GIAB: PacBio: HG001.RTG-repeatfinder-p_arm.tsv
-        GIAB: PacBio: HG001.RTG-repeatfinder-q_arm.tsv
-        GIAB: PacBio: HG002.10kb+15kb-repeatfinder-p_arm.tsv
-        GIAB: PacBio: HG002.10kb+15kb-repeatfinder-q_arm.tsv
-        GIAB: PacBio: HG005.10x-repeatfinder-p_arm.tsv
-        GIAB: PacBio: HG005.10x-repeatfinder-q_arm.tsv"""
+rule kmerscanner_all_motifs_all_subjects:
     input:
-        unpack(repeatfinder_input)
-    output:
-        p_arm="data/datasets/{group}/PacBio/{sample}-repeatfinder-p_arm.tsv",
-        q_arm="data/datasets/{group}/PacBio/{sample}-repeatfinder-q_arm.tsv"
-    threads: 4
-    shell: """
-        ./edgecase repeatfinder -j {threads} -f 'tract_anchor' -F 'is_q|3840' \
-            -m 4 -M 16 -P 1.1 {input.sam} > {output.p_arm}
-        ./edgecase repeatfinder -j {threads} -f 'is_q|tract_anchor' -F 3840 \
-            -m 4 -M 16 -P 1.1 {input.sam} > {output.q_arm}
-    """
-
-
-def load_repeatfinder(unfiltered_filenames, arm):
-    sample_reports, subjects = [], []
-    for tsv in sorted(f for f in unfiltered_filenames if arm in f):
-        sample_report = read_csv(tsv, sep="\t", usecols=(0, 4, 5), index_col=0)
-        subject = search(r'HG00[0-9]', tsv).group()
-        subjects.append(subject)
-        sample_report.columns = [
-            subject+" "+c for c in list(sample_report.columns)
-        ]
-        sample_reports.append(sample_report)
-    raw_report = concat(sample_reports, axis=1, sort=False)
-    raw_report["arm"] = arm
-    return raw_report, subjects
-
-
-rule giab_repeats:
-    """Combines GIAB repeatfinder results (from repeatfinder) into one table, calculates Mudholkar-George combined p-values.
-    Outputs of relevance to the paper:
-        GIAB: PacBio: repeatfinder-paper-p_arm.tsv
-        GIAB: PacBio: repeatfinder-paper-q_arm.tsv"""
-    input:
-        giab=expand(
-            "data/datasets/GIAB/PacBio/{sample}-repeatfinder-{arm}.tsv",
-            sample=["HG001/HG001.RTG", "HG002/HG002.10kb+15kb", "HG005/HG005.10x"],
-            arm=["p_arm", "q_arm"]
-        )
-    output:
-        giab_merged_p_arm=temp("data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm-unadjusted.tsv"),
-        giab_merged_q_arm=temp("data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm-unadjusted.tsv"),
-    run:
-        p_arm_report, p_arm_subjects = load_repeatfinder(input.giab, "p_arm")
-        q_arm_report, q_arm_subjects = load_repeatfinder(input.giab, "q_arm")
-        assert set(p_arm_subjects) == set(q_arm_subjects)
-        subjects = p_arm_subjects
-        merged_report = concat([p_arm_report, q_arm_report], axis=0).dropna()
-        p_ilocs = list(range(1, len(input.giab), 2))
-        merged_report["mgpval"] = merged_report.iloc[:,p_ilocs].fillna(1).apply(
-            lambda r: combine_pvalues(r, method="mudholkar_george")[1], axis=1,
-        )
-        merged_report.index.name = "#motif"
-        merged_report = merged_report[sorted(
-            c for c in merged_report.columns if not c.endswith("p")
-        )]
-        subset_report = lambda df, arm: df[df["arm"]==arm].drop(columns="arm")
-        subset_report(merged_report, "p_arm").to_csv(
-            output.giab_merged_p_arm, sep="\t"
-        )
-        subset_report(merged_report, "q_arm").to_csv(
-            output.giab_merged_q_arm, sep="\t"
-        )
-
-
-rule plottable_repeats:
-    """Selects top repeats for plotting. Of relevance to the paper:
-        GIAB: PacBio: repeatfinder-plottable-p_arm.tsv
-        GIAB: PacBio: repeatfinder-plottable-q_arm.tsv"""
-    input:
-        giab=expand("data/datasets/GIAB/PacBio/repeatfinder-paper-{arm}.tsv", arm=["p_arm", "q_arm"]),
-        chm=expand("data/datasets/T2T/PacBio/sorted_pbhifi_t2t_CHM13hTERT-repeatfinder-{arm}.tsv", arm=["p_arm", "q_arm"])
-    output:
-        giab=expand("data/datasets/GIAB/PacBio/repeatfinder-plottable-{arm}.tsv", arm=["p_arm", "q_arm"]),
-        chm=expand("data/datasets/T2T/PacBio/sorted_pbhifi_t2t_CHM13hTERT-repeatfinder-plottable-{arm}.tsv", arm=["p_arm", "q_arm"])
-    params:
-        max_motifs=5, min_abundance={"p_arm": .002, "q_arm": .01}
-    run:
-        for group, arm in product(["GIAB", "T2T"], ["p_arm", "q_arm"]):
-            matches = lambda tsv: (group in tsv) and (arm in tsv)
-            full_tsv = next(filter(matches, input))
-            full_report = read_csv(full_tsv, sep="\t", index_col=0)
-            full_report = full_report[(
-                c for c in full_report.columns if "abundance" in c
-            )]
-            report_medians = full_report.median(axis=1).rename("abundance")
-            report_medians.index.name = "#motif"
-            report_medians_df = report_medians.to_frame()
-            filtered_report_medians = report_medians_df[:params.max_motifs][
-                report_medians_df["abundance"]>=params.min_abundance[arm]
-            ]
-            small_tsv = next(filter(matches, output))
-            filtered_report_medians.to_csv(small_tsv, sep="\t")
-
-
-def kmerscanner_input(w):
-    bam_mask = "{}/{}/PacBio/{}-tailpuller.bam"
-    bam = bam_mask.format(w.prefix, w.group, w.sample)
-    if w.group == "GIAB":
-        tsv_mask = "{}/{}/PacBio/repeatfinder-plottable-{}.tsv"
-        tsv = tsv_mask.format(w.prefix, w.group, w.arm)
-    else:
-        tsv_mask = "{}/{}/PacBio/{}-repeatfinder-plottable-{}.tsv"
-        tsv = tsv_mask.format(w.prefix, w.group, w.sample, w.arm)
-    return dict(bam=bam, tsv=tsv)
-
-
-def get_sam_flags(arm):
-    if arm == "q_arm":
-        shell_flags = "-f {} -F 3844".format(IS_Q_TRACT_ANCHOR)
-        samfilters = [IS_Q_TRACT_ANCHOR, 3844, 0]
-    elif arm == "p_arm":
-        shell_flags = "-f {} -F {}".format(TRACT_ANCHOR, IS_Q_3844)
-        samfilters = [TRACT_ANCHOR, IS_Q_3844, 0]
-    else:
-        raise ValueError("Unknown `arm`: '{}'".format(arm))
-    return shell_flags, samfilters
-
-
-rule kmerscanner:
-    """Runs kmerscanner for only the plottable repeats (from plottable_repeats). Outputs of relevance to the paper:
-        GIAB: PacBio: HG001.RTG-kmerscanner-plottable-p_arm-temp.dat.gz
-        GIAB: PacBio: HG001.RTG-kmerscanner-plottable-q_arm-temp.dat.gz
-        GIAB: PacBio: HG002.10kb+15kb-kmerscanner-plottable-p_arm-temp.dat.gz
-        GIAB: PacBio: HG002.10kb+15kb-kmerscanner-plottable-q_arm-temp.dat.gz
-        GIAB: PacBio: HG005.10x-kmerscanner-plottable-p_arm-temp.dat.gz
-        GIAB: PacBio: HG005.10x-kmerscanner-plottable-q_arm-temp.dat.gz"""
-    input: unpack(kmerscanner_input)
-    output: dat=temp("{prefix}/{group}/PacBio/{sample}-kmerscanner-plottable-{arm}-temp.dat.gz")
-    run:
-        shell_flags, _ = get_sam_flags(wildcards.arm)
-        shell("""
-            ./edgecase kmerscanner {shell_flags} --motif-file {input.tsv} \
-                {input.bam} | gzip -2 > {output.dat}
-        """)
-
-
-rule kmerscanner_filtered:
-    """Filters kmerscanner outputs (from kmerscanner) to only the chromosome arms that are covered enough. Of relevance to the paper:
-        GIAB: PacBio: HG001.RTG-kmerscanner-plottable-p_arm.dat.gz
-        GIAB: PacBio: HG001.RTG-kmerscanner-plottable-q_arm.dat.gz
-        GIAB: PacBio: HG002.10kb+15kb-kmerscanner-plottable-p_arm.dat.gz
-        GIAB: PacBio: HG002.10kb+15kb-kmerscanner-plottable-q_arm.dat.gz
-        GIAB: PacBio: HG005.10x-kmerscanner-plottable-p_arm.dat.gz
-        GIAB: PacBio: HG005.10x-kmerscanner-plottable-q_arm.dat.gz"""
-    input: dat="{prefix}/{group}/PacBio/{sample}-kmerscanner-plottable-{arm}-temp.dat.gz"
-    output: dat="{prefix}/{group}/PacBio/{sample}-kmerscanner-plottable-{arm}.dat.gz"
-    params: min_reads=5
-    run:
-        raw_densities = read_csv(input.dat, sep="\t")
-        chromosome_counter = raw_densities[["#name", "chrom"]].drop_duplicates()
-        chromosome_counts = chromosome_counter["chrom"].value_counts()
-        indexer = (chromosome_counts>=params.min_reads)
-        chromosomes_to_keep = chromosome_counts[indexer].index
-        filtered_densities = raw_densities[
-            raw_densities["chrom"].isin(chromosomes_to_keep)
-        ]
-        filtered_densities.to_csv(
-            output.dat, compression="gzip", sep="\t", index=False
-        )
-
-
-rule densityplot:
-    """Plots density plots for each of the kmer scan files (from kmerscanner_filtered)"""
-    input: dat="{prefix}/{group}/PacBio/{sample}-kmerscanner-plottable-{arm}.dat.gz"
-    output: pdf="{prefix}/{group}/PacBio/{sample}-densityplot-{arm}.pdf"
-    params: index="assets/hg38ext.fa.ecx"
-    run:
-        shell_flags, _ = get_sam_flags(wildcards.arm)
-        shell("""
-            ./edgecase densityplot --palette paper -x {params.index} \
-                --title ' ' {shell_flags} -z {input.dat} > {output.pdf}
-        """)
-
-
-rule levenshtein:
-    """Runs Levenshtein-based clustering for all longread samples"""
-    input: bam="{prefix}-tailpuller.bam", tsv="{prefix}-kmerscanner-plottable-{arm}.dat.gz"
-    output: tsv="{prefix}-levenshtein-{arm}.tsv"
-    params: directory="{prefix}-levenshtein-{arm}"
-    run:
-        shell_flags, _ = get_sam_flags(wildcards.arm)
-        shell("""
-            mkdir {params.directory} 2>/dev/null || :
-            ./edgecase levenshtein {shell_flags} --kmerscanner-file {input.tsv} \
-                --output-dir {params.directory} {input.bam} \
-                > {output.tsv}
-        """)
-
-
-def haplotype_densityplots_input(w):
-    tsv_mask = "data/datasets/{}/{}-levenshtein-{}.tsv"
-    tsv = tsv_mask.format(w.group, w.prefix, w.arm)
-    dat_mask = "data/datasets/{}/{}-levenshtein-{}/*dat.gz"
-    dats = glob(dat_mask.format(w.group, w.prefix, w.arm))
-    return [tsv] + dats
-
-
-rule haplotype_densityplots:
-    """Plots density plots for each of the haplotype kmer scan files (from levenshtein)"""
-    input:
-        haplotype_densityplots_input
-    output:
-        outdir=directory("data/datasets/{group,[^/]+}/{prefix}-levenshtein-{arm}-densityplots"),
-        tar="data/datasets/{group,[^/]+}/{prefix}-levenshtein-{arm}-densityplots.tar"
-    params:
-        index="assets/hg38ext.fa.ecx",
-        plot_span={
-            "GIAB": {
-                "p_arm": "PAPER_LEFT_SPAN=12000 PAPER_RIGHT_SPAN=500",
-                "q_arm": "PAPER_LEFT_SPAN=1000 PAPER_RIGHT_SPAN=11000"
-            },
-            "T2T": {
-                "p_arm": "PAPER_LEFT_SPAN=3000 PAPER_RIGHT_SPAN=500",
-                "q_arm": "PAPER_LEFT_SPAN=500 PAPER_RIGHT_SPAN=4000"
-            }
-        }
-    run:
-        shell("mkdir {output.outdir} 2>/dev/null || :")
-        for filename in input:
-            matcher = search(r'([^/]+)\.dat\.gz', filename)
-            if matcher:
-                pdf = path.join(output.outdir, matcher.group(1) + ".pdf")
-                shell_flags, _ = get_sam_flags(wildcards.arm)
-                env_directive = params.plot_span[wildcards.group][wildcards.arm]
-                shell("""
-                    {env_directive} ./edgecase densityplot \
-                        --palette 'paper|legend=False' -x {params.index} \
-                        {shell_flags} --zoomed-in -z {filename} > {pdf}
-                """)
-        shell("tar cf {output.tar} {output.outdir}")
-
-
-def weighted_quantile(points, weights, q):
-    indsort = argsort(points.values)
-    spoints, sweights = points.values[indsort], weights.values[indsort]
-    sn = cumsum(sweights)
-    pn = (sn - sweights / 2) / sn[-1]
-    if isinstance(q, float):
-        return interp(q, pn, spoints)
-    else:
-        return [(_q, interp(_q, pn, spoints)) for _q in q]
-
-
-rule kmerscan_for_entropy:
-    """Performs kmerscan with a different window size (ENTROPY_W) for further calculation of entropy"""
-    input:
-        bam="data/datasets/GIAB/PacBio/{sample}-tailpuller.bam",
-        tsv="data/datasets/GIAB/PacBio/repeatfinder-paper-{arm}.tsv"
-    output:
-        dat="data/datasets/GIAB/PacBio/{sample}-entropy/kmerscanner-{arm}.dat.gz"
-    run:
-        shell_flags, _ = get_sam_flags(wildcards.arm)
-        shell("""
-            ./edgecase kmerscanner -w {ENTROPY_W} {shell_flags} \
-                --motif-file {input.tsv} {input.bam} | gzip -2 > {output.dat}
-        """)
-
-
-def safe_idxmax(column):
-    if column.max() > 0:
-        return column.idxmax()
-    else:
-        return nan
-
-
-rule giab_entropy:
-    """Performs entropy calculation"""
-    input: dat="data/datasets/GIAB/PacBio/{sample}-entropy/kmerscanner-{arm}.dat.gz"
-    output: tsv="data/datasets/GIAB/PacBio/{sample}-entropy/entropies-{arm}.tsv.gz"
-    run:
-        _, samfilters = get_sam_flags(wildcards.arm)
-        ks = load_kmerscan(
-            input.dat, gzipped=True, samfilters=samfilters, bin_size=ENTROPY_W
-        )
-        entropy_stats_list = []
-        desc = wildcards.sample + " entropy"
-        for bdf in progressbar(ks.values(), desc=desc):
-            per_read_modes = bdf.groupby("name").apply(
-                lambda block: block.set_index("motif").iloc[:,8:].apply(
-                    safe_idxmax, axis=0
-                )
-            )
-            filtered_prm = per_read_modes.dropna(how="all", axis=1)
-            coverage = (~filtered_prm.isnull()).sum(axis=0)
-            max_motifs = len(bdf["motif"].drop_duplicates())
-            max_entropy = log2(coverage.apply(lambda c: min(c, max_motifs)))
-            raw_entropies = per_read_modes.apply(
-                lambda column: entropy(column.value_counts())
-            )
-            entropies = raw_entropies / max_entropy
-            entropy_stats_list.append(
-                DataFrame({"entropy": entropies, "coverage": coverage})
-            )
-        entropy_stats = concat(entropy_stats_list, axis=0)
-        entropy_stats.dropna(how="any", axis=0).to_csv(
-            output.tsv, sep="\t", index=False
-        )
-
-
-rule giab_entropies:
-    """Combines entropies for multiple samples into one dataframe"""
-    input:
-        tsvs=expand(
-            "data/datasets/GIAB/PacBio/{sample}-entropy/entropies-{arm}.tsv.gz",
-            sample=PACBIO_NAME_TO_SAMPLE.values(), arm=["p_arm", "q_arm"]
-        )
-    output:
-        tsv="data/datasets/GIAB/PacBio/entropy.tsv"
-    run:
-        entropies = concat([
-            read_csv(tsv, sep="\t") for tsv in input.tsvs
-        ], axis=0)
-        entropies.to_csv(output.tsv, sep="\t", index=False)
-        qrange = arange(0, 1.01, .01)
-        qstats = [entropies["entropy"].quantile(q) for q in qrange]
-        wqstats = weighted_quantile(
-            entropies["entropy"], entropies["coverage"], qrange
-        )
-        for (q, wqval), qval in zip(wqstats, qstats):
-            print("{:03d}\t{:.6f}\t{:.6f}".format(int(q*100), qval, wqval))
-
-
-rule telbam_to_fasta:
-    """Extracts reads in FASTA format from telbams for shortread-only repeatfinder"""
-    input: bam="data/datasets/NASA/{technology}/{subject}/{subject}-telbam.bam"
-    output: fa="data/datasets/NASA/{technology}/{subject}/{subject}-telbam.fa"
-    threads: 4
-    shell: """
-        samtools collate -@{threads} \
-            -o {input.bam}-collated {input.bam} {input.bam}-collation-temp
-        samtools fasta -n -F3844 {input.bam}-collated > {output.fa}
-        rm -f {input.bam}-collated
-    """
-
-
-rule repeatfinder_shortread:
-    """Runs repeatfinder in --collapse-reverse-complement mode on short read data"""
-    input: fa="data/datasets/NASA/{technology}/{subject}/{subject}-telbam.fa"
-    output: tsv="data/datasets/NASA/{technology}/{subject}/{subject}-telbam-repeatfinder.tsv"
-    threads: 4
-    shell: """
-        ./edgecase repeatfinder -j {threads} -C -s 8G \
-            -m 4 -M 16 -P 1.1 --fmt fastx {input.fa} > {output.tsv}
-    """
-
-
-SHORTREAD_10X_SAMPLES = [
-    "Subject_1_1", "Subject_1_2", "Subject_1_3", "Subject_2",
-]
-SHORTREAD_ILLUMINA_SAMPLES = [
-    "A", "B", "C", "D",
-]
-
-
-def shortread_repeatfinder_combined_input(w):
-    if w.technology == "10X":
-        mask = "data/datasets/NASA/10X/{}/{}-telbam-repeatfinder.tsv"
-        samples = SHORTREAD_10X_SAMPLES
-    elif w.technology == "Illumina":
-        mask = "data/datasets/NASA/Illumina/{}/{}-telbam-repeatfinder.tsv"
-        samples = SHORTREAD_ILLUMINA_SAMPLES
-    else:
-        raise ValueError("technology='{}'".format(w.technology))
-    return [mask.format(sample, sample) for sample in samples]
-
-
-rule shortread_repeatfinder_combined:
-    """Combine shortread repeatfinder results per-technology (RNA-seq [TODO], Illumina, 10X)"""
-    input: shortread_repeatfinder_combined_input
-    output: tsv="data/datasets/NASA/{technology}/{technology}-repeatfinder-unadjusted.tsv"
-    run:
-        rfs = [
-            read_csv(tsv, sep="\t", usecols=(0, 4, 5), escapechar="#").rename(
-                columns={
-                    "abundance": tsv.split("/")[-1].split("-")[0],
-                    "p": tsv.split("/")[-1].split("-")[0]+" p",
-                }
-            )
-            for tsv in input
-        ]
-        merged_report = concat(
-            [rf.set_index("monomer") for rf in rfs], axis=1,
-        ).dropna()
-        merged_report["mgpval"] = merged_report.iloc[:,1::2].fillna(1).apply(
-            lambda r: combine_pvalues(r, method="mudholkar_george")[1], axis=1,
-        )
-        #george = merged_report.iloc[:,p_ilocs].fillna(1).apply(
-        #    lambda r: combine_pvalues(r, method="mudholkar_george")[1], axis=1,
-        #)
-        #merged_report["mgp_adjusted"] = Series(
-        #    data=multipletests(george, method="bonferroni")[1],
-        #    index=george.index,
-        #)
-        #merged_report = merged_report[merged_report["mgp_adjusted"]<.05]
-        merged_report.index.name = "#motif"
-        merged_report = merged_report[sorted(
-            c for c in merged_report.columns if not c.endswith("p")
-        )]
-        merged_report.to_csv(output.tsv, sep="\t")
-
-
-rule all_platform_repeatfinder_adjusted:
-    input:
-        giab_p="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm-unadjusted.tsv",
-        giab_q="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm-unadjusted.tsv",
-        illumina="data/datasets/NASA/Illumina/Illumina-repeatfinder-unadjusted.tsv",
-        chromium="data/datasets/NASA/10X/10X-repeatfinder-unadjusted.tsv",
-    output:
-        giab_p="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm.tsv",
-        giab_q="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm.tsv",
-        illumina="data/datasets/NASA/Illumina/Illumina-repeatfinder.tsv",
-        chromium="data/datasets/NASA/10X/10X-repeatfinder.tsv",
-    run:
-        pvals = concat(
-            [read_csv(tsv, sep="\t")["mgpval"] for tsv in input], axis=0,
-        )
-        p_adjusted = multipletests(pvals, method="bonferroni")[1]
-        bonferroni_lookup = {p: padj for p, padj in zip(pvals, p_adjusted)}
-        for dataset, tsv in input.items():
-            rf = read_csv(tsv, sep="\t")
-            rf["p_adjusted"] = rf["mgpval"].map(bonferroni_lookup)
-            rf = rf.drop(columns="mgpval")
-            rf["#motif"] = rf["#motif"].apply( # fix old repeatfinder motifs
-                lambda m: m*int(ceil(4/len(m))) if len(m) < 4 else m
-            )
-            rf = rf[rf["p_adjusted"]<.05]
-            rf.to_csv(output[dataset], sep="\t", index=False)
-
-
-rule all_platform_repeatfinder_intersected:
-    input:
-        giab_p="data/datasets/GIAB/PacBio/repeatfinder-paper-p_arm.tsv",
-        giab_q="data/datasets/GIAB/PacBio/repeatfinder-paper-q_arm.tsv",
-        illumina="data/datasets/NASA/Illumina/Illumina-repeatfinder.tsv",
-        chromium="data/datasets/NASA/10X/10X-repeatfinder.tsv",
-    output:
-        tsv="data/datasets/NASA/repeatfinder-intersected-with-GIAB.tsv"
-    run:
-        get_cmc = lambda tsv: set(read_csv(tsv, sep="\t")["#motif"].apply(
-            lowest_collapsed_revcomp_alpha_inversion
-        ))
-        common_motifs_collapsed = (
-            (get_cmc(input.giab_p) | get_cmc(input.giab_q)) &
-            get_cmc(input.illumina) &
-            get_cmc(input.chromium)
-        )
-        def resubset(tsv, name):
-            rf = read_csv(tsv, sep="\t", index_col=0)
-            rf.index = rf.index.map(lowest_collapsed_revcomp_alpha_inversion)
-            rf = rf.reindex(common_motifs_collapsed)
-            rf["median"] = rf.iloc[:,:-1].median(axis=1)
-            rf = rf.iloc[:,[-1,-2]]
-            rf.columns = [name+" median abundance", name+" adjusted p-value"]
-            rf.index = rf.index.map(revcomp).map(custom_alpha_inversion)
-            return rf
-        shortread_rf = concat([
-                resubset(input.illumina, "illumina"),
-                resubset(input.chromium, "chromium")
-            ],
-            axis=1
-        )
-        shortread_rf.sort_values(
-            by="chromium median abundance", ascending=False,
-        ).to_csv(
-            output.tsv, sep="\t",
-        )
-
-
-# Retained for documentation/historical purposes:
-# include: "../../publications/methods-paper/snakefiles/old-shortread.snake"
-# include: "../../publications/methods-paper/snakefiles/bootstraps.snake"
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/kmerscanner-all-p_arm.dat.gz"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/kmerscanner-all-q_arm.dat.gz"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],

@@ -1,9 +1,9 @@
 from sys import stdout
 from tempfile import TemporaryDirectory
 from pysam import AlignmentFile, FastxFile
-from re import finditer, IGNORECASE
 from os import path
 from edgecaselib.util import get_executable, progressbar, revcomp
+from edgecaselib.util import get_circular_pattern
 from edgecaselib.formats import filter_bam
 from functools import lru_cache
 from subprocess import check_output
@@ -51,6 +51,7 @@ __docopt_converters__ = [
     lambda max_k: int(max_k),
     lambda min_repeats: int(min_repeats),
     lambda max_p_adjusted: float(max_p_adjusted),
+    lambda max_motifs: None if (max_motifs is None) else int(max_motifs),
     lambda jobs: int(jobs),
 ]
 
@@ -58,6 +59,13 @@ __docopt_tests__ = {
     lambda min_k, max_k: 0 < min_k <= max_k: "not satisfied: 0 < m <= M",
     lambda min_repeats: min_repeats > 0: "--min-repeats must be integer > 0",
 }
+
+
+REPORT_COLUMNS = [
+    "monomer", "motif", "length", "score", "fraction_explained",
+    "p", "p_adjusted",
+]
+REPORT_COLUMNS_ESCAPED = ["#"+REPORT_COLUMNS[0]] + REPORT_COLUMNS[1:]
 
 
 def interpret_args(fmt, jellyfish):
@@ -74,25 +82,14 @@ def interpret_args(fmt, jellyfish):
 def convert_input(bam, manager, tempdir, samfilters):
     """Convert BAM to fasta; count bases"""
     fasta = path.join(tempdir, "input.fa")
-    base_count = 0
     with manager(bam) as alignment, open(fasta, mode="wt") as fasta_handle:
         for entry in filter_bam(alignment, samfilters, "SAM/BAM -> FASTA"):
             entry_str = ">{}\n{}".format(entry.qname, entry.query_sequence)
-            base_count += len(entry.query_sequence)
             print(entry_str, file=fasta_handle)
-    return fasta, base_count
+    return fasta
 
 
-def count_fastx_bases(sequencefile, pattern=r'[acgt]', flags=IGNORECASE, desc="Counting input bases"):
-    """Count bases in FASTX file"""
-    with FastxFile(sequencefile) as fastx:
-        return sum(
-            sum(1 for _ in finditer(pattern, entry.sequence, flags=flags))
-            for entry in progressbar(fastx, desc=desc, unit="read")
-        )
-
-
-def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs, tempdir):
+def find_repeats(sequencefile, min_k, max_k, min_repeats, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs, tempdir):
     """Find all repeats in sequencefile"""
     per_k_reports = []
     k_iterator = progressbar(
@@ -120,7 +117,6 @@ def find_repeats(sequencefile, min_k, max_k, min_repeats, base_count, jellyfish,
         )
         k_report = k_report[repeats_indexer]
         k_report["kmer"] = k_report["kmer"].apply(lambda kmer:kmer[:k])
-        k_report["abundance"] = k_report["count"] / base_count
         k_report["length"] = k
         per_k_reports.append(k_report)
     return concat(per_k_reports, axis=0)
@@ -181,7 +177,7 @@ def get_motifs_fisher(single_length_report, collapse_reverse_complement=False):
         lowest_collapsed_revcomp_alpha_inversion if collapse_reverse_complement
         else lowest_alpha_inversion
     )
-    fishery_groupby = fishery[["motif", "count", "abundance"]].groupby(
+    fishery_groupby = fishery[["motif", "count"]].groupby(
         "motif", as_index=False,
     )
     fishery = fishery_groupby.sum()
@@ -219,7 +215,7 @@ def analyze_repeats(full_report, collapse_reverse_complement=False, adj="bonferr
     ])
     candidates["p_adjusted"] = multipletests(candidates["p"], method=adj)[1]
     return candidates[
-        ["motif", "length", "count", "abundance", "p", "p_adjusted"]
+        ["motif", "length", "count", "p", "p_adjusted"]
     ]
 
 
@@ -244,7 +240,7 @@ def coerce_and_filter_report(analysis, max_p_adjusted):
         if len(synonym_data):
             synonyms_to_keep.add(
                 synonym_data.sort_values(
-                    by="abundance", ascending=False
+                    by="count", ascending=False
                 ).iloc[0, 0]
             )
     synonyms_to_remove = (
@@ -254,6 +250,31 @@ def coerce_and_filter_report(analysis, max_p_adjusted):
         (~analysis["motif"].isin(synonyms_to_remove)) &
         (analysis["p_adjusted"]<max_p_adjusted)
     ].copy()
+
+
+def explain_report(filtered_analysis, sequencefile, min_repeats):
+    """Calculate fraction of reads explainable by each motif"""
+    explained_analysis = filtered_analysis.copy()
+    explained_analysis["bases_explained"], total_bases = 0.0, 0
+    with FastxFile(sequencefile) as fastx:
+        iterator = progressbar(fastx, desc="Calculating fractions", unit="read")
+        for entry in iterator:
+            for motif in filtered_analysis["motif"]:
+                positions_to_mask = set()
+                motifs_pattern = get_circular_pattern(
+                    motif, repeats=min_repeats,
+                )
+                matcher = motifs_pattern.finditer(
+                    entry.sequence, overlapped=True,
+                )
+                for match in matcher:
+                    positions_to_mask |= set(range(match.start(), match.end()))
+                indexer = (
+                    explained_analysis["motif"]==motif, "bases_explained",
+                )
+                explained_analysis.loc[indexer] += len(positions_to_mask)
+            total_bases += len(entry.sequence)
+    return explained_analysis, total_bases
 
 
 def coerce_to_monomer(motif, min_k):
@@ -268,23 +289,23 @@ def coerce_to_monomer(motif, min_k):
         return motif
 
 
-def format_analysis(filtered_analysis, min_k, max_motifs):
+def format_analysis(explained_analysis, min_k, max_motifs, total_bases):
     """Make dataframe prettier"""
-    filtered_analysis["motif"] = filtered_analysis["motif"].apply(
+    explained_analysis["motif"] = explained_analysis["motif"].apply(
         custom_alpha_inversion,
     )
-    filtered_analysis["monomer"] = filtered_analysis["motif"].apply(
+    explained_analysis["monomer"] = explained_analysis["motif"].apply(
         lambda motif: coerce_to_monomer(motif, min_k=min_k),
     )
-    formatted_analysis = filtered_analysis.sort_values(
-        by=["abundance", "p_adjusted"], ascending=[False, True],
+    formatted_analysis = explained_analysis.sort_values(
+        by=["count", "p_adjusted"], ascending=[False, True],
     )
-    formatted_analysis = formatted_analysis[
-        ["monomer", "motif", "length", "count", "abundance", "p", "p_adjusted"]
-    ]
-    formatted_analysis.columns = [
-        "#monomer", "motif", "length", "count", "abundance", "p", "p_adjusted",
-    ]
+    formatted_analysis["score"], formatted_analysis["fraction_explained"] = (
+        formatted_analysis["count"] / total_bases,
+        formatted_analysis["bases_explained"] / total_bases
+    )
+    formatted_analysis = formatted_analysis[REPORT_COLUMNS]
+    formatted_analysis.columns = REPORT_COLUMNS_ESCAPED
     if max_motifs is None:
         return formatted_analysis
     else:
@@ -297,26 +318,24 @@ def main(sequencefile, fmt, flags, flag_filter, min_quality, min_k, max_k, min_r
     with TemporaryDirectory() as tempdir:
         if manager == AlignmentFile: # will need to convert SAM to fastx
             samfilters = [flags, flag_filter, min_quality]
-            sequencefile, base_count = convert_input(
+            sequencefile = convert_input(
                 sequencefile, manager, tempdir, samfilters,
             )
-        else:
-            base_count = count_fastx_bases(sequencefile)
         full_report = find_repeats(
-            sequencefile, min_k, max_k, min_repeats, base_count,
-            jellyfish, jellyfish_hash_size, collapse_reverse_complement,
-            jobs, tempdir,
+            sequencefile, min_k, max_k, min_repeats, jellyfish,
+            jellyfish_hash_size, collapse_reverse_complement, jobs, tempdir,
         )
-    if full_report is None:
-        columns = [
-            "#monomer", "motif", "length", "count", "abundance",
-            "p", "p_adjusted",
-        ]
-        print(*columns, sep="\t", file=file)
-    else:
-        analysis = analyze_repeats(full_report, collapse_reverse_complement)
-        filtered_analysis = coerce_and_filter_report(analysis, max_p_adjusted)
-        formatted_analysis = format_analysis(
-            filtered_analysis, min_k, max_motifs,
-        )
-        formatted_analysis.to_csv(file, sep="\t", index=False)
+        if full_report is None:
+            print(*REPORT_COLUMNS_ESCAPED, sep="\t", file=file)
+        else:
+            analysis = analyze_repeats(full_report, collapse_reverse_complement)
+            filtered_analysis = coerce_and_filter_report(
+                analysis, max_p_adjusted,
+            )
+            explained_analysis, total_bases = explain_report(
+                filtered_analysis, sequencefile, min_repeats,
+            )
+            formatted_analysis = format_analysis(
+                explained_analysis, min_k, max_motifs, total_bases,
+            )
+            formatted_analysis.to_csv(file, sep="\t", index=False)

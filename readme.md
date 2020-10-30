@@ -313,7 +313,7 @@ optional arguments:
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -z, --gzipped          input is gzipped (must specify if any of -qfF present) (default: False)
-  -b B, --bin-size B     size of each bin in bp for visualization speedup (default: 100)
+  -b B, --bin-size B     size of each bin in bp (default: 10)
   --zoomed-in            plot taller traces, cut off pre-anchor regions (default: False)
   --palette ?            custom palette for plotting motifs (default: None)
   -e, --exploded         plot each read separately (default: False)
@@ -331,10 +331,7 @@ key-value sequence of "motif=color" and "legend=boolean", for example:
 Options *--exploded* and *--title* are deprecated.
 
 Option *--zoomed-in* plots taller figures, discards non-telomeric regions, and
-visualizes read coverage above each plot. With this option, two custom "debug"
-environment variables can be passed to *densityplot* that specify how much
-of the surrounding reference coordinates should be included: *PAPER_LEFT_SPAN*
-and *PAPER_RIGHT_SPAN*.
+visualizes read coverage above each plot.
 
 Annotates the anchors from the ECX with dashed lines:
 * mask_anchor == gray,

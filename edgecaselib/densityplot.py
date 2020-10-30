@@ -10,9 +10,12 @@ from matplotlib.patches import Rectangle, Patch
 from numpy import clip
 from seaborn import lineplot
 from itertools import count
-from os import path, getenv
+from os import path
 from pandas import concat
 from re import search
+
+
+buffer = getattr(stdout, "buffer", stdout)
 
 
 __doc__ = """edgeCase densityplot: visualization of motif densities
@@ -33,8 +36,8 @@ Required options:
     -x, --index [filename]        location of the reference .ecx index
 
 Options:
-    -z, --gzipped                 input is gzipped (must specify if any of -qfF present
-    -b, --bin-size [integer]      size of each bin in bp for visualization speedup [default: 100]
+    -z, --gzipped                 input is gzipped (must specify if any of -qfF present)
+    -b, --bin-size [integer]      size of each bin in bp (overrides bin size in <dat>)
     --n-boot [integer]            number of bootstrap iterations for 95% confidence intervals [default: 1000]
     -e, --exploded                plot each read separately
     --zoomed-in                   plot taller traces, cut off pre-anchor regions
@@ -48,7 +51,7 @@ Input filtering options:
 """
 
 __docopt_converters__ = [
-    lambda bin_size: int(bin_size),
+    lambda bin_size: None if bin_size is None else int(bin_size),
     lambda n_boot: int(n_boot),
 ]
 
@@ -191,7 +194,7 @@ def make_decorated_densities_iterator(densities):
     )
 
 
-def plot_exploded_densities(densities, ecx, title, samfilters, file=stdout.buffer):
+def plot_exploded_densities(densities, ecx, title, samfilters, file=buffer):
     """Plot binned densities as line plots, one read at a time"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
@@ -207,14 +210,11 @@ def plot_exploded_densities(densities, ecx, title, samfilters, file=stdout.buffe
 
 def stack_motif_densities(binned_density_dataframe):
     """Prepare densities for plotting the stacked area chart; return normal order but stack from bottom"""
-    if "abundance" in binned_density_dataframe.columns:
-        motif_order = binned_density_dataframe[["motif", "abundance"]] \
-            .drop_duplicates().sort_values(by="abundance") \
-            ["motif"].drop_duplicates().values
-    else:
-        motif_order = binned_density_dataframe[["motif", "total_count"]] \
-            .drop_duplicates().sort_values(by="total_count") \
-            ["motif"].drop_duplicates().values
+    motif_order = (
+        binned_density_dataframe[["motif", "score"]]
+        .drop_duplicates().sort_values(by="score")["motif"]
+        .drop_duplicates().values
+    )
     skinny_bdf = binned_density_dataframe[
         ["name", "motif"] + list(binned_density_dataframe.columns[9:])
     ]
@@ -373,7 +373,7 @@ def plot_combined_density(binned_density_dataframe, n_boot, ecx, title, palette,
     return updated_palette
 
 
-def align_subplots(ax2chrom, ecx, target_anchor, is_q, unit_adjustment=1e6):
+def align_subplots(ax2chrom, ecx, target_anchor, is_q, unit_adjustment=None, unit_fmt=",.0f"):
     """Modify xlim of related axes to make their scales match"""
     prime = 3 if is_q else 5
     anchor_positions, left_spans, right_spans = {}, {}, {}
@@ -392,25 +392,15 @@ def align_subplots(ax2chrom, ecx, target_anchor, is_q, unit_adjustment=1e6):
         else:
             error_msk = "{} not found on {} prime for {} in ECX"
             raise ValueError(error_msk.format(target_anchor, prime, chrom))
-    max_left_span = str(getenv("PAPER_LEFT_SPAN"))
-    if max_left_span.isdigit():
-        max_left_span = int(max_left_span)
-    else:
-        max_left_span = max(left_spans.values())
-    max_right_span = str(getenv("PAPER_RIGHT_SPAN"))
-    if max_right_span.isdigit():
-        max_right_span = int(max_right_span)
-    else:
-        max_right_span = max(right_spans.values())
     for ax, chrom in ax2chrom.items():
         ax.set(xlim=(
-            anchor_positions[ax] - max_left_span,
-            anchor_positions[ax] + max_right_span,
+            anchor_positions[ax] - max(left_spans.values()),
+            anchor_positions[ax] + max(right_spans.values()),
         ))
         if unit_adjustment:
             ax.set(
                 xticklabels=[
-                    "{:.3f}".format(int(xt) / unit_adjustment)
+                    format(int(xt) / unit_adjustment, unit_fmt)
                     for xt in ax.get_xticks().tolist()
                 ]
             )
@@ -425,9 +415,9 @@ def add_legend(updated_palette, ax, exploded, is_q):
             Patch(label=motif, fc=color, ec="black", hatch=None, alpha=.7)
             for motif, color in reversed(updated_palette.items())
         ][::-1]
-        background_handle = [
-            Patch(label="other", fc=BGCOLOR, ec="black", hatch=None, alpha=.7)
-        ]
+        background_handle = [Patch(
+            label="background", fc=BGCOLOR, ec="black", hatch=None, alpha=.7,
+        )]
         if is_q:
             loc="upper left"
         else:
@@ -461,7 +451,7 @@ def plot_density_scale(ax):
     )
 
 
-def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, file=stdout.buffer):
+def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, file=buffer, unit="Kbp"):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator = make_decorated_densities_iterator(densities)
     switch_backend("Agg")
@@ -483,15 +473,20 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
             ecx_chrom_name=ecx_chrom_name,
         )
         ax2chrom[ax] = ecx_chrom_name
-    align_subplots(ax2chrom, ecx, target_anchor, is_q)
+    try:
+        unit_adjustment = {"Kbp": 1e3, "Mbp": 1e6, "bp": None}[unit]
+        unit_fmt = {"Kbp": ",.0f", "Mbp": ",.3f", "bp": ",.0f"}[unit]
+    except KeyError:
+        raise ValueError("unit", unit)
+    align_subplots(
+        ax2chrom, ecx, target_anchor, is_q,
+        unit_adjustment=unit_adjustment, unit_fmt=unit_fmt,
+    )
     if legend:
-        add_legend(
-            updated_palette, axs[0, 0], exploded=False, is_q=is_q,
-        )
+        add_legend(updated_palette, axs[0, 0], exploded=False, is_q=is_q)
         plot_density_scale(axs[0, 0])
-    if title:
-        axs[0, 0].set(title=title)
-    axs[-1, 0].set(xlabel="Mbp")
+    axs[0, 0].set(title=title)
+    axs[-1, 0].set(xlabel=unit)
     figure.savefig(file, bbox_inches="tight", format="pdf")
 
 
@@ -569,7 +564,7 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
-def main(dat, gzipped, index, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, file=stdout.buffer, **kwargs):
+def main(dat, gzipped, index, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
     target_anchor, is_q, palette, legend, title = interpret_arguments(

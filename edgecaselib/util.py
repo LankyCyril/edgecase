@@ -1,5 +1,5 @@
 from sys import stderr
-from regex import compile
+from regex import compile, IGNORECASE as REGEX_IGNORECASE
 from re import split, search, IGNORECASE
 from shutil import which
 from os import path, access, X_OK
@@ -48,6 +48,19 @@ def motif_revcomp(motif, ignorecase=True):
         return MOTIF_COMPLEMENT_PATTERN.sub(matcher, motif[::-1])
     except KeyError:
         raise ValueError("Unsupported character(s) in motif: {}".format(motif))
+
+
+def get_circular_pattern(motif, repeats=2):
+    """Convert motif into circular regex pattern (e.g., r'TCGA|CGAT|GATC|ATCG' for TCGA)"""
+    atom_pattern = compile(r'[ACGT.]|\[[ACGT]+\]', flags=REGEX_IGNORECASE)
+    atoms = atom_pattern.findall(motif)
+    if "".join(atoms) != motif:
+        raise ValueError("Could not parse motif: {}".format(motif))
+    repeated_inversions = {
+        "".join(atoms[i:] + atoms[:i]) * repeats
+        for i in range(len(atoms))
+    }
+    return compile(r'|'.join(repeated_inversions), flags=REGEX_IGNORECASE)
 
 
 def chromosome_natsort(chrom):

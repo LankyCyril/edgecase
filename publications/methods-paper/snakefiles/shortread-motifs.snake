@@ -1,0 +1,70 @@
+make_pvals_worse = lambda p: p if p != 0 else SMALLEST_P_VALUE
+
+
+rule repeatfinder_illumina:
+    input: fq=DATA_DIR+"/NASA/Illumina/{subject}/telbam.fq.gz",
+    output: tsv=DATA_DIR+"/NASA/Illumina/{subject}/repeatfinder.tsv",
+    params: s="32G", min_k=4, max_k=16, max_p_adjusted=1.1,
+    threads: 12,
+    run:
+        shell("""
+            ./edgecase repeatfinder -j {threads} -s {params.s} \
+                -m {params.min_k} -M {params.max_k} -P {params.max_p_adjusted} \
+                -C --fmt fastx {input.fq} > {output.tsv}
+        """)
+
+
+rule repeatfinder_chromium:
+    input: bam=DATA_DIR+"/NASA/10X/{subject}/telbam.bam",
+    output: tsv=DATA_DIR+"/NASA/10X/{subject}/repeatfinder.tsv",
+    params: s="32G", min_k=4, max_k=16, max_p_adjusted=1.1,
+    threads: 12,
+    run:
+        shell("""
+            ./edgecase repeatfinder -j {threads} -s {params.s} \
+                -m {params.min_k} -M {params.max_k} -P {params.max_p_adjusted} \
+                -C {input.bam} > {output.tsv}
+        """)
+
+
+rule repeatfinder_all_shortread:
+    input:
+        chromium=[
+            DATA_DIR+f"/NASA/10X/Subject_{sid}/repeatfinder.tsv"
+            for sid in ["1_1", "1_2", "1_3", "2"]
+        ],
+        illumina=[
+            DATA_DIR+f"/NASA/Illumina/{subject}/repeatfinder.tsv"
+            for subject in list("ABCD")
+        ],
+    output:
+        chromium=DATA_DIR+"/NASA/10X/repeatfinder-unadjusted.tsv",
+        illumina=DATA_DIR+"/NASA/Illumina/repeatfinder-unadjusted.tsv",
+    run:
+        pivot_p = dict(index="#monomer", columns="subject", values="p")
+        pivot_s = dict(index="#monomer", columns="subject", values="score")
+        pivot_f = dict(
+            index="#monomer", columns="subject", values="fraction_explained",
+        )
+        for kind in "chromium", "illumina":
+            rf_as_list = []
+            for tsv in getattr(input, kind):
+                kd = escape({"chromium": "10X", "illumina": "Illumina"}[kind])
+                sample_rf = read_csv(tsv, sep="\t", usecols=(0, 3, 4, 5))
+                rpath = sub(r'^'+escape(DATA_DIR)+r'/NASA/'+kd+r'/', "", tsv)
+                sample_rf["subject"], *_ = rpath.split("/")
+                rf_as_list.append(sample_rf)
+            rf = concat(rf_as_list)
+            rf["p"] = rf["p"].apply(make_pvals_worse)
+            rf_by_p = rf[pivot_p.values()].pivot(**pivot_p).fillna(1)
+            rf_by_s = rf[pivot_s.values()].pivot(**pivot_s).fillna(0)
+            rf_by_f = rf[pivot_f.values()].pivot(**pivot_f)
+            assert (rf_by_p.index == rf_by_f.index).all()
+            assert (rf_by_p.index == rf_by_s.index).all()
+            rf_combined = concat(
+                {"score": rf_by_s, "fraction_explained": rf_by_f}, axis=1,
+            )
+            rf_combined = rf_combined[sorted(rf_combined.columns)]
+            mg = lambda row: combine_pvalues(row, method="mudholkar_george")[1]
+            rf_combined["p"] = rf_by_p.apply(mg, axis=1).fillna(1)
+            rf_combined.to_csv(getattr(output, kind), sep="\t")

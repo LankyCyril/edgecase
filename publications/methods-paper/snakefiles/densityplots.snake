@@ -1,0 +1,83 @@
+from pandas import read_csv
+from gzip import open as gzopen
+from matplotlib.pyplot import subplots, switch_backend
+
+
+rule plottable_repeats:
+    input:
+        p_arm=DATA_DIR+"/PacBio/repeatfinder-p_arm.tsv",
+        q_arm=DATA_DIR+"/PacBio/repeatfinder-q_arm.tsv",
+    output:
+        p_arm=DATA_DIR+"/PacBio/repeatfinder-p_arm-plottable.tsv",
+        q_arm=DATA_DIR+"/PacBio/repeatfinder-q_arm-plottable.tsv",
+    params: n=4
+    run:
+        for arm in "p_arm", "q_arm":
+            rf = read_csv(
+                getattr(input, arm), sep="\t",
+                skiprows=1, usecols=[0]+list(range(8,15)),
+            )
+            top_rf = rf.rename(columns={"#monomer": "#motif"})[:params.n].copy()
+            top_rf["score"] = (
+                top_rf.drop(columns=["#motif", "p_adjusted"], errors="ignore")
+                .mean(axis=1)
+            )
+            top_rf[["#motif", "score"]].to_csv(
+                getattr(output, arm), sep="\t", index=False,
+            )
+
+
+rule kmerscanner_unfiltered:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/tailpuller.bam",
+        tsv=DATA_DIR+"/PacBio/repeatfinder-{arm}-plottable.tsv",
+    output:
+        dat=temp(DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}-unfiltered.dat.gz"),
+    run:
+        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+        shell("""
+            ./edgecase kmerscanner --motif-file {input.tsv} -b 10 \
+                {flags} {input.bam} | gzip -2 > {output.dat}
+        """)
+
+
+rule kmerscanner_filtered:
+    input: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}-unfiltered.dat.gz",
+    output: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}.dat.gz",
+    params: min_reads=MIN_PLOT_COVERAGE,
+    run:
+        raw_densities = read_csv(input.dat, sep="\t")
+        chromosome_counter = raw_densities[["#name", "chrom"]].drop_duplicates()
+        chromosome_counts = chromosome_counter["chrom"].value_counts()
+        indexer = (chromosome_counts>=params.min_reads)
+        chromosomes_to_keep = chromosome_counts[indexer].index
+        filtered_densities = raw_densities[
+            raw_densities["chrom"].isin(chromosomes_to_keep)
+        ]
+        filtered_densities.to_csv(
+            output.dat, compression="gzip", sep="\t", index=False,
+        )
+
+
+rule densityplot:
+    input: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}.dat.gz",
+    output: pdf=DATA_DIR+"/PacBio/{group}/{subject}/densityplot-{arm}.pdf",
+    run:
+        with gzopen(input.dat, mode="rt") as dat:
+            for i, _ in enumerate(dat):
+                if i > 0:
+                    kmerscan_empty = False
+                    break
+            else:
+                kmerscan_empty = True
+        if kmerscan_empty:
+            switch_backend("Agg")
+            figure, ax = subplots()
+            figure.savefig(output.pdf, bbox_inches="tight")
+        else:
+            flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+            shell("""
+                ./edgecase densityplot \
+                    -x {HG38EXT_ECX} --palette paper --title ' ' {flags} \
+                    -z {input} > {output}
+            """)

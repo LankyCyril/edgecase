@@ -12,3 +12,4 @@ publications/methods-paper/figures/*-.png
 publications/methods-paper/figures/*/*-.png
 publications/methods-paper/figures/*.svg
 publications/methods-paper/figures/*/*.svg
+Snakefile
