@@ -5,14 +5,17 @@ all: renders/figures/Figure-S1.pdf renders/figures/Figure-S2.pdf
 all: renders/figures/Figure-S3.pdf renders/figures/Figure-S4.pdf
 all: renders/figures/Figure-S5.pdf renders/figures/Figure-S6.pdf
 all: renders/figures/Figure-S7.pdf renders/figures/Figure-SH.pdf
-all: submission/figures/Supplemental_Fig_S1.pdf
-all: submission/figures/Supplemental_Fig_S2.pdf
-all: submission/figures/Supplemental_Fig_S3.pdf
-all: submission/figures/Supplemental_Fig_S4.pdf
-all: submission/figures/Supplemental_Fig_S5.pdf
-all: submission/figures/Supplemental_Fig_S6.pdf
-all: submission/figures/Supplemental_Fig_S7.pdf
-all: submission/figures/Supplemental_Fig_S8.pdf
+
+submission: renders/figures/Figure-1.png renders/figures/Figure-2.png
+submission: renders/figures/Figure-3.png renders/figures/Figure-4.png
+submission: submission/figures/Supplemental_Fig_S1.pdf
+submission: submission/figures/Supplemental_Fig_S2.pdf
+submission: submission/figures/Supplemental_Fig_S3.pdf
+submission: submission/figures/Supplemental_Fig_S4.pdf
+submission: submission/figures/Supplemental_Fig_S5.pdf
+submission: submission/figures/Supplemental_Fig_S6.pdf
+submission: submission/figures/Supplemental_Fig_S7.pdf
+submission: submission/figures/Supplemental_Fig_S8.pdf
 
 renders/%.pdf: latex/%.tex
 	pdflatex $<
@@ -28,6 +31,9 @@ renders/figures/%.pdf: latex/figures/%.tex
 	pdflatex $<
 	rm -f $(basename $(@F)).aux $(basename $(@F)).log
 	mv $(@F) $@
+
+renders/figures/%.png: renders/figures/%.pdf
+	convert -density 300 $< $@
 
 submission/figures/%.pdf: latex/supplemental-figures-GR/%.tex
 	pdflatex $<
