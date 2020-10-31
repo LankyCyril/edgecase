@@ -5,6 +5,14 @@ all: renders/figures/Figure-S1.pdf renders/figures/Figure-S2.pdf
 all: renders/figures/Figure-S3.pdf renders/figures/Figure-S4.pdf
 all: renders/figures/Figure-S5.pdf renders/figures/Figure-S6.pdf
 all: renders/figures/Figure-S7.pdf renders/figures/Figure-SH.pdf
+all: submission/figures/Supplemental_Fig_S1.pdf
+all: submission/figures/Supplemental_Fig_S2.pdf
+all: submission/figures/Supplemental_Fig_S3.pdf
+all: submission/figures/Supplemental_Fig_S4.pdf
+all: submission/figures/Supplemental_Fig_S5.pdf
+all: submission/figures/Supplemental_Fig_S6.pdf
+all: submission/figures/Supplemental_Fig_S7.pdf
+all: submission/figures/Supplemental_Fig_S8.pdf
 
 renders/%.pdf: latex/%.tex
 	pdflatex $<
@@ -17,6 +25,11 @@ renders/%.pdf: latex/%.tex
 	mv $(@F) $@
 
 renders/figures/%.pdf: latex/figures/%.tex
+	pdflatex $<
+	rm -f $(basename $(@F)).aux $(basename $(@F)).log
+	mv $(@F) $@
+
+submission/figures/%.pdf: latex/supplemental-figures-GR/%.tex
 	pdflatex $<
 	rm -f $(basename $(@F)).aux $(basename $(@F)).log
 	mv $(@F) $@
