@@ -7,13 +7,20 @@ from collections import OrderedDict
 
 
 PDFS = [
-    "haplotypes/5qtel_1-500K_1_12_12_rc.pdf",
-    "haplotypes/6qtel_1-500K_1_12_12_rc.pdf", "haplotypes/chr7.pdf",
-    "haplotypes/chr8.pdf", "haplotypes/chr11.pdf", "haplotypes/chr12.pdf",
-    "haplotypes/14qtel_1-500K_1_12_12_rc.pdf", "haplotypes/chr15.pdf",
-    "haplotypes/16qtel_1-500K_1_12_12_rc.pdf",
-    "haplotypes/18qtel_1-500K_1_12_12_rc.pdf", "haplotypes/chr19.pdf",
-    "haplotypes/chr21.pdf", "haplotypes/chr22.pdf", "haplotypes/chrX.pdf",
+    "latex/figures/haplotypes/5qtel_1-500K_1_12_12_rc.pdf",
+    "latex/figures/haplotypes/6qtel_1-500K_1_12_12_rc.pdf",
+    "latex/figures/haplotypes/chr7.pdf",
+    "latex/figures/haplotypes/chr8.pdf",
+    "latex/figures/haplotypes/chr11.pdf",
+    "latex/figures/haplotypes/chr12.pdf",
+    "latex/figures/haplotypes/14qtel_1-500K_1_12_12_rc.pdf",
+    "latex/figures/haplotypes/chr15.pdf",
+    "latex/figures/haplotypes/16qtel_1-500K_1_12_12_rc.pdf",
+    "latex/figures/haplotypes/18qtel_1-500K_1_12_12_rc.pdf",
+    "latex/figures/haplotypes/chr19.pdf",
+    "latex/figures/haplotypes/chr21.pdf",
+    "latex/figures/haplotypes/chr22.pdf",
+    "latex/figures/haplotypes/chrX.pdf",
 ]
 
 

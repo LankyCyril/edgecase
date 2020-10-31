@@ -7,7 +7,7 @@ from re import search
 from collections import OrderedDict, defaultdict
 
 
-SOURCE_DIR = "haplotypes-constrained"
+SOURCE_DIR = "latex/figures/haplotypes-constrained"
 SUBJECTS = [f"HG00{i}" for i in range(1, 8)]
 
 CHROMS = [
