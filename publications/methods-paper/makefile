@@ -8,18 +8,18 @@ all: renders/figures/Figure-S7.pdf renders/figures/Figure-SH.pdf
 
 renders/%.pdf: latex/%.tex
 	pdflatex $<
-	bibtex $(basename $<)
+	bibtex $(basename $(@F))
 	pdflatex $<
 	pdflatex $<
-	rm -f $(basename $<).aux $(basename $<).bbl $(basename $<).blg
-	rm -f $(basename $<)-blx.bib $(basename $<).log $(basename $<).run.xml
-	rm -f $(basename $<).toc
-	mv latex/$(@F) $@
+	rm -f $(basename $(@F)).aux $(basename $(@F)).bbl $(basename $(@F)).blg
+	rm -f $(basename $(@F))-blx.bib $(basename $(@F)).log
+	rm -f $(basename $(@F)).toc $(basename $(@F)).run.xml
+	mv $(@F) $@
 
 renders/figures/%.pdf: latex/figures/%.tex
 	pdflatex $<
-	rm -f $(basename $<).aux $(basename $<).log
-	mv latex/figures/$(@F) $@
+	rm -f $(basename $(@F)).aux $(basename $(@F)).log
+	mv $(@F) $@
 
 renders/%.odt: latex/%.tex
 	./tex2office -i latex/references.bib latex/figures latex/tables --svg $<
