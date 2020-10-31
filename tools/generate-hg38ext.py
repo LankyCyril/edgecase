@@ -9,22 +9,28 @@ from binascii import hexlify
 from gzip import open as gzopen
 from itertools import chain
 from textwrap import fill
+from zlib import decompress
+from base64 import decodebytes
 
 try:
     from tqdm import tqdm
 except ModuleNotFoundError:
-    def tqdm(it, *args, **kwargs):
+    def tqdm(it, desc=None, *args, **kwargs):
+        if desc is not None:
+            print(desc, end="...\n", file=stderr)
         return it
 
 
 USAGE = """usage:
 {0} --local hg38.fasta stong2014.fasta
-    generate hg38ext.fa from local files
+    generate hg38ext.fa from local files and output to stdout
 {0} --remote
-    download appropriate assemblies and generate hg38ext.fa
+    download appropriate assemblies, generate hg38ext.fa, and output to stdout
+{0} --ecx
+    output the edgeCase indeX (hg38ext.fa.ecx) to stdout
 
-NOTE! This tool prints the uncompressed FASTA to stdout. You should pipe it
-into a file, for example:
+NOTE! This tool writes uncompressed data (FASTA or ECX) to stdout.
+You should pipe it into a file, for example:
 {0} --remote > hg38ext.fa
 """
 
@@ -57,6 +63,39 @@ TO_REVCOMP_MASKS = {
 ALPHABET = list("AaCcNnnNgGtT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
 COMPLEMENT_PATTERN = compile(r'|'.join(COMPLEMENTS.keys()))
+
+HG38EXT_ECX_GZ = (
+b'eNqVWEuPGzcMPs/+jR6LBUQ9yQZBj0WRXgskJ8N1N9nFPms7AfrvS+oxOw+L4wYIRXjJT6LE+Ujp'
+b'\np69P+2+nX573p8fd/uVw/3r86A3FD19fj48fEch+OB/3h3P7G0SH/uanu5fz8d/h+LJ/vhveXk/'
+b'y\n/2cYDvfH1+fX0yv/+Lx/eNmVv8sEw9vxgdXD0/50Gk6v34+Hu+Hp4eVx+Otpf3h8ejidb4y4ww'
+b'CG\n/2UJ5YcsZElDGCarHO6/ORxuh9ubbGKXjrYIzTGbuKWjK0JzzCZ+6eiL0ByzSVg6hiI0x2wSh'
+b'5gd\nY3OMRWiO2SQtZ0xFaI7ZBJczYhGaYzah5YxUhOaYTcCsMsBUqeZAMYLleqFJ1bkYrVIIbJWq'
+b'czHi\nNMpTi39RoP5epApRjHwHwlepQhQjTq3UINIEIlSpQhSjuNqFWKXqXIzSav9TlapzMcLVzFi'
+b'l6pyN\nrFnObE2VqnPOOQtDMGXuMkL9tUiVQsoskjqhrT68Q9gqVYhs+nkZ/OciVM8M/2Xp+aUI1b'
+b'Nk3GA9\nko+egZrmlqTrOgi+8Kv1FtAFS01zZsm+PYRQ6ZfQuhACNS2aJQ33EGLlYTLWeIYYtbjk4'
+b'x5CJUII\n5Fyg5EbNL2myh1AZEXwwCaOLo5aWfNlDqNQIDp3ziT+GpuGSODsIrjEkOJcwyXE2za0Z'
+b'tAfSmBIc\nrz/GDFI0t2bSHkhjTJ7fRs4Falpdw4xReyCNMwG8C97xFjeN1pzaA2msCSYiupTZpWi'
+b'0ZtUeSONN\nMJybAEhNI7Pm1R5Io0Z01ifvoSl2TZA9iEaQaGzk/QhNiWua7EEUIxoCRj5U5uuqpP'
+b'p7kSoENab1\nnJ4QU1NwzbcdCG8ap8ZIROia4teM24NozBoMGvQ8eVVozbg9CFsZl6nGGaQwanHJv'
+b'D0EVzg2JAvJ\ncwJUJS75t+dfso/PIBBiGWjCvLnLZvI+Ptyd75/3L7vn/flw3/z//v72640Pre21'
+b'sUg3IV4dgBcQ\naycKaFKWOOlEN72T1o5uemPrSa3LKy8ffKPiLW/SGtMt72Bad8qVKks/IdlNbxh'
+b'bVA8C4q2ZEewm\ngN1oUzcB3NiqhhSyjDNi3QTw712ezfeCUsHGLm8TIIzNWszMGGHOQpsAsRJFIi'
+b'60IqOZEcgVyR/S\nvHfASRfx3jsUINdfCY79A1gb0I2an/QPOkpZDk3bCBzbCJy1EVvLKdtQWwknm'
+b'dm0sMpwBWVex0Ok\npiVzIdUUoFkt98Sc1bRwIeUUIDetogaBmmbnVXQTyE9rmKfYlHkN24QJYx3j'
+b'CpqY+apCF9JQPfcY\np+VMTrsqYVbONheUJiUtST2qSpyVtE0YfC9rlusJjJqdlLVNlLKNdvfbH5i'
+b'4hww/YLd/Og+eAvO0\nSD87fXki4o9VnosKCKfZ7U1q7R5/ktyeigTdjedlt3rj3X363SYp6nVy5G'
+b'+Sbxx5CNP2bWUosG66\nGiuw9r0Z5K9SSLdpdtYMrt1B3HMC//lSJktetuR44N31DCzSzTq59Y54A'
+b'fEbN+S1mxO3MLi3893T\nDm6DMZ92sOOj4f3j/FwxXRjEMAO007WGo8rPOfEyDm9nuUZVpLqKy0Ap'
+b'CVLjXojS3kMEo/iXSKL4\ncYOqRDJjWzUSuoyTAmLKEid4ajwoqYqmWnI5c1l6xb/EI7mKnESpLGR'
+b'3KaDxYLdDQtuB4gtUlRdT\nrBOV5A02B/DghDxk0EFyaCjfC0pNVM5qQbVqaKEDlfgqJgJngHpgkk'
+b'b1zkOr76gHUcIK4sq78c96\nKfIte5J/zLsZdNmIOy1A7IJaoiifmAzTd5XKMp0gc27R+D6TAiSyo'
+b'6bhlEhRnlLNYK+NdHZj0CLl\ngtIFjUh8nHnACagaKUmqkX1/RwocZBy1pODkSEm4mTeEro101uWr'
+b'kfo+qHNyW81DmIDqkUr2URjf\nediW5NJWNafglEilgJD07Fen7/xGogabFFx5/oEy2BmuHm/OQXx'
+b'/lYq5lRg1VKFKyFJqOCTwV4fc\naQm2dwDk9bQ3jyOTuEjmIV7RelyehhvePFGnvwHLzhx1Gen/TJ'
+b'N3SyIQeKkjF+L40dmxeYXSt8hp\n0HyZBkGQIayLTH9XfMb24wuZIeOkOyyKU6Fq5C5DcJnBqzNlf'
+b'lXV444aMN+pQhnmd+CNqFNGnjzq\n8d2Tl1YVUKFq1DFD4BCuDXr2tKOHTApqknPOQ5ig6vFCTk6o'
+b'ywAEn6STHzVSkGq4lBFgiNeGO3uL\nUsPldOuj8l9tGdwEdSPcnJFQHSDfGIi736aRglTCBZsRpBu'
+b'+Oqfn7zd6xEEBRjJchPOQZsAbQeeE\nHI3JWIvO+6YEFapGLVXyP0oAIII=\n')
 
 
 def revcomp(sequence):
@@ -121,7 +160,7 @@ def parser_iterator(filename, to_revcomp, desc="Parsing", entry_filter=lambda e:
 
 
 def generate_hg38ext(hg38, stong2014):
-    """Generate hg38ext from the hg38 and stong2014 FASTA files"""
+    """Generate hg38ext from the hg38 and stong2014 FASTA files, write to stdout"""
     subhaps = {mask.format(STONG_INFIX) for mask in STONG2014_SUBHAP_MASKS}
     to_revcomp = {mask.format(STONG_INFIX) for mask in TO_REVCOMP_MASKS}
     hg38_iterator = parser_iterator(hg38, to_revcomp, desc="Parsing reference")
@@ -134,6 +173,11 @@ def generate_hg38ext(hg38, stong2014):
     return 0
 
 
+def output_ecx():
+    """Write the hg38ext ECX to stdout"""
+    print(decompress(decodebytes(HG38EXT_ECX_GZ)).decode().rstrip("\n"))
+
+
 if __name__ == "__main__":
     # interpret command-line arguments and dispatch to subroutines:
     if (len(argv) == 2) and (argv[1] == "--remote"):
@@ -142,6 +186,8 @@ if __name__ == "__main__":
             returncode = generate_hg38ext(hg38, stong2014)
     elif (len(argv) == 4) and (argv[1] == "--local"):
         returncode = generate_hg38ext(hg38=argv[2], stong2014=argv[3])
+    elif (len(argv) == 2) and (argv[1] == "--ecx"):
+        returncode = output_ecx()
     else:
         print(USAGE.format(__file__).rstrip(), file=stderr)
         returncode = 1
