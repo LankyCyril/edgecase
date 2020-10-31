@@ -89,7 +89,7 @@ Specifically, as described in the bioRxiv preprint, the human reference can be
 constructed from the hg38/GRCh38 reference genome and subtelomeric assemblies
 published by [Stong et al., 2014](https://dx.doi.org/10.1101%2Fgr.166983.113).
 To generate this reference, which we call "extended", or *hg38ext*, run
-`tools/generate-hg38ext.py --remote > hg38ext.fa`.
+`assets/generate-hg38ext.py --remote > hg38ext.fa`.
 
 
 ### Custom SAM flags
