@@ -89,22 +89,26 @@
 \doublespacing
 
 \section*{Abstract} \addcontentsline{toc}{section}{Abstract}
-Telomeres are regions of repetitive nucleotide sequences capping the ends of eukaryotic chromosomes that protect against deterioration, and whose lengths can be correlated with age and adverse health risk factors.
-Given their length and repetitive nature, telomeric regions are not easily reconstructed from short-read sequencing, making telomere sequence resolution a very costly and generally intractable problem.
-Recently, long-read sequencing, with read lengths measuring in hundreds of Kbp, has made it possible to routinely read into telomeric regions and inspect their sequence structure.
-Here, we describe a framework for
-    extracting telomeric reads from whole genome single-molecule sequencing experiments,
-    prior-less \textit{de novo} identification of telomere repeat motifs,
-    and describing their sequence variation.
-We find that
-    long telomeric stretches can be accurately captured with long-read sequencing,
-    observe extensive sequence heterogeneity of human telomeres,
-    discover and localize non-canonical motifs (both previously reported as well as novel),
-    confirm the presence of the non-canonical motifs in short read sequencing experiments,
-    and report the first motif composition maps of human telomeric haplotypes across populations on a multi-Kbp scale.
+    Telomeres are regions of repetitive nucleotide sequences capping the ends of eukaryotic chromosomes that protect against deterioration,
+        and whose lengths can be correlated with age and adverse health risk factors.
+    Given their length and repetitive nature,
+        telomeric regions are not easily reconstructed from short-read sequencing,
+        making telomere sequence resolution a very costly and generally intractable problem.
+    Recently, long-read sequencing, with read lengths measuring in hundreds of Kbp,
+        has made it possible to routinely read into telomeric regions and inspect their sequence structure.
+    Here, we describe a framework for
+        extracting telomeric reads from whole genome single-molecule sequencing experiments,
+        prior-less \textit{de novo} identification of telomere repeat motifs,
+        and describing their sequence variation.
+    We find that
+        long telomeric stretches can be accurately captured with long-read sequencing,
+        observe extensive sequence heterogeneity of human telomeres,
+        discover and localize non-canonical motifs (both previously reported as well as novel),
+        confirm the presence of the non-canonical motifs in short read sequencing experiments,
+        and report the first motif composition maps of human telomeric haplotypes across populations on a multi-Kbp scale.
 
 \section*{Keywords} \addcontentsline{toc}{section}{Keywords}
-Telomere, telomeric haplotypes, long-read sequencing, telomere sequence heterogeneity
+    Telomere, telomeric haplotypes, long-read sequencing, telomere sequence heterogeneity
 
 \pagebreak
 %\singlespacing
@@ -112,36 +116,61 @@ Telomere, telomeric haplotypes, long-read sequencing, telomere sequence heteroge
 \doublespacing
 
 \section*{Introduction} \addcontentsline{toc}{section}{Introduction}
-Telomeres are the functional ends of human chromosomes that naturally shorten with cell division and therefore with age \cite{teloaging}.
-Telomere length can also be influenced by a variety of lifestyle factors and environmental exposures (e.g., stress, exercise, air pollution, radiation) \cite{teloeffects}.
-While human telomeres are known to consist largely of a conserved six-nucleotide repeat (TTAGGG) \cite{moyzis}, several studies have identified variations of this motif in proximal telomeric regions \cite{telovars1989,telovars1999,telovars2018,telovars2019}.
-However, such studies were performed with oligonucleotide hybridization, PCR, immunoprecipitation, and short-read sequencing, requiring prior assumptions about specific target motifs, custom sample preparation, and targeted sequencing, and therefore preventing \textit{de novo} identification of motif variants and their localization.
-Thus, long-range maps of telomeric sequence variation in the human genome are still lacking.
-Such maps can provide insight into telomere biology and enable novel approaches to analyze the effects of health status, aging, and environment on telomere sequence and length.
-\\~\\
-To improve our understanding of telomere sequence structure and variation, we developed \textit{edgeCase}, a framework for alignment and \textit{de novo} telomeric motif discovery which uses human whole genome long-read sequencing experiments, making it easily scalable.
-We have validated these methods using Genome in a Bottle \cite{giab} single-molecule real-time (SMRT) sequencing datasets generated with Pacific Biosciences circular consensus sequencing (PacBio CCS) \cite{pacbio,pacbioccs}, and short-read Illumina \cite{illumina} and 10X Genomics (Chromium) \cite{10x} datasets.
-These results provide evidence for multiple novel, non-canonical telomeric repeats, resolution of multiple chromosome-specific haplotypes with SMRT sequencing, and a new method for long-range characterization of the structure of telomeric sequences.
+    Telomeres are the functional ends of human chromosomes that naturally shorten with cell division and therefore with age \cite{teloaging}.
+    Telomere length can also be influenced by a variety of lifestyle factors and environmental exposures
+        (e.g., stress, exercise, air pollution, radiation) \cite{teloeffects}.
+    While human telomeres are known to consist largely of a conserved six-nucleotide repeat (TTAGGG) \cite{moyzis},
+        several studies have identified variations of this motif in proximal telomeric regions
+            \cite{telovars1989,telovars1999,telovars2018,telovars2019}.
+    However, such studies were performed with oligonucleotide hybridization, PCR, immunoprecipitation, and short-read sequencing,
+        requiring prior assumptions about specific target motifs, custom sample preparation, and targeted sequencing,
+        and therefore preventing \textit{de novo} identification of motif variants and their localization.
+    Thus, long-range maps of telomeric sequence variation in the human genome are still lacking.
+    Such maps can provide insight into telomere biology and enable novel approaches to analyze the effects of
+        health status, aging, and environment on telomere sequence and length.
+    \\~\\
+    To improve our understanding of telomere sequence structure and variation, we developed \textit{edgeCase},
+        a framework for alignment and \textit{de novo} telomeric motif discovery
+        which uses human whole genome long-read sequencing experiments,
+            making it easily scalable.
+    We have validated these methods using
+        Genome in a Bottle \cite{giab} single-molecule real-time (SMRT) sequencing datasets
+            generated with Pacific Biosciences circular consensus sequencing (PacBio CCS) \cite{pacbio,pacbioccs},
+        and short-read Illumina \cite{illumina} and 10X Genomics (Chromium) \cite{10x} datasets.
+    These results provide evidence for
+        multiple novel, non-canonical telomeric repeats,
+        resolution of multiple chromosome-specific haplotypes with SMRT sequencing,
+        and a new method for long-range characterization of the structure of telomeric sequences.
 
 \section*{Results} \addcontentsline{toc}{section}{Results}
 
 \subsection*{A telomere-annotated reference genome recovers telomeric reads from human long-read whole genome sequencing datasets}
 \addcontentsline{toc}{subsection}{A telomere-annotated reference genome recovers telomeric reads from human long-read whole genome sequencing datasets}
-We constructed an extended reference genome, \textit{hg38ext}, that combines chromosome sequences of the \textit{hg38} reference genome \cite{grch38,hg38} and human subtelomeric assemblies \cite{riethman2014}, resulting in a reference set annotated with boundaries of subtelomeric and telomeric tracts. % (see \hyperref[sec:methods]{Materials and Methods}).
-The layout of this reference set is available in \textbf{Supplemental File S1}, and the set itself can be reproduced with a script available as \textbf{Supplemental File S2}.
-We then aligned PacBio CCS reads of seven Genome in a Bottle (GIAB) human subjects (HG001 through HG007) to \textit{hg38ext}, and in total, observed reads mapping to the ends of chromosomes and extending into telomeric regions on 10 \textit{p} arms and 19 \textit{q} arms, with 53\textendash{}295 such reads on the \textit{p} arms and 384\textendash{}1119 on the \textit{q} arms (\textbf{Supplemental Table S1}).
-Portions of reads contained in the telomeric regions were extracted for further analysis (\textbf{\autoref{fig:schematic_alignment}}).
-    \begin{figure}[h!] \centering % \vspace{5mm}
-    \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-1.pdf}
-    \caption{
-         \small Mapping of candidate telomeric reads, illustrated with reads from the HG002 dataset aligning to \mbox{chromosome 5.}
-         The chromosome is displayed schematically, centered around the centromere.
-         Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
-         Coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
-         Statistics for all chromosomes of all seven datasets are provided in \textbf{Supplemental Table S1}.
-    }
-    \label{fig:schematic_alignment}
-    \end{figure}
+    We constructed an extended reference genome, \textit{hg38ext},
+        that combines chromosome sequences of the \textit{hg38} reference genome \cite{grch38,hg38}
+            and human subtelomeric assemblies \cite{riethman2014},
+        resulting in a reference set annotated with boundaries of subtelomeric and telomeric tracts.
+            % (see \hyperref[sec:methods]{Materials and Methods}).
+        The layout of this reference set is available in \textbf{Supplemental File S1},
+            and the set itself can be reproduced with a script available as \textbf{Supplemental File S2}.
+    We then aligned PacBio CCS reads of seven Genome in a Bottle (GIAB) human subjects (HG001 through HG007) to \textit{hg38ext},
+        and in total, observed reads mapping to the ends of chromosomes and extending into telomeric regions
+            on 10 \textit{p} arms and 19 \textit{q} arms,
+                with 53\textendash{}295 such reads on the \textit{p} arms
+                and 384\textendash{}1119 on the \textit{q} arms
+                    (\textbf{Supplemental Table S1}).
+    Portions of reads contained in the telomeric regions were extracted for further analysis (\textbf{\autoref{fig:schematic_alignment}}).
+        \begin{figure}[h!] \centering % \vspace{5mm}
+        \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-1.pdf}
+        \caption{
+             \small Mapping of candidate telomeric reads, illustrated with reads from the HG002 dataset aligning to \mbox{chromosome 5.}
+             The chromosome is displayed schematically, centered around the centromere.
+             Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
+             Coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
+             Statistics for all chromosomes of all seven datasets are provided in \textbf{Supplemental Table S1}.
+        }
+        \label{fig:schematic_alignment}
+        \end{figure}
 
 \subsection*{Telomeric reads contain variations of the canonical motif}
 \addcontentsline{toc}{subsection}{Telomeric reads contain variations of the canonical motif}
