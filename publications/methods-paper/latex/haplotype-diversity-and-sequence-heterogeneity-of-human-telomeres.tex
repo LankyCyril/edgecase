@@ -144,8 +144,8 @@
 
 \section*{Results} \addcontentsline{toc}{section}{Results}
 
-\subsection*{A telomere-annotated reference genome recovers telomeric reads from human long-read whole genome sequencing datasets}
-\addcontentsline{toc}{subsection}{A telomere-annotated reference genome recovers telomeric reads from human long-read whole genome sequencing datasets}
+\subsection*{A telomere-annotated reference genome enables recovery of telomeric reads from human long-read whole genome sequencing datasets}
+\addcontentsline{toc}{subsection}{A telomere-annotated reference genome enables recovery of telomeric reads from human long-read whole genome sequencing datasets}
     We constructed an extended reference genome, \textit{hg38ext},
         that combines chromosome sequences of the \textit{hg38} reference genome \cite{grch38,hg38}
             and human subtelomeric assemblies \cite{riethman2014},
@@ -172,8 +172,8 @@
         \label{fig:schematic_alignment}
         \end{figure}
 
-\subsection*{Telomeric reads contain variations of the canonical motif}
-\addcontentsline{toc}{subsection}{Telomeric reads contain variations of the canonical motif}
+\subsection*{Telomeric long reads contain variations of the canonical motif}
+\addcontentsline{toc}{subsection}{Telomeric long reads contain variations of the canonical motif}
     We performed \textit{de novo} repeat discovery in the telomeric sequences for motifs of lengths 4 through 16,
             and identified motifs in repeat contexts that are statistically enriched in the seven datasets.
         The majority of motifs were either the canonical TTAGGG / CCCTAA,
@@ -186,17 +186,15 @@
             and 11.6\%\textendash{}36.3\% on the \textit{p} arms,
             and three more motifs (TT\underline{G}GGG, TTA\underline{G}GGG, T\underline{G}AGGG)
                 each explained at least 1\% of the repeat content in all seven datasets.
-        These top motifs, as well as 11 less enriched ones,
-            were confirmed in independently generated human short read and linked-read genomic datasets
-            (\textbf{Supplemental Table S2}).
-            \input{latex/tables/Table-1-repeatfinder.tex} % tab:repeatfinder
-    \noindent We visualized the locations of the top four enriched motifs and their reverse complements
+    \\~\\
+    We visualized the locations of the top four enriched motifs and their reverse complements
         on the chromosomal ends of the HG002 dataset (\textbf{\autoref{fig:hg002_densityplot}}),
         as it provided the deepest coverage among the assessed datasets (\textbf{Supplemental Table S1}).
         Only the chromosomal arms covered by at least 25 reads were plotted.
             Plots for the other six datasets are available as \textbf{Supplemental Figs. S1\textendash{}S6}.
+        \input{latex/tables/Table-1-repeatfinder.tex} % tab:repeatfinder
         \begin{figure}[h!] \centering
-        \includegraphics[height=.773\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-2.pdf}
+        \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-2.pdf}
         \caption{
              \small Densities of the top four enriched motifs at ends of chromosomal \textbf{(A)} \textit{p} arms
              and \textbf{(B)} \textit{q} arms of the HG002 dataset.
@@ -207,7 +205,7 @@
         }
         \label{fig:hg002_densityplot}
         \end{figure}
-    \\~\\
+    \noindent % \\~\\
     Long reads on each arm agreed on the locations of different motifs within any given 10 bp window
         (the coverage-weighted median of normalized Shannon entropy was 0.00 for all data,
         and the coverage-weighted 3rd quartile was 0.00\textendash{}0.13,
@@ -225,9 +223,20 @@
         \label{fig:entropy}
         \end{figure}
 
-%TODO Validation in short reads XXX XXX XXX
+\subsection*{Short-read sequencing validates motif variations observed in long reads}
+\addcontentsline{toc}{subsection}{Short-read sequencing validates motif variations observed in long reads}
+    We validated these findings using short-read sequencing in two ways.
+    First, we found that telomeric candidate reads extracted with \textit{Telomerecat} \cite{telomerecat}
+        from respective GIAB Illumina datasets
+        supported a definitive majority of the telomeric sequence on the \textit{q} arms of long-read datasets
+            (median 98\% of the sequence supported, \textbf{Supplemental Fig. S7}).
+        At the same time, only a median of 38\% of the sequence of the \textit{p} arm long reads was supported,
+            and while this does not automatically invalidate them (see \hyperref[sec:discussion]{Discussion}),
+            only the long reads mapping to the \textit{q} arms were used for downstream analyses.
+    Second, we confirmed 15 enriched motifs in independently generated human short-read and linked-read genomic datasets,
+        with the same four motifs being the most enriched (\textbf{Supplemental Table S2}).
 
-\subsection*{Long-read sequencing resolves human telomeric haplotypes} %TODO rename to something about "variation," "spectra," etc.
+\subsection*{Long-read sequencing resolves human telomeric haplotypes} %TODO uncovers a variety
 \addcontentsline{toc}{subsection}{Long-read sequencing resolves human telomeric haplotypes}
 %TODO discuss causes of entropy: seq. errors, SV, haplotypes
 %TODO rewrite this entire section!
@@ -236,7 +245,8 @@ We examined the \textit{q} arms of the HG002 dataset to investigate this heterog
 Pairwise distances between the reads within these clusters were significantly lower than those for out-of-cluster pairings, implying that distinct telomeric haplotypes are present.
 To quantify the differences between putative haplotypes, we calculated silhouette scores \cite{silhouette} for these clusterings (\autoref{tab:levenshtein-q_arm}), and generated motif density plots for the four chromosome arms with the highest such scores to visualize the differences in haplotypes (\autoref{fig:levenshtein_q_arm}).
 
-\section*{Discussion} \addcontentsline{toc}{section}{Discussion}
+\section*{Discussion} \addcontentsline{toc}{section}{Discussion} \label{sec:discussion}
+% TODO: non-invalidation due to BIAS of telomerecat and who-knows-what-goings-on on the p arm (biology? tech artifacts?)
 Repeat-rich, low-complexity regions of the human genome such as telomeres have been historically recalcitrant to full mapping and annotation \cite{miga2015}, mainly due to the alignment challenge they pose and to the read lengths required to span such areas \cite{ngslowcomplexity}.
 The advent of long-read, single-molecule methods (third generation sequencing) has provided new opportunities to map the sequence composition of a previously "dark" area of the human genome, enabling research into the sequence composition and length dynamics \cite{luxton2020} of telomeres. %TODO add Luxton ref.
 Our results reaffirm that the canonical repeat (TTAGGG) is certainly the most dominant type of motif in telomeres, but also reveal a surprising diversity of repeat variations, which are confirmed by both short and long-read sequencing technologies.
