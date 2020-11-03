@@ -131,39 +131,72 @@ We constructed an extended reference genome, \textit{hg38ext}, that combines chr
 The layout of this reference set is available in \textbf{Supplemental File S1}, and the set itself can be reproduced with a script available as \textbf{Supplemental File S2}.
 We then aligned PacBio CCS reads of seven Genome in a Bottle (GIAB) human subjects (HG001 through HG007) to \textit{hg38ext}, and in total, observed reads mapping to the ends of chromosomes and extending into telomeric regions on 10 \textit{p} arms and 19 \textit{q} arms, with 53\textendash{}295 such reads on the \textit{p} arms and 384\textendash{}1119 on the \textit{q} arms (\textbf{Supplemental Table S1}).
 Portions of reads contained in the telomeric regions were extracted for further analysis (\textbf{\autoref{fig:schematic_alignment}}).
-
-\begin{figure}[h!] \centering % \vspace{5mm}
-\includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-1.pdf}
-\caption{
-     \small Mapping of candidate telomeric reads, illustrated with reads from the HG002 dataset aligning to \mbox{chromosome 5.}
-     The chromosome is displayed schematically, centered around the centromere.
-     Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
-     Coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
-     Statistics for all chromosomes of all seven datasets are provided in \textbf{Supplemental Table S1}.
-}
-\label{fig:schematic_alignment}
-\end{figure}
-
-%TODO move support a few sections forward
-%Illumina reads from matching GIAB datasets supported 70.8\%, 63.3\%, and 82.7\% of the candidate PacBio CCS sequence, %TODO w/o direct support
-%providing average coverages of $\sim$5x, $\sim$9x, and $\sim$6x, respectively. %TODO new numbers; TODO recalculate coverage or refer to Table
+    \begin{figure}[h!] \centering % \vspace{5mm}
+    \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-1.pdf}
+    \caption{
+         \small Mapping of candidate telomeric reads, illustrated with reads from the HG002 dataset aligning to \mbox{chromosome 5.}
+         The chromosome is displayed schematically, centered around the centromere.
+         Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
+         Coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
+         Statistics for all chromosomes of all seven datasets are provided in \textbf{Supplemental Table S1}.
+    }
+    \label{fig:schematic_alignment}
+    \end{figure}
 
 \subsection*{Telomeric reads contain variations of the canonical motif}
 \addcontentsline{toc}{subsection}{Telomeric reads contain variations of the canonical motif}
-We performed \textit{de novo} repeat discovery %FIXME in the supported regions
-for motifs of lengths 4 through 16 and identified motifs in repeat contexts that are statistically enriched in the three datasets.
-The majority of motifs were either the canonical TTAGGG / CCCTAA, its variations (e.g., TT\underline{G}GGG / CCC\underline{C}AA), or a duplet of variants, such as TTAGGGTTA\underline{G}GGG (\autoref{tab:repeatfinder_full}).
-CG-rich motifs were also observed on the \textit{p} arms.
-The top enriched motif (TTAGGG / CCCTAA) explained 43.3\%\textendash{}54.4\% of the telomeric repeat content on the \textit{q} arms, and 10.0\%\textendash{}22.7\% on the \textit{p} arms, %TODO use recalculated values
-%FIXME while overall, four motifs on the \textit{q} arms and three motifs on the \textit{p} arms each explained at least 0.5\% of the repeat content.
-These top motifs, as well as 15 less enriched ones, were confirmed in independently generated human short read and linked-read genomic datasets (\hyperref[sec:supp_methods]{Supplemental methods}, \autoref{tab:shortread_repeatfinder}). %TODO See MAIN methods now
-%TODO "N" (top?) enriched motifs
-%TODO mention that they confirm only the existence of motifs, but not the locations, because they cannot.
-% ?? out of ?? (??.?\%) of these motifs were confirmed in independently generated human linked-read, short read genomic, and short read transcriptomic datasets (\hyperref[sec:supp_methods]{Supplemental methods}, \autoref{tab:shortread_repeatfinder}).
-\autoref{fig:hg002_densityplot_q_arm} visualizes the locations of the top four enriched motifs on the \textit{q} arm of the HG002 dataset; only the arms covered by at least 25 reads are displayed. %TODO p+q
-Plots for other datasets and arms are available as supplemental figures: \autoref{fig:hg002_densityplot_p_arm} visualizes the top three motifs on the \textit{p} arm of the HG002 dataset, \autoref{fig:hg001_densityplots} and \autoref{fig:hg005_densityplots} visualize datasets HG001 and HG005 respectively. %TODO: all other datasets in Supplement
-Long reads on each arm agreed on the locations of different motifs within any given 10 bp window (the median of normalized Shannon entropy was 0.000 for all data, and the 3rd quartile was 0.166, 0.074, and 0.211 for the three datasets, respectively, \autoref{fig:entropy}), indicating that locations of the variations are colinear among reads and are not a result of sequencing errors. %TODO new 3rd quartile values
-%FIXME move "not a result of sequencing errors to next section, expand on potential causes of third quartile
+    We performed \textit{de novo} repeat discovery in the telomeric sequences for motifs of lengths 4 through 16,
+            and identified motifs in repeat contexts that are statistically enriched in the seven datasets.
+        The majority of motifs were either the canonical TTAGGG / CCCTAA,
+            its variations (e.g., TT\underline{G}GGG / CCC\underline{C}AA),
+            or a duplet of variants, such as TTAGGGTTA\underline{G}GGG
+            (\textbf{\autoref{tab:repeatfinder}}).
+        CG-rich motifs were also observed on the \textit{p} arms.
+        The top enriched motif (TTAGGG / CCCTAA) explained
+            62.2\%\textendash{}82.5\% of the telomeric repeat content on the \textit{q} arms
+            and 11.6\%\textendash{}36.3\% on the \textit{p} arms,
+            and three more motifs (TT\underline{G}GGG, TTA\underline{G}GGG, T\underline{G}AGGG)
+                each explained at least 1\% of the repeat content in all seven datasets.
+        These top motifs, as well as 11 less enriched ones,
+            were confirmed in independently generated human short read and linked-read genomic datasets
+            (\textbf{Supplemental Table S2}).
+            \input{latex/tables/Table-1-repeatfinder.tex} % tab:repeatfinder
+    \noindent We visualized the locations of the top four enriched motifs and their reverse complements
+        on the chromosomal ends of the HG002 dataset (\textbf{\autoref{fig:hg002_densityplot}}),
+        as it provided the deepest coverage among the assessed datasets (\textbf{Supplemental Table S1}).
+        Only the chromosomal arms covered by at least 25 reads were plotted.
+            Plots for the other six datasets are available as \textbf{Supplemental Figs. S1\textendash{}S6}.
+        \begin{figure}[h!] \centering
+        \includegraphics[height=.773\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-2.pdf}
+        \caption{
+             \small Densities of the top four enriched motifs at ends of chromosomal \textbf{(A)} \textit{p} arms
+             and \textbf{(B)} \textit{q} arms of the HG002 dataset.
+             \textit{Background} represents the remaining sequence content (non-repeating sequence and not significantly enriched motifs).
+             Only the arms covered by at least 25 reads are displayed.
+             Reads are shown aligned to the contigs in the \textit{hg38ext} reference set, and genomic coordinates are given in Kbp.
+             Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
+        }
+        \label{fig:hg002_densityplot}
+        \end{figure}
+    \\~\\
+    Long reads on each arm agreed on the locations of different motifs within any given 10 bp window
+        (the coverage-weighted median of normalized Shannon entropy was 0.00 for all data,
+        and the coverage-weighted 3rd quartile was 0.00\textendash{}0.13,
+        \textbf{\autoref{fig:entropy}}),
+        indicating that locations of the variations are colinear among reads.
+        \begin{figure}[h!] \centering
+        \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-3.pdf}
+        \caption{
+            \small Distribution of motif entropies in 10 bp windows of of candidate PacBio CCS reads aligning to the same chromosomal arms
+            in GIAB datasets HG001 through HG007,
+            with respect to per-window coverage,
+            and the coverage-weighted quartiles of the entropy values.
+            % no fourth quartile: https://math.stackexchange.com/a/1468111
+        }
+        \label{fig:entropy}
+        \end{figure}
+
+%TODO Validation in short reads XXX XXX XXX
 
 \subsection*{Long-read sequencing resolves human telomeric haplotypes} %TODO rename to something about "variation," "spectra," etc.
 \addcontentsline{toc}{subsection}{Long-read sequencing resolves human telomeric haplotypes}
