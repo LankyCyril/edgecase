@@ -125,14 +125,28 @@ These results provide evidence for multiple novel, non-canonical telomeric repea
 
 \section*{Results} \addcontentsline{toc}{section}{Results}
 
-\subsection*{Telomeric reads are present in human long-read whole genome sequencing datasets} %TODO highlight hg38ext in subsection title
-\addcontentsline{toc}{subsection}{Telomeric reads are present in human long-read whole genome sequencing datasets} %TODO mention protocol / ext
-We aligned PacBio CCS reads of three Genome in a Bottle (GIAB) human subjects (HG001, HG002, and HG005) to a combination of the human reference genome and human subtelomeric assemblies (see \hyperref[sec:methods]{Materials and Methods}). %TODO describe how to obtain
-In total, we observed reads mapping to the ends of chromosomes and extending into telomeric regions on 9 \textit{p} arms and 17 \textit{q} arms, with 256 such reads ($\sim$10x mean coverage) in the HG001 dataset, 570 ($\sim$22x) in HG002, and 241 ($\sim$9x) in HG005.
-\autoref{fig:hg002_alignment} schematically represents the alignment of such reads in the HG002 dataset; alignment plots for the other two datasets are available as a supplemental figure (\autoref{fig:hg00x_alignments}), and full mapping statistics are available \mbox{in \autoref{tab:telomeric_read_counts}}. %TODO reword to describe protocol, Figure illustrates protocol, Table provides mapping stats
+\subsection*{A telomere-annotated reference genome recovers telomeric reads from human long-read whole genome sequencing datasets}
+\addcontentsline{toc}{subsection}{A telomere-annotated reference genome recovers telomeric reads from human long-read whole genome sequencing datasets}
+We constructed an extended reference genome, \textit{hg38ext}, that combines chromosome sequences of the \textit{hg38} reference genome \cite{grch38,hg38} and human subtelomeric assemblies \cite{riethman2014}, resulting in a reference set annotated with boundaries of subtelomeric and telomeric tracts. % (see \hyperref[sec:methods]{Materials and Methods}).
+The layout of this reference set is available in \textbf{Supplemental File S1}, and the set itself can be reproduced with a script available as \textbf{Supplemental File S2}.
+We then aligned PacBio CCS reads of seven Genome in a Bottle (GIAB) human subjects (HG001 through HG007) to \textit{hg38ext}, and in total, observed reads mapping to the ends of chromosomes and extending into telomeric regions on 10 \textit{p} arms and 19 \textit{q} arms, with 53\textendash{}295 such reads on the \textit{p} arms and 384\textendash{}1119 on the \textit{q} arms (\textbf{Supplemental Table S1}).
+Portions of reads contained in the telomeric regions were extracted for further analysis (\textbf{\autoref{fig:schematic_alignment}}).
+
+\begin{figure}[h!] \centering % \vspace{5mm}
+\includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-1.pdf}
+\caption{
+     \small Mapping of candidate telomeric reads, illustrated with reads from the HG002 dataset aligning to \mbox{chromosome 5.}
+     The chromosome is displayed schematically, centered around the centromere.
+     Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
+     Coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
+     Statistics for all chromosomes of all seven datasets are provided in \textbf{Supplemental Table S1}.
+}
+\label{fig:schematic_alignment}
+\end{figure}
+
 %TODO move support a few sections forward
-Illumina reads from matching GIAB datasets supported 70.8\%, 63.3\%, and 82.7\% of the candidate PacBio CCS sequence, %TODO w/o direct support
-providing average coverages of $\sim$5x, $\sim$9x, and $\sim$6x, respectively. %TODO new numbers; TODO recalculate coverage or refer to Table
+%Illumina reads from matching GIAB datasets supported 70.8\%, 63.3\%, and 82.7\% of the candidate PacBio CCS sequence, %TODO w/o direct support
+%providing average coverages of $\sim$5x, $\sim$9x, and $\sim$6x, respectively. %TODO new numbers; TODO recalculate coverage or refer to Table
 
 \subsection*{Telomeric reads contain variations of the canonical motif}
 \addcontentsline{toc}{subsection}{Telomeric reads contain variations of the canonical motif}
