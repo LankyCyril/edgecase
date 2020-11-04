@@ -292,22 +292,77 @@
 
 \section*{Discussion} \addcontentsline{toc}{section}{Discussion} \label{sec:discussion}
 % TODO: non-invalidation due to BIAS of telomerecat and who-knows-what-goings-on on the p arm (biology? tech artifacts?)
-Repeat-rich, low-complexity regions of the human genome such as telomeres have been historically recalcitrant to full mapping and annotation \cite{miga2015}, mainly due to the alignment challenge they pose and to the read lengths required to span such areas \cite{ngslowcomplexity}.
-The advent of long-read, single-molecule methods (third generation sequencing) has provided new opportunities to map the sequence composition of a previously "dark" area of the human genome, enabling research into the sequence composition and length dynamics \cite{luxton2020} of telomeres. %TODO add Luxton ref.
-Our results reaffirm that the canonical repeat (TTAGGG) is certainly the most dominant type of motif in telomeres, but also reveal a surprising diversity of repeat variations, which are confirmed by both short and long-read sequencing technologies.
-This diversity of repeats includes previously reported variants, as well as novel motifs that are characterized not only by nucleotide substitutions, but also insertions, deletions, and even motif pairing.
-Apart from these variations, CG-rich motifs were identified in telomeric regions of \textit{p} arms, consistent with previously reported findings \cite{cpg}.
-Moreover, while short read sequencing is able to identify such variants, it alone cannot reveal the relative locations of these motifs within telomeres, as repetitive short reads can neither be aligned outside of the reference genome nor provide enough overlap variability to be assembled \textit{de novo}. %TODO stress that it is de novo and novel; TODO contrast with old methods, not only with SR seq XXX!!!
-Long SMRT reads, on the other hand, can be anchored to known subtelomeric sequences of the human genome and extend into the previously unmapped telomeric area.
-These results also highlight the need of better subtelomeric and telomeric annotations in the human genome.
-Four of the 40 subtelomeric assemblies \cite{riethman2014} were homologous to regions in the reference genome far within the respective chromosomes (up to 586 Kbp into the reference sequence), and the canonical motif was present on the \textit{q} arm of chr8 only after 2\textendash{}3Kbp past the annotated boundary in all datasets, suggesting that the existing assemblies do not provide a completely accurate telomeric annotation, and that methods described herein could help to resolve these areas of reference genomes.
-\\~\\
-We observed PacBio CCS reads reaching up to 16 Kbp beyond the known regions of the genome, and resolving the underlying sequence with reasonable fidelity, measured both by the entropy of motif assignment and by pairwise Levenshtein distances between the reads belonging to the same chromosomal arms.
-While short reads also provided support for non-canonical motifs, the overlap between the short and the long reads was substantial, but not complete, which can be explained by the necessary bias towards the canonical motif during the selection of short reads.
-Therefore, telomeric regions with higher content of non-canonical repeats are less likely to be identified through the use of short reads, and instead, long reads appear to be more suitable for this purpose as well. %TODO as well as for the purpose of long-range mapping XXX!!
-The identified variations in long range contexts enable clustering of SMRT reads into distinct haplotypes at ends of chromosomes, and thus provide a new means of diplotype mapping and reveal the existence and motif composition of such diplotypes on a multi-Kbp scale.
-%TODO paragraph about re-clustered spectra constrained to subjects, suggest multiple haplotypes, talk about cell types, the need to sequence deeper and maybe cell-specific seq.
-%XXX for reviewers: stress that the shift from diplotypes to spectra does not invalidate the previous findings: we were able to put these findings and the method into a broader context and see more structure.
+    Repeat-rich, low-complexity regions of the human genome such as telomeres
+        have been historically recalcitrant to full mapping and annotation \cite{miga2015},
+        mainly due to the alignment challenge they pose and to the read lengths required to span such areas \cite{ngslowcomplexity}.
+    The advent of long-read, single-molecule methods (third generation sequencing)
+        has provided new opportunities to map the sequence composition of a previously "dark" area of the human genome,
+        enabling research into the sequence composition and length dynamics \cite{luxton2020} of telomeres.
+    Our results reaffirm
+        that the canonical repeat (TTAGGG) is certainly the most dominant type of motif in telomeres,
+        but also reveal a surprising diversity of repeat variations,
+            which are confirmed by both short and long-read sequencing technologies.
+    This diversity of repeats includes previously reported variants,
+        as well as novel motifs that are characterized not only by nucleotide substitutions,
+        but also insertions, deletions, and even motif pairing.
+    Apart from these variations,
+        CG-rich motifs were identified in telomeric regions of \textit{p} arms,
+        consistent with previously reported findings \cite{cpg}.
+    Moreover, while short read sequencing is able to identify such variants,
+        it alone cannot reveal the relative locations of these motifs within telomeres,
+        as repetitive short reads can
+            neither be aligned outside of the reference genome
+            nor provide enough overlap variability to be assembled \textit{de novo}.
+    Long SMRT reads, on the other hand,
+        can be anchored to known subtelomeric sequences of the human genome and extend into the previously unmapped telomeric area.
+    Furthermore, in contrast to previously published research that utilized targeted sequencing
+        \cite{telovars1989,telovars1999,telovars2018,telovars2019},
+        the method described here allows identification of multiple enriched motifs and their localization
+            \textit{de novo}, without any bias introduced by prior knowledge about the sequence of target motifs.
+    These results also highlight the need of better subtelomeric and telomeric annotations in the human genome:
+    Four of the 40 subtelomeric assemblies \cite{riethman2014}
+        were homologous to regions in the reference genome far within the respective chromosomes (up to 586 Kbp into the reference sequence),
+        and the canonical motif was present on the \textit{q} arm of chr8
+            only after 2\textendash{}3Kbp past the annotated boundary in all datasets,
+        suggesting that the existing assemblies do not provide a completely accurate telomeric annotation,
+        and that methods described herein could help to resolve these areas of reference genomes.
+    \\~\\
+    We observed PacBio CCS reads reaching up to 16 Kbp beyond the known regions of the genome,
+        and resolving the underlying sequence with reasonable fidelity,
+        measured both by the entropy of motif assignment and by pairwise Levenshtein distances
+            between the reads belonging to the same chromosomal arms.
+    While short reads also provided support for non-canonical motifs,
+        the overlap between the short and the long reads was substantial, but not complete,
+        which can be explained by the necessary bias towards the canonical motif during the selection of short reads.
+    Therefore, telomeric regions with higher content of non-canonical repeats are less likely to be identified through the use of short reads,
+        and instead, long reads appear to be more suitable for this purpose as well.
+    Of note, the captured PacBio CCS reads that mapped to \textit{q} arm telomeres
+        agreed with short read sequences much better (median 98\% support, \textbf{Supplemental Fig. S7})
+        than the reads that mapped to \textit{p} arm telomeres (median 38\% support).
+        While, for this reason, we opted to choose only the \textit{q} arm reads for deeper analysis,
+            this discrepancy can lend itself to multiple potential explanations,
+                from artifacts of SMRT technology preventing faithful reproduction of the sequence,
+                to the inherent bias of short-read based methods \cite{telomerecat} towards the canonical motif CCCTAA
+                    that in fact could be present at a lower percentage on \textit{p} arm telomeres.
+            Therefore, more research is required to determine the level of deviation of \textit{p} arm telomeric sequences
+                from those on \textit{q} arms, and into biases and limitations of different technologies
+                    for sequencing distal \textit{p} arm chromosomal regions.
+    \\~\\
+    The identified variations in long range contexts elucidate
+        subject-specific, trio- and population-specific similarities of \textit{q} arm telomeric sequences,
+            as well as a level of interpopulation similarity,
+        and thus provide a new means of haplotype mapping and reveal the existence and motif composition of haplotype spectra
+            on a multi-Kbp scale.
+    Clustering on a per-subject basis concealed interpopulation similarity,
+        but underscored intra-subject variation (\textbf{Supplemental Fig. S8}),
+            suggesting coexistence of multiple telomeric haplotypes per \textit{q} arm within each subject.
+        Given that the reference DNA for the subjects HG001 through HG007
+            was extracted from growths of B lymphoblastoid cell lines,
+            this suggests that as B cells undergo maturation,
+                distinct clones may have distinct variations in their telomeric sequence.
+        This opens up avenues of investigation into the haplotypic variation among not only immune cells,
+            but also different cell types overall.
+%TODO for reviewers: stress that the shift from diplotypes to spectra does not invalidate the previous findings: we were able to put these findings and the method into a broader context and see more structure.
 
 \section*{Materials and Methods} \addcontentsline{toc}{section}{Materials and Methods} \label{sec:methods}
 
