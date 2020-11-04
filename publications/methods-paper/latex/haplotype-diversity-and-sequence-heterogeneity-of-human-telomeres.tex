@@ -153,7 +153,7 @@
             % (see \hyperref[sec:methods]{Materials and Methods}).
         The layout of this reference set is available in \textbf{Supplemental File S1},
             and the set itself can be reproduced with a script available as \textbf{Supplemental File S2}.
-    We then aligned PacBio CCS reads of seven Genome in a Bottle (GIAB) human subjects (HG001 through HG007) to \textit{hg38ext},
+    We then aligned PacBio CCS reads of seven Genome in a Bottle (GIAB, \cite{giab}) human subjects (HG001 through HG007) to \textit{hg38ext},
         and in total, observed reads mapping to the ends of chromosomes and extending into telomeric regions
             on 10 \textit{p} arms and 19 \textit{q} arms,
                 with 53\textendash{}295 such reads on the \textit{p} arms
@@ -280,14 +280,11 @@
         Therefore, the captured reads reflected spectra of haplotypes,
             generally describing subject- and population-specific similarities,
             but including a sizable component that described interpopulation similarity.
-        Two sets of GIAB subjects represented family trios:
-            the Azhkenazim trio (son: HG002, father: HG003, mother: HG004),
-            and the Chinese trio (HG005, HG006, HG007, respectively),
-            and familial inheritance of variation was also observed:
-                either parent's telomeric reads were more similar to their son's than to the other parent's reads in the Azhkenazim trio.
-                In the Chinese trio,
-                    the amount of inheritance of variation from either parent to the son was not found to be statistically significant overall,
-                    but was present on several of the assessed chromosomes (\textbf{Supplemental Table S3}).
+        Familial inheritance of variation was also observed:
+            either parent's telomeric reads were more similar to their son's than to the other parent's reads in the Azhkenazim trio.
+            In the Chinese trio,
+                the amount of inheritance of variation from either parent to the son was not found to be statistically significant overall,
+                but was present on several of the assessed chromosomes (\textbf{Supplemental Table S3}).
         \input{latex/tables/Table-3-haplotype-comparisons.tex}
 
 \section*{Discussion} \addcontentsline{toc}{section}{Discussion} \label{sec:discussion}
@@ -359,7 +356,7 @@
         Given that the reference DNA for the subjects HG001 through HG007
             was extracted from growths of B lymphoblastoid cell lines,
             this suggests that as B cells undergo maturation,
-                distinct clones may have distinct variations in their telomeric sequence.
+                distinct clones may gain distinct variations in their telomeric sequence.
         This opens up avenues of investigation into the haplotypic variation among not only immune cells,
             but also different cell types overall.
 %TODO for reviewers: stress that the shift from diplotypes to spectra does not invalidate the previous findings: we were able to put these findings and the method into a broader context and see more structure.
@@ -368,39 +365,65 @@
 
 \subsection*{The extended reference genome}
 \addcontentsline{toc}{subsection}{The extended reference genome}
-We constructed the extended reference genome by performing an all-to-all alignment of all contigs in the \textit{hg38} reference genome \cite{grch38,hg38} and the subtelomeric assemblies \cite{riethman2014} with \textit{minimap2} \cite{minimap} using three settings for assembly-to-reference mapping (\textit{asm5}, \textit{asm10}, \textit{asm20}).
-Forty subtelomeric contigs mapped to ends of \textit{hg38} chromosomes with a mapping quality of 60, one (XpYptel) mapped with the quality of 0 and was discarded; one (14qtel) mapped to the ALT version of chr14 (chr14\_KI270846v1\_alt) with the quality of 52, which, in turn, mapped to the main chr14 chromosome with the quality of 60. %TODO stress that the mappings were perfect (CIGAR)
-%Finally, an ALT version of chr12 (chr12\_GL877875v1\_alt) mapped to chr12 and an unplaced chrUn\_KI270745v1 to chr17, both with the quality of 60.
-These data and the exact match and mismatch coordinates were used to create a combined reference (\textit{hg38ext}) in which subtelomeric contigs informed the locations of the boundaries of the telomeric tracts (\textit{tract\_anchor}).
-Such contigs that mapped fully within \textit{hg38} chromosomes resulted in \textit{tract\_anchor} annotations directly on those \textit{hg38} chromosomes; partially mapping contigs were considered as forking from the \textit{hg38} sequence and were similarly annotated by themselves.
+    We constructed the extended reference genome by performing an all-to-all alignment
+        of all contigs in the \textit{hg38} reference genome \cite{grch38,hg38}
+        and the subtelomeric assemblies \cite{riethman2014}
+        with \textit{minimap2} \cite{minimap} using three settings
+            for assembly-to-reference mapping (\textit{asm5}, \textit{asm10}, \textit{asm20}).
+    Forty subtelomeric contigs mapped to ends of \textit{hg38} chromosomes with a mapping quality of 60,
+        one (XpYptel) mapped with the quality of 0 and was discarded;
+        one (14qtel) mapped to the ALT version of chr14 (chr14\_KI270846v1\_alt) with the quality of 52,
+            which, in turn, mapped to the main chr14 chromosome with the quality of 60.
+    These data and the exact match and mismatch coordinates were used to create a combined reference (\textit{hg38ext})
+        in which subtelomeric contigs informed the locations of the boundaries of the telomeric tracts (\textit{tract\_anchor}).
+    Such contigs that mapped fully within \textit{hg38} chromosomes resulted in \textit{tract\_anchor} annotations
+            directly on those \textit{hg38} chromosomes;
+        partially mapping contigs were considered as forking from the \textit{hg38} sequence and were similarly annotated by themselves.
 
 \subsection*{Detection of telomeric sequences in long-read datasets}
 \addcontentsline{toc}{subsection}{Detection of telomeric sequences in long-read datasets}
-Three subjects were selected for the analysis. %TODO obviously, seven now
-The first individual (NA12878/HG001) came from the pilot genome of the HapMap project \cite{HG001}, while the other two, including the son from the Ashkenazi Jewish Trio (NA24385/HG002) and the son from the Chinese Trio (NA24631/HG005), are members of the Personal Genome Project, whose genomes are consented for commercial redistribution and reidentification \cite{HG00X}. %TODO provenance of all
-These subjects are referred to hereafter as HG001, HG002, and HG005, respectively. %TODO all seven
-\\~\\
-For subjects HG001 and HG005, Genome in a Bottle \cite{giab} PacBio\_SequelII\_CCS\_11kb datasets were used (one dataset per each subject).
-For subject HG002, a combination of two sequencing experiments was analyzed (PacBio\_CCS\_10kb and PacBio\_CCS\_15kb). %TODO list all datasets
-The mean coverage was $\sim$29x, $\sim$58x, and $\sim$32x for subjects HG001, HG002, and HG005, respectively. %TODO recalc new coverages
-Reads were mapped to \textit{hg38ext} with \textit{minimap2}, and reads that mapped to either end of either chromosome and overlapped the boundary of its telomeric tract were selected for further analysis. %TODO re-reference Figure 1
-These reads had a portion of their sequence mapped to the reference contig and a portion extending beyond the reference (soft- or hard-clipped in the alignment file).
-Sequences past the \textit{tract\_anchor} marker were extracted from the reads that had this marker within their mapped portion (from the 5' end to the marker on \textit{p} arms and from the marker to the 3' end on \textit{q} arms, accounting for forward and reverse mappings).
-%TODO move the short-read paragraph into a later Validation section, together with real humans
-To identify regions of the telomeres that are fully supported by both short and long reads, we extracted candidate telomeric reads from GIAB Illumina datasets
-   (NIST\_NA12878\_HG001\_HiSeq\_300x,
-    NIST\_HiSeq\_HG002\_Homogeneity-10953946,
-    HG005\_NA24631\_son\_HiSeq\_300x;
-    all three $\sim$300x coverage)
-with \textit{Telomerecat} \cite{telomerecat}, and selected those that mapped perfectly with \textit{minimap2} (at least a 50bp-long exact match without insertions or deletions, allowing all secondary mappings) to the telomeric regions of the PacBio CCS candidates from the same subject's dataset. %TODO describe new approach and reference supplemental figure
+    Seven subjects were selected for the analysis.
+    The first individual (NA12878/HG001) came from the pilot genome of the HapMap project \cite{HG001},
+    while the other six,
+        including
+            the Ashkenazim Jewish Trio (son: NA24385/HG002, father: NA24149/HG003, mother: NA24143/HG004)
+            and the Chinese Trio \\%rem
+            (\mbox{son: NA24631/HG005}, father: NA24694/HG006, mother: NA24695/HG007),
+        are members of the Personal Genome Project,
+            whose genomes are consented for commercial redistribution and reidentification \cite{HG00X}.
+    These subjects are referred to hereafter as HG001 through HG007, respectively.
+    \\~\\
+    Multiple Genome in a Bottle \cite{giab} PacBio CCS \cite{pacbio,pacbioccs} datasets were available and combined per each subject,
+        with mean coverages of individual datasets ranging from $\sim$21x to $\sim$69x (\textbf{Supplemental Table S4}).
+    Reads were mapped to \textit{hg38ext} with \textit{minimap2},
+        and reads that mapped to either end of either chromosome and overlapped the boundary of its telomeric tract
+        were selected for further analysis (\textbf{\autoref{fig:schematic_alignment}}).
+    These reads had a portion of their sequence mapped to the reference contig and a portion extending beyond the reference
+        (soft- or hard-clipped in the alignment file).
+    Sequences past the \textit{tract\_anchor} marker were extracted from the reads that had this marker within their mapped portion
+        (from the 5' end to the marker on \textit{p} arms and from the marker to the 3' end on \textit{q} arms,
+        accounting for forward and reverse mappings).
 
-\subsection*{Detection of telomeric sequences in short- and linked-read datasets} %TODO "Validation," include GIAB short reads here XXX!!
-\addcontentsline{toc}{subsection}{Detection of telomeric sequences in short- and linked-read datasets}
-To evaluate sequence motifs in datasets generated by technologies other than SMRT, we generated four whole-genome Illumina datasets (mean coverage $\sim$104x) and three linked-read 10X datasets (mean coverage $\sim$28x) for one individual at different timepoints aboard the International Space Station (ISS), and one additional linked-read 10X dataset (coverage $\sim$47x) for another individual aboard the ISS.
-%TODO stress non-cell lines, real humans; argument about non-LONG-READS as a separate phrase.
-Blood samples were collected from astronaut subjects as described in \cite{twins_study}. %TODO cite Garrett-Bakelman 2019
-For each sample, 1.2ng of sorted immune cell input was aliquoted for TruSeq PCR-free WGS (short read) and standard Chromium 10X whole genome (linked-read) preparation respectively, and sequenced across one S4 flow cell on an Illumina NovaSeq 6000.
-From these datasets, candidate telomeric short reads were selected using Telomerecat \cite{telomerecat}.
+\subsection*{Evaluation of telomeric content in short- and linked-read datasets}
+\addcontentsline{toc}{subsection}{Evaluation of telomeric content in short- and linked-read datasets}
+    To evaluate the concordance of telomeric reads captured by long- and short-read technologies,
+        we extracted candidate telomeric reads from GIAB Illumina datasets for each subject (\textbf{Supplemental Table S4})
+            with \textit{Telomerecat} \cite{telomerecat},
+            and mapped the short reads back onto the candidate long reads from the same subject's dataset with \textit{minimap2},
+            allowing all secondary mappings.
+        Then, we calculated and plotted the fractions of each long read that was supported by the short reads that aligned to it
+            (\textbf{Supplemental Fig. S7}).
+    \\~\\
+    To evaluate sequence motifs in independent samples collected from human subjects (as opposed to reference cell lines),
+        we generated four whole-genome Illumina datasets (mean coverage $\sim$104x)
+        and three linked-read 10X datasets (mean coverage $\sim$28x) for one individual at different timepoints,
+        and one additional linked-read 10X dataset (coverage $\sim$47x) for another individual.
+    These data were originally obtained from astronaut subjects for an unrelated space biology experiment,
+        and the blood samples were collected from the subjects as described in \cite{twins_study}.
+        For each sample, 1.2ng of sorted immune cell input was aliquoted for
+            TruSeq PCR-free WGS (short read) and standard Chromium 10X whole genome (linked-read) preparation respectively,
+            and sequenced across one S4 flow cell on an Illumina NovaSeq 6000.
+    From these datasets, candidate telomeric short reads were selected using Telomerecat \cite{telomerecat}.
 
 \subsection*{Identification of repeat content}
 \addcontentsline{toc}{subsection}{Identification of repeat content}
