@@ -236,9 +236,8 @@
     Second, we confirmed 15 enriched motifs in independently generated human short-read and linked-read genomic datasets,
         with the same four motifs being the most enriched (\textbf{Supplemental Table S2}).
 
-\subsection*{Long-read sequencing resolves human telomeric haplotypes} %TODO uncovers a variety
-\addcontentsline{toc}{subsection}{Long-read sequencing resolves human telomeric haplotypes}
-%TODO discuss causes of entropy: seq. errors, SV, haplotypes
+\subsection*{Long-read sequencing uncovers a variety of human telomeric haplotypes}
+\addcontentsline{toc}{subsection}{Long-read sequencing uncovers a variety of human telomeric haplotypes}
     While reads agreed on colinearity of motifs, evidenced by low entropy,
         rarer non-zero entropy values could be attributable both to sequencing errors
         and to structural variations within the same subject's dataset.
@@ -276,7 +275,7 @@
                 these reads were twice as close to reads from a different population than they were to any reads of their own subjects.
             (Another 388 reads, or 11\%, also clustered away from their respective subjects, but by a less than 2x distance ratio).
             This trend is observable on \textbf{\autoref{fig:haplotypes}},
-                with subjects and populations appearing in a mixed order along the clustering.
+                with subjects' and populations' reads interspersed across multiple clusters.
         Therefore, the captured reads reflected spectra of haplotypes,
             generally describing subject- and population-specific similarities,
             but including a sizable component that described interpopulation similarity.
@@ -288,7 +287,6 @@
         \input{latex/tables/Table-3-haplotype-comparisons.tex}
 
 \section*{Discussion} \addcontentsline{toc}{section}{Discussion} \label{sec:discussion}
-% TODO: non-invalidation due to BIAS of telomerecat and who-knows-what-goings-on on the p arm (biology? tech artifacts?)
     Repeat-rich, low-complexity regions of the human genome such as telomeres
         have been historically recalcitrant to full mapping and annotation \cite{miga2015},
         mainly due to the alignment challenge they pose and to the read lengths required to span such areas \cite{ngslowcomplexity}.
@@ -457,8 +455,8 @@
                 can only be explained by the repeats of said 4-mer.
         On the one hand, the maximum fraction of the sequence that can be explained by any one motif is a useful metric,
             and it was calculated and reported.
-        On the other hand, the fraction of the sequence that is attributable to only one specific motif
-            elucidates the extent of deviation from the surrounding repeat context,
+        On the other hand, the fraction of the \textit{k}-mers attributable to a specific motif \textendash{} and not to any others \textendash{}
+            elucidates the extent of deviation from the background repeat context,
             and identifies motifs that most affect the sequence structure;
             it was calculated as well and reported as each motif's score.
     Additionally, motifs that were significantly enriched in the datasets produced by all three technologies (PacBio, Illumina, 10X),
@@ -494,8 +492,8 @@
         were removed from the study,
         and the analysis was repeated.
 
-\subsection*{Extraction of telomeric haplotypes from long-read datasets} %TODO rewrite whole section to talk about spectra XXX!!
-\addcontentsline{toc}{subsection}{Extraction of telomeric haplotypes from long-read datasets}
+\subsection*{Identification of telomeric haplotypic variation}
+\addcontentsline{toc}{subsection}{Identification of telomeric haplotypic variation}
 Within groups of reads mapping to each chromosome arm, all relative pairwise Levenshtein distances were calculated. %TODO explain it's edit dist
 In short, to calculate the absolute distance between each pair of reads, the sequences in the overlapping positions of the reads were extracted; the distance then equaled the minimum number of single-character insertions, deletions, and substitutions required to make these sequences identical. %TODO explain calculation a bit more
 The relative distance was computed as the absolute distance divided by the length of the overlap.
