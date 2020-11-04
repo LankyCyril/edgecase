@@ -1,15 +1,15 @@
-Subject        Ethnicity          Status within trio  GIAB PacBio CCS datasets used     Average coverage  GIAB Illumina datasets used            Average coverage
-NA12878/HG001  Utah/Mormon        None                PacBio_SequelII_CCS_11kb          ~29x              NIST_NA12878_HG001_HiSeq_300x          ~300x
-NA24385/HG002  Ashkenazim Jewish  Son                 PacBio_CCS_10kb                   ~30x              NIST_HiSeq_HG002_Homogeneity-10953946  ~300x
-.              .                  .                   PacBio_CCS_15kb                   ~32x              .                                      .
-.              .                  .                   PacBio_CCS_15kb_20kb_chemistry2   ~56x              .                                      .
-NA24149/HG003  Ashkenazim Jewish  Father              PacBio_CCS_Google_15kb            ~22x              NIST_HiSeq_HG003_Homogeneity-12389378  ~300x
-.              .                  .                   PacBio_CCS_15kb_20kb_chemistry2   ~68x              .                                      .
-NA24143/HG004  Ashkenazim Jewish  Mother              PacBio_CCS_Google_15kb            ~21x              NIST_HiSeq_HG004_Homogeneity-14572558  ~300x
-.              .                  .                   PacBio_CCS_15kb_20kb_chemistry2   ~69x              .                                      .
-.              .                  .                   PacBio_CCS_HudsonAlpha_15kb_21kb  ~48x              .                                      .
-NA24631/HG005  Chinese            Son                 PacBio_SequelII_CCS_11kb          ~32x              HG005_NA24631_son_HiSeq_300x           ~300x
-NA24694/HG006  Chinese            Father              PacBio_CCS_15kb_20kb_chemistry2   ~46x              NA24694_Father_HiSeq100x               ~100x
-.              .                  .                   PacBio_HiFi_Google                ~27x              .                                      .
-NA24695/HG007  Chinese            Mother              PacBio_CCS_15kb_20kb_chemistry2   ~46x              NA24695_Mother_HiSeq100x               ~100x
-.              .                  .                   PacBio_HiFi_Google                ~22x              .                                      .
+Subject	Ethnicity	Status within trio	GIAB PacBio CCS datasets used	Average coverage	GIAB Illumina datasets used	Average coverage
+NA12878/HG001	Utah/Mormon	None	PacBio_SequelII_CCS_11kb	~29x	NIST_NA12878_HG001_HiSeq_300x	~300x
+NA24385/HG002	Ashkenazim Jewish	Son	PacBio_CCS_10kb	~30x	NIST_HiSeq_HG002_Homogeneity-10953946	~300x
+			PacBio_CCS_15kb	~32x		
+			PacBio_CCS_15kb_20kb_chemistry2	~56x		
+NA24149/HG003	Ashkenazim Jewish	Father	PacBio_CCS_Google_15kb	~22x	NIST_HiSeq_HG003_Homogeneity-12389378	~300x
+			PacBio_CCS_15kb_20kb_chemistry2	~68x		
+NA24143/HG004	Ashkenazim Jewish	Mother	PacBio_CCS_Google_15kb	~21x	NIST_HiSeq_HG004_Homogeneity-14572558	~300x
+			PacBio_CCS_15kb_20kb_chemistry2	~69x		
+			PacBio_CCS_HudsonAlpha_15kb_21kb	~48x		
+NA24631/HG005	Chinese	Son	PacBio_SequelII_CCS_11kb	~32x	HG005_NA24631_son_HiSeq_300x	~300x
+NA24694/HG006	Chinese	Father	PacBio_CCS_15kb_20kb_chemistry2	~46x	NA24694_Father_HiSeq100x	~100x
+			PacBio_HiFi_Google	~27x		
+NA24695/HG007	Chinese	Mother	PacBio_CCS_15kb_20kb_chemistry2	~46x	NA24695_Mother_HiSeq100x	~100x
+			PacBio_HiFi_Google	~22x		
