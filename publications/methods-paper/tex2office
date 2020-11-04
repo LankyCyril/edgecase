@@ -180,7 +180,11 @@ def to_base64(soup, workdir, debug):
     for img in soup.find_all("img"):
         extension = img["src"].split(".")[-1].lower()
         if extension in BASE64_PREFIXES:
-            with open(path.join(workdir, img["src"]), mode="rb") as img_bytes:
+            if path.exists(img["src"]):
+                img_path = img["src"]
+            else:
+                img_path = path.join(workdir, img["src"])
+            with open(img_path, mode="rb") as img_bytes:
                 b64 = b64encode(img_bytes.read())
             img["src"] = "data:image/{};base64,{}".format(
                 BASE64_PREFIXES[extension], b64.decode(),
@@ -311,7 +315,7 @@ def main(args, TempDir, prefix="converted"):
         )
         if args.include:
             for filename in args.include:
-                mklink(filename, workdir)
+                mklink(filename.split("/")[0], workdir)
         xhlatex(basename, args.include, workdir, args.debug)
         soup = simplify_html(basename, workdir, args.debug)
         soup_with_PIC_fix = adjust_PICs(

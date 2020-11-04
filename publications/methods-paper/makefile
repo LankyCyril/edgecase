@@ -8,8 +8,8 @@ all: renders/figures/Figure-S7.pdf renders/figures/Figure-SH.pdf
 
 submission: renders/figures/Figure-1.png renders/figures/Figure-2.png
 submission: renders/figures/Figure-3.png renders/figures/Figure-4.png
-submission: submission/figures/Figure_1.png submission/figures/Figure_2.png
-submission: submission/figures/Figure_3.png submission/figures/Figure_4.png
+submission: submission/figures/Figure_1.pdf submission/figures/Figure_2.pdf
+submission: submission/figures/Figure_3.pdf submission/figures/Figure_4.pdf
 submission: submission/figures/Supplemental_Fig_S1.pdf
 submission: submission/figures/Supplemental_Fig_S2.pdf
 submission: submission/figures/Supplemental_Fig_S3.pdf
@@ -18,6 +18,7 @@ submission: submission/figures/Supplemental_Fig_S5.pdf
 submission: submission/figures/Supplemental_Fig_S6.pdf
 submission: submission/figures/Supplemental_Fig_S7.pdf
 submission: submission/figures/Supplemental_Fig_S8.pdf
+submission: renders/haplotype-diversity-and-sequence-heterogeneity-of-human-telomeres.odt
 
 renders/%.pdf: latex/%.tex
 	pdflatex $<
@@ -47,4 +48,4 @@ submission/figures/Supplemental_%.pdf: latex/supplemental-figures-GR/Supplementa
 
 renders/%.odt: latex/%.tex
 	./tex2office -i latex/references.bib latex/figures latex/tables --svg $<
-	mv latex/$(@F) $<
+	mv latex/$(@F) $@

@@ -441,7 +441,7 @@
             on the background of counts of other \textit{k}-mers of the same length.
     Briefly, we considered \textit{k}-mers with counts higher than 1.5 interquartile range above the third quartile of the distribution
         as potentially classifiable,
-        and a 2\texttimes{}2 contingency matrix $ C $ for the test was constructed as follows:
+        and a $ 2 \times{} 2 $ contingency matrix $ C $ for the test was constructed as follows:
         row 0 contained counts of potentially classifiable \textit{k}-mers,
         row 1 contained counts of remaining (non-classifiable) \textit{k}-mers,
         columns 0 and 1 contained counts of single and remaining (background) \textit{k}-mers, respectively,
@@ -457,7 +457,7 @@
     As even doubled sequences (such as ACGTACGT for motif ACGT) can partially overlap at the boundaries of repeat contexts,
         we quantified their presence in the telomeric reads in two distinct ways.
         Consider a sequence such as TTAGGG(\underline{TTAGTTAG})GGTTA:
-            the inner (TTAG)\texttimes{}2 repeat can be explained by the repeats of the canonical motif extending into it from either side;
+            the inner (TTAG)x2 repeat can be explained by the repeats of the canonical motif extending into it from either side;
             the middle part of a similar sequence with a bigger number of the repeats of the 4-mer, TTAGGG\underline{TTAG(TTAGTTAG)TTAG}GGTTA,
                 can only be explained by the repeats of said 4-mer.
         On the one hand, the maximum fraction of the sequence that can be explained by any one motif is a useful metric,
