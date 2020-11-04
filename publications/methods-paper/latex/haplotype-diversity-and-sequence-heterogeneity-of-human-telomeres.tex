@@ -239,11 +239,56 @@
 \subsection*{Long-read sequencing resolves human telomeric haplotypes} %TODO uncovers a variety
 \addcontentsline{toc}{subsection}{Long-read sequencing resolves human telomeric haplotypes}
 %TODO discuss causes of entropy: seq. errors, SV, haplotypes
-%TODO rewrite this entire section!
-Sequences of telomeric reads clustered by relative pairwise Levenshtein distances \cite{levenshtein} with varying levels of heterogeneity depending on the dataset and the chromosomal arm to which they belonged.
-We examined the \textit{q} arms of the HG002 dataset to investigate this heterogeneity, as they provided the deepest coverage (\autoref{tab:telomeric_read_counts}), and found that, on 12 out of the 15 arms, reads clustered into two prominent groups per arm when maximizing the Bayesian information criterion \cite{bic} (see \hyperref[sec:methods]{Materials and Methods}).
-Pairwise distances between the reads within these clusters were significantly lower than those for out-of-cluster pairings, implying that distinct telomeric haplotypes are present.
-To quantify the differences between putative haplotypes, we calculated silhouette scores \cite{silhouette} for these clusterings (\autoref{tab:levenshtein-q_arm}), and generated motif density plots for the four chromosome arms with the highest such scores to visualize the differences in haplotypes (\autoref{fig:levenshtein_q_arm}).
+    While reads agreed on colinearity of motifs, evidenced by low entropy,
+        rarer non-zero entropy values could be attributable both to sequencing errors
+        and to structural variations within the same subject's dataset.
+    To investigate this possibility,
+        we clustered reads on each \textit{q} arm of each subject by relative pairwise Levenshtein distances \cite{levenshtein}
+        and found that hierarchical clustering described read similarity well,
+            resulting in high cophenetic correlation between the dendrograms and the pairwise distance matrices
+                (\textbf{\autoref{tab:cophenetic}}),
+            and in visible structure (\textbf{\autoref{fig:haplotypes}}).
+            % \eject \pdfpageheight=40in \pdfpagewidth=22in
+                \begin{figure}[h!] \centering % \vspace{5mm}
+                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-4-lowdpi.png}
+                \caption{
+                    \small Clustering of reads by relative pairwise Levenshtein distances (unitless measure)
+                    on each chromosomal \mbox{\textit{q} arm} of datasets HG001 through HG007,
+                    and densities of top four enriched motifs along each read.
+                    Each horizontal line represents an individual read;
+                    Genomic coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
+                    Only the chromosomal arms cumulatively covered by at least 25 reads are displayed.
+                }
+                \label{fig:haplotypes}
+                \end{figure}
+            % \eject \pdfpageheight=11in \pdfpagewidth=8.5in
+            \input{latex/tables/Table-2-cophenetic.tex} % tab:cophenetic
+    ~\\
+    In this complex clustering, subject- and population-specific variation was evident and quantifiable via relative Levenshtein distances
+        (\textbf{\autoref{tab:haptests}}; see \hyperref[sec:methods]{Materials and Methods}):
+        overall,
+            telomeric reads within a subject were more similar than within a population
+                (adjusted Wilcoxon signed-rank test \textit{p} = 7.7e-223),
+            and telomeric reads within a population were more similar than between populations
+                (\textit{p} = 3.1e-120).
+        Importantly, however, this was true for most, but not all reads;
+            4\% of all assessed reads (142 out of 3,686) contributed to interpopulation similarity;
+                these reads were twice as close to reads from a different population than they were to any reads of their own subjects.
+            (Another 388 reads, or 11\%, also clustered away from their respective subjects, but by a less than 2x distance ratio).
+            This trend is observable on \textbf{\autoref{fig:haplotypes}},
+                with subjects and populations appearing in a mixed order along the clustering.
+        Therefore, the captured reads reflected spectra of haplotypes,
+            generally describing subject- and population-specific similarities,
+            but including a sizable component that described interpopulation similarity.
+        Two sets of GIAB subjects represented family trios:
+            the Azhkenazim trio (son: HG002, father: HG003, mother: HG004),
+            and the Chinese trio (HG005, HG006, HG007, respectively),
+            and familial inheritance of variation was also observed:
+                either parent's telomeric reads were more similar to their son's than to the other parent's reads in the Azhkenazim trio.
+                In the Chinese trio,
+                    the amount of inheritance of variation from either parent to the son was not found to be statistically significant overall,
+                    but was present on several of the assessed chromosomes (\textbf{Supplemental Table S3}).
+        \input{latex/tables/Table-3-haplotype-comparisons.tex}
 
 \section*{Discussion} \addcontentsline{toc}{section}{Discussion} \label{sec:discussion}
 % TODO: non-invalidation due to BIAS of telomerecat and who-knows-what-goings-on on the p arm (biology? tech artifacts?)
