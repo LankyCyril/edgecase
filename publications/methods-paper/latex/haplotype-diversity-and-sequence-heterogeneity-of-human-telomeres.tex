@@ -348,6 +348,11 @@
             as well as a level of interpopulation similarity,
         and thus provide a new means of haplotype mapping and reveal the existence and motif composition of haplotype spectra
             on a multi-Kbp scale.
+    Interpopulation similarity, as well as familial inheritance of variation in the Ashkenazim trio,
+        evidenced that the observed haplotypes could not be attributed to per-dataset batch effects.
+    Coverage of different chromosomes was uneven,
+        and as such, numbers of captured telomeric reads and levels of observed similarity varied from chromosome to chromosome;
+        this calls for more sequencing experiments aimed to reconstruct the full picture of this variation.
     Clustering on a per-subject basis concealed interpopulation similarity,
         but underscored intra-subject variation (\textbf{Supplemental Fig. S8}),
             suggesting coexistence of multiple telomeric haplotypes per \textit{q} arm within each subject.
@@ -448,9 +453,9 @@
         and the Bonferroni multiple testing correction was applied.
     Motifs in the long-read datasets for which \textit{k}-mers yielded \textit{p}-values below the cutoff of 0.05 were reported.
     As even doubled sequences (such as ACGTACGT for motif ACGT) can partially overlap at the boundaries of repeat contexts,
-        we quantified their presence in the telomeric reads in two ways.
+        we quantified their presence in the telomeric reads in two distinct ways.
         Consider a sequence such as TTAGGG(\underline{TTAGTTAG})GGTTA:
-            the inner (TTAG)\texttimes{}2 repeat can be explained by the repeats of the canonical motif extending from either side;
+            the inner (TTAG)\texttimes{}2 repeat can be explained by the repeats of the canonical motif extending into it from either side;
             the middle part of a similar sequence with a bigger number of the repeats of the 4-mer, TTAGGG\underline{TTAG(TTAGTTAG)TTAG}GGTTA,
                 can only be explained by the repeats of said 4-mer.
         On the one hand, the maximum fraction of the sequence that can be explained by any one motif is a useful metric,
@@ -494,16 +499,39 @@
 
 \subsection*{Identification of telomeric haplotypic variation}
 \addcontentsline{toc}{subsection}{Identification of telomeric haplotypic variation}
-Within groups of reads mapping to each chromosome arm, all relative pairwise Levenshtein distances were calculated. %TODO explain it's edit dist
-In short, to calculate the absolute distance between each pair of reads, the sequences in the overlapping positions of the reads were extracted; the distance then equaled the minimum number of single-character insertions, deletions, and substitutions required to make these sequences identical. %TODO explain calculation a bit more
-The relative distance was computed as the absolute distance divided by the length of the overlap.
-Relative distances were then clustered using Ward's method via the Euclidean metric.
-%TODO write so much here XXX XXX XXX XXX!!!
-%The optimal number of clusters was determined by maximizing the Bayesian information criterion \cite{bic}, allowing for no more than one outlier and at least five reads per cluster, and silhouette scores for these clusterings were calculated.
-%Briefly, as previously described \cite{silhouette}, a silhouette score of a clustering was computed as the mean value of silhouette coefficients of all entries, which, in turn, equaled $ (b - a) \over{max(a, b)} $ where $ a = $ {\rmfamily mean intra-cluster distance} and $ b = $ {\rmfamily mean nearest-cluster distance} for an entry.
-%Levenshtein distances of all within-cluster pairings and of all out-of-cluster pairings were compared using the one-tailed Mann-Whitney U test; \textit{p}-values were adjusted with the Bonferroni correction.
-%Distinct clusters of reads within the same chromosome arm (adjusted Mann-Whitney U \textit{p}-value below 0.05) were reported as putative haplotypes.
-%As the HG002 dataset was combined from two sequencing experiments, we investigated the provenance of reads in these haplotypes; reads from both sequencing experiments contributed to each haplotype with an average $\sim$1:2 ratio (\autoref{tab:hg002_haplotype_assignment}).
+    Within groups of reads mapping to each \textit{q} arm, all relative pairwise Levenshtein distances were calculated.
+    In short, Levenshtein distance is a string metric defined as the edit distance between two strings (sequences),
+        equal to the minimum number of single-character insertions, deletions, and substitutions
+            required to make these sequences identical \cite{levenshtein}.
+    For each pair of reads, this metric was calculated and represented absolute edit distance;
+        the relative distance was then computed as the absolute distance divided by the length of the overlap,
+            to normalize for the variation of such lengths.
+    Pairwise relative distances were then clustered using Ward's method via the Euclidean metric,
+        resulting in hierarchical structure describing the extents of similarity among reads.
+    To quantify how accurately hierarchical clustering described this similarity,
+        cophenetic distances \cite{cophenetic} between the hierarchies (dendrograms) and the distance matrices was calculated,
+        and their Pearson correlation coefficients and Bonferroni-corrected \textit{p}-values were reported.
+    \\~\\
+    We then traversed the distance matrices,
+        and for each read, tracked the closest reads by category:
+            closest reads from the same subject,
+            from the same trio (population),
+            and from the outgroup (other populations).
+        For the Ashkenazim and the Chinese trios, we also tracked the closest reads
+            between the parents
+            and between each parent and the child.
+        Thus, for each read, we determined whether it locally clustered
+            within its own category
+                (for example, with other reads of the same subject, or with other reads from the same population)
+            or in a different one
+                (for example, with other reads of a different population),
+            and the value of the distances that drove either clustering.
+        Performing the Wilcoxon signed-rank test on these values between either categories
+            provided us with \textit{p}-values that, after a Bonferroni correction,
+            described whether reads tended to cluster in their own category or in a different one.
+        Additionally, we also identified the minority of reads that did not follow the overall trend,
+            and quantified the extent to which they did so
+                (such as the reads that contributed to interpopulation similarity).
 
 \section*{Data access} \addcontentsline{toc}{section}{Data access}
 The NASA Life Sciences Data Archive (LSDA) is the repository for all human and animal research data, including the whole genome Illumina and 10X Chromium sequencing datasets from subjects aboard the ISS that were used in this study.
