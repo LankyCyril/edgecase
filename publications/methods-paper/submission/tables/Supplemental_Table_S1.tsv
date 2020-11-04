@@ -1,3 +1,4 @@
+# The number of telomeric reads on each arm identified in GIAB PacBio CCS datasets
 Arm	Chromosome	Reference contig	HG001	HG002	HG003	HG004	HG005	HG006	HG007	TOTAL
 q	chr2	2qtel_1-500K_1_12_12_rc	0	0	0	0	1	0	0	1
 q	chr3	chr3	0	0	0	3	0	1	0	4

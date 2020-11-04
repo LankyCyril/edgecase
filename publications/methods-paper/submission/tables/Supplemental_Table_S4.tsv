@@ -1,3 +1,4 @@
+# Description of GIAB datasets used
 Subject	Ethnicity	Status within trio	GIAB PacBio CCS datasets used	Average coverage	GIAB Illumina datasets used	Average coverage
 NA12878/HG001	Utah/Mormon	None	PacBio_SequelII_CCS_11kb	~29x	NIST_NA12878_HG001_HiSeq_300x	~300x
 NA24385/HG002	Ashkenazim Jewish	Son	PacBio_CCS_10kb	~30x	NIST_HiSeq_HG002_Homogeneity-10953946	~300x
