@@ -411,8 +411,7 @@
             with \textit{Telomerecat} \cite{telomerecat},
             and mapped the short reads back onto the candidate long reads from the same subject's dataset with \textit{minimap2},
             allowing all secondary mappings.
-        Then, we calculated and plotted the fractions of each long read that was supported by the short reads that aligned to it
-            (\textbf{Supplemental Fig. S7}).
+        Then, we calculated the fractions of each long read that was supported by the short reads that aligned to it.
     \\~\\
     To evaluate sequence motifs in independent samples collected from human subjects (as opposed to reference cell lines),
         we generated four whole-genome Illumina datasets (mean coverage $\sim$104x)
@@ -427,32 +426,73 @@
 
 \subsection*{Identification of repeat content}
 \addcontentsline{toc}{subsection}{Identification of repeat content}
-Overrepresentation of motifs of lengths $k \subset [4 .. 16]$ was tested within the candidate telomeric regions of PacBio CCS reads, as well as in the candidate reads from independently generated Illumina and 10X Chromium datasets.  %TODO make sure to define or redefine "telomeric regions"
-To target motifs in repeat contexts, doubled sequences (for example, \textit{k}-mer ACGTACGT for motif ACGT) were counted with \textit{jellyfish} \cite{jellyfish}, and counts of \textit{k}-mers synonymous with respect to circular shifts (for example, ACGTACGT and CGTACGTA) were summed together.
-For each such \textit{k}-mer, Fisher's exact test was performed to determine whether its count is significant on the background of counts of other \textit{k}-mers of the same length.
-Briefly, we considered \textit{k}-mers with counts higher than 1.5 interquartile range above the third quartile of the distribution as potentially classifiable, and a 2\texttimes{}2 contingency matrix $ C $ for the test was constructed as follows:
-row 0 contained counts of potentially classifiable \textit{k}-mers,
-row 1 contained counts of remaining (non-classifiable) \textit{k}-mers,
-columns 0 and 1 contained counts of single and remaining (background) \textit{k}-mers, respectively,
-i.e.:
-$ C_{0,0} = $ {\rmfamily count of target \textit{k}-mer},
-$ C_{0,1} = $ {\rmfamily sum of counts of other potentially classifiable \textit{k}-mers},
-$ C_{1,0} = $ {\rmfamily median count of \textit{k}-mer},
-$ C_{1,1} = $ {\rmfamily sum of counts of other non-classifiable \textit{k}-mers}.
-The resultant \textit{p}-values for each motif among the samples were combined using the Mudholkar-George method \cite{george} within each technology (PacBio CCS, Illumina, 10X Genomics), and the Bonferroni multiple testing correction was applied
-Motifs in the long-read datasets for which \textit{k}-mers yielded \textit{p}-values below the cutoff of 0.05 were reported. %TODO Table
-Additionally, motifs that were significantly enriched in the datasets produced by all three technologies (PacBio, Illumina, 10X), with respect to reverse-complemented equivalence, were reported. %TODO Supplemental table
+    Overrepresentation of motifs of lengths $k \subset [4 .. 16]$ was tested within the candidate telomeric regions of PacBio CCS reads,
+        as well as in the candidate reads from independently generated Illumina and 10X Chromium datasets.
+    To target motifs in repeat contexts,
+        doubled sequences (for example, \textit{k}-mer ACGTACGT for motif ACGT) were counted with \textit{jellyfish} \cite{jellyfish},
+        and counts of \textit{k}-mers synonymous with respect to circular shifts (for example, ACGTACGT and CGTACGTA) were summed together.
+    For each such \textit{k}-mer,
+        Fisher's exact test was performed to determine whether its count is significant
+            on the background of counts of other \textit{k}-mers of the same length.
+    Briefly, we considered \textit{k}-mers with counts higher than 1.5 interquartile range above the third quartile of the distribution
+        as potentially classifiable,
+        and a 2\texttimes{}2 contingency matrix $ C $ for the test was constructed as follows:
+        row 0 contained counts of potentially classifiable \textit{k}-mers,
+        row 1 contained counts of remaining (non-classifiable) \textit{k}-mers,
+        columns 0 and 1 contained counts of single and remaining (background) \textit{k}-mers, respectively,
+            i.e.:
+                $ C_{0,0} = $ {\rmfamily count of target \textit{k}-mer},
+                $ C_{0,1} = $ {\rmfamily sum of counts of other potentially classifiable \textit{k}-mers},
+                $ C_{1,0} = $ {\rmfamily median count of \textit{k}-mer},
+                $ C_{1,1} = $ {\rmfamily sum of counts of other non-classifiable \textit{k}-mers}.
+    The resultant \textit{p}-values for each motif among the samples were combined using the Mudholkar-George method \cite{george}
+        within each technology (PacBio CCS, Illumina, 10X Genomics),
+        and the Bonferroni multiple testing correction was applied.
+    Motifs in the long-read datasets for which \textit{k}-mers yielded \textit{p}-values below the cutoff of 0.05 were reported.
+    As even doubled sequences (such as ACGTACGT for motif ACGT) can partially overlap at the boundaries of repeat contexts,
+        we quantified their presence in the telomeric reads in two ways.
+        Consider a sequence such as TTAGGG(\underline{TTAGTTAG})GGTTA:
+            the inner (TTAG)\texttimes{}2 repeat can be explained by the repeats of the canonical motif extending from either side;
+            the middle part of a similar sequence with a bigger number of the repeats of the 4-mer, TTAGGG\underline{TTAG(TTAGTTAG)TTAG}GGTTA,
+                can only be explained by the repeats of said 4-mer.
+        On the one hand, the maximum fraction of the sequence that can be explained by any one motif is a useful metric,
+            and it was calculated and reported.
+        On the other hand, the fraction of the sequence that is attributable to only one specific motif
+            elucidates the extent of deviation from the surrounding repeat context,
+            and identifies motifs that most affect the sequence structure;
+            it was calculated as well and reported as each motif's score.
+    Additionally, motifs that were significantly enriched in the datasets produced by all three technologies (PacBio, Illumina, 10X),
+        with respect to reverse-complemented equivalence, were reported.
 
 \subsection*{Evaluation of sequence concordance in telomeric long reads}
 \addcontentsline{toc}{subsection}{Evaluation of sequence concordance in telomeric long reads}
-As telomeric reads contain long low-complexity regions and present an alignment challenge, we evaluated concordance of their sequences without realignment of their portions that extended past the reference sequence.
-To that end, for all reads mapping to the same chromosomal arm, we calculated densities of each identified motif in a rolling window starting from the innermost mapped position of each entire read.
-To evaluate whether the reads on the same arm agree on the positions of different motifs, for each read, we calculated motif densities in 10 bp windows with 10 bp smoothing to buffer insertions and deletions.
-For each window in each read, the motif with the highest density was selected to represent that window.
-Then, normalized Shannon entropy among all reads was calculated in each window as $ S = \frac{ - \sum_{i} \; ( p_{i} ln p_{i} )}{ln N} $, where $ p_{i} $ is the frequency of each motif in the window and $ N $ is the number of motifs \cite{hepc_entropy}.
-The value of normalized entropy was a metric bounded by $ [ 0, 1 ] $, with $ 0 $ describing perfect agreement and $ 1 $ describing maximum randomness.
-For visualization, we performed 1000 rounds of bootstrap of the calculated density values in the 10 bp rolling windows, and selected the lower and the upper bounds of the 95\% confidence interval of bootstrap.
-Of note, several chromosome arms had the \textit{tract\_anchor} position further away from the end of the contig than others ($\sim$79\textendash{}586 Kbp into the chromosome sequence), and the reads mapping to these arms did not contain these motifs, suggesting that either their subtelomeric annotations were incorrect or large insertions or duplications were present in the reference genome; in light of this, reads mapping to the \mbox{\textit{p} arm} of chr1, the \textit{q} arm of chr4, and both arms of chr20 were removed from the study, and the analysis was repeated.
+    As telomeric reads contain long low-complexity regions and present an alignment challenge,
+        we evaluated concordance of their sequences without realignment of their portions that extended past the reference sequence.
+    To that end, for all reads mapping to the same chromosomal arm,
+        we calculated densities of each identified motif in a rolling window starting from the innermost mapped position of each entire read.
+    To evaluate whether the reads on the same arm agree on the positions of different motifs,
+        for each read, we calculated motif densities in 10 bp windows with 10 bp smoothing to buffer insertions and deletions.
+    For each window in each read,
+        the motif with the highest density was selected to represent that window.
+    Then, normalized Shannon entropy among all reads was calculated in each window as $ S = \frac{ - \sum_{i} \; ( p_{i} ln p_{i} )}{ln N} $,
+        where $ p_{i} $ is the frequency of each motif in the window and $ N $ is the number of motifs \cite{hepc_entropy}.
+    The value of normalized entropy was a metric bounded by $ [ 0, 1 ] $,
+        with $ 0 $ describing perfect agreement and $ 1 $ describing maximum randomness.
+    For motif visualization,
+        we performed 1000 rounds of bootstrap of the calculated density values in the 10 bp rolling windows,
+            and selected the lower and the upper bounds of the 95\% confidence interval of bootstrap.
+    Of note, several chromosome arms had the \textit{tract\_anchor} position further away from the end of the contig than others
+            ($\sim$79\textendash{}586 Kbp into the chromosome sequence),
+        and the reads mapping to these arms did not contain these motifs,
+        suggesting that
+            either their subtelomeric annotations were incorrect
+            or large insertions or duplications were present in the reference genome;
+        in light of this, reads mapping to
+            the \mbox{\textit{p} arm} of chr1,
+            the \textit{q} arm of chr4,
+            and both arms of chr20
+        were removed from the study,
+        and the analysis was repeated.
 
 \subsection*{Extraction of telomeric haplotypes from long-read datasets} %TODO rewrite whole section to talk about spectra XXX!!
 \addcontentsline{toc}{subsection}{Extraction of telomeric haplotypes from long-read datasets}
