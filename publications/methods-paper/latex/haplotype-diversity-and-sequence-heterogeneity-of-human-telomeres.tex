@@ -207,18 +207,18 @@
         \end{figure}
     \noindent % \\~\\
     Long reads on each arm agreed on the locations of different motifs within any given 10 bp window
-        (the coverage-weighted median of normalized Shannon entropy was 0.00 for all data,
-        and the coverage-weighted 3rd quartile was 0.00\textendash{}0.13,
+        (the coverage-weighted median of normalized Shannon entropy was 0.00 in all datasets,
+        while most non-zero values were contained only in the top quartile,
+        i.e., between the 75th and the 100th percentile,
         \textbf{\autoref{fig:entropy}}),
-        indicating that locations of the variations are colinear among reads.
+        indicating that locations of the variations are consistent among reads.
         \begin{figure}[h!] \centering
         \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-3.pdf}
         \caption{
             \small Distribution of motif entropies in 10 bp windows of of candidate PacBio CCS reads aligning to the same chromosomal arms
             in GIAB datasets HG001 through HG007,
             with respect to per-window coverage,
-            and the coverage-weighted quartiles of the entropy values.
-            % no fourth quartile: https://math.stackexchange.com/a/1468111
+            and the coverage-weighted percentiles of the entropy values.
         }
         \label{fig:entropy}
         \end{figure}
@@ -497,6 +497,10 @@
         where $ p_{i} $ is the frequency of each motif in the window and $ N $ is the number of motifs \citep{hepc_entropy}.
     The value of normalized entropy was a metric bounded by $ [ 0, 1 ] $,
         with $ 0 $ describing perfect agreement and $ 1 $ describing maximum randomness.
+    As coverage of windows drops off towards the distal end of the alignment,
+        lower covered windows have less chance to produce entropy;
+        we calculated percentiles of entropy as weighted by coverage minus one
+        (thus prioritizing higher covered windows, and removing windows with the coverage of one and no entropy from the calculation).
     For motif visualization,
         we performed 1000 rounds of bootstrap of the calculated density values in the 10 bp rolling windows,
             and selected the lower and the upper bounds of the 95\% confidence interval of bootstrap.
