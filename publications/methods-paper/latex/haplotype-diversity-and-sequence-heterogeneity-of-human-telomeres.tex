@@ -246,20 +246,22 @@
         and found that hierarchical clustering described read similarity well,
             resulting in high cophenetic correlation between the dendrograms and the pairwise distance matrices
                 (\textbf{\autoref{tab:cophenetic}}),
-            and in visible structure (\textbf{\autoref{fig:haplotypes}}).
-            % \eject \pdfpageheight=40in \pdfpagewidth=22in
-                \begin{figure}[h!] \centering % \vspace{5mm}
-                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-4.png}
-                \caption{
-                    \small Clustering of reads by relative pairwise Levenshtein distances (unitless measure)
-                    on each chromosomal \mbox{\textit{q} arm} of datasets HG001 through HG007,
-                    and densities of top four enriched motifs along each read.
-                    Each horizontal line represents an individual read;
-                    Genomic coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
-                    Only the chromosomal arms cumulatively covered by at least 25 reads are displayed.
-                }
-                \label{fig:haplotypes}
-                \end{figure}
+            and in visible structure (
+                \textbf{\autoref{fig:haplotypes}} %remall
+            ).
+            % \eject \pdfpageheight=40in \pdfpagewidth=22in %remall
+                \begin{figure}[h!] \centering % \vspace{5mm} %remall
+                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-4.png} %remall
+                \caption{ %remall
+                    \small Clustering of reads by relative pairwise Levenshtein distances (unitless measure) %remall
+                    on each chromosomal \mbox{\textit{q} arm} of datasets HG001 through HG007, %remall
+                    and densities of top four enriched motifs along each read. %remall
+                    Each horizontal line represents an individual read; %remall
+                    Genomic coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries. %remall
+                    Only the chromosomal arms cumulatively covered by at least 25 reads are displayed. %remall
+                } %remall
+                \label{fig:haplotypes} %remall
+                \end{figure} %remall
             % \eject \pdfpageheight=11in \pdfpagewidth=8.5in
             \input{latex/tables/Table-2-cophenetic.tex} % tab:cophenetic
     ~\\~\\
@@ -357,7 +359,9 @@
         in particular, familial inheritance of haplotypes was only registered in half the cases in the Chinese trio.
         This calls for more sequencing experiments aimed to reconstruct the full picture of this variation.
     Clustering on a per-subject basis concealed interpopulation similarity,
-        but underscored intra-subject variation (\textbf{\autoref{fig:subject_haplotypes}}),
+        but underscored intra-subject variation (
+            \textbf{\autoref{fig:subject_haplotypes}} %remall
+        ),
             suggesting coexistence of multiple telomeric haplotypes per \textit{q} arm within each subject.
         Given that the reference DNA for the subjects HG001 through HG007
             was extracted from growths of B lymphoblastoid cell lines,
@@ -365,19 +369,19 @@
                 distinct clones may gain distinct variations in their telomeric sequence.
         This opens up avenues of investigation into the haplotypic variation among not only immune cells,
             but also different cell types overall.
-                \begin{figure}[h!] \centering % \vspace{5mm}
-                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-SH.png}
-                \caption{
-                    \small Clustering of reads by relative pairwise Levenshtein distances (unitless measure)
-                    within each individual dataset (HG001 through HG007)
-                    on each chromosomal \mbox{\textit{q} arm},
-                    and densities of top four enriched motifs along each read.
-                    Each horizontal line represents an individual read;
-                    Genomic coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
-                    Only the chromosomal arms cumulatively covered by at least 25 reads are displayed.
-                }
-                \label{fig:subject_haplotypes}
-                \end{figure}
+                \begin{figure}[h!] \centering % \vspace{5mm} %remall
+                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-SH.png} %remall
+                \caption{ %remall
+                    \small Clustering of reads by relative pairwise Levenshtein distances (unitless measure) %remall
+                    within each individual dataset (HG001 through HG007) %remall
+                    on each chromosomal \mbox{\textit{q} arm}, %remall
+                    and densities of top four enriched motifs along each read. %remall
+                    Each horizontal line represents an individual read; %remall
+                    Genomic coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries. %remall
+                    Only the chromosomal arms cumulatively covered by at least 25 reads are displayed. %remall
+                } %remall
+                \label{fig:subject_haplotypes} %remall
+                \end{figure} %remall
 %TODO for reviewers: stress that the shift from diplotypes to spectra does not invalidate the previous findings: we were able to put these findings and the method into a broader context and see more structure.
 
 \section*{Materials and Methods} \addcontentsline{toc}{section}{Materials and Methods} \label{sec:methods}

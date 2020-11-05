@@ -47,5 +47,5 @@ submission/figures/Supplemental_%.pdf: latex/supplemental-figures-GR/Supplementa
 	mv $(@F) $@
 
 renders/%.odt: latex/%.tex
-	./tex2office -i latex/references.bib latex/figures latex/tables -- $<
+	./tex2office -i latex/references.bib latex/figures latex/tables --svg $<
 	mv latex/$(@F) $@
