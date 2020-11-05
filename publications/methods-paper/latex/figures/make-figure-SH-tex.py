@@ -17,7 +17,7 @@ CHROMS = [
     "chr22", "chrX",
 ]
 
-pad = lambda s, n: "-"*n+" "+s+" "+"-"*n
+pad = lambda s, n: "\hspace*{"+str(n*3.9)+"pt}"+s+"\hspace*{"+str(n*3.9)+"pt}"
 ADJUSTED_NAMES = {
     "5qtel_1-500K_1_12_12_rc": pad("5qtel_1-500K_1_12_12_rc", 32),
     "6qtel_1-500K_1_12_12_rc": pad("6qtel_1-500K_1_12_12_rc", 16),
@@ -31,7 +31,7 @@ ADJUSTED_NAMES = {
 }
 
 TEX_LEGEND = r'''\begin{textblock}{13}($X,$Y)
-\includegraphics[width=$WIDTHin,keepaspectratio]{haplotypes/haplotypes-legend.pdf}
+\includegraphics[width=$WIDTHin,keepaspectratio]{latex/figures/haplotypes/haplotypes-legend.pdf}
 \end{textblock}'''
 LEGEND_WIDTH = 4.5
 EXTRA_MARGIN = 3
@@ -43,13 +43,15 @@ TEX_HEADER = r'''\documentclass{article}
 \usepackage[sfdefault]{roboto}
 \usepackage{graphicx}
 \usepackage{tikz}
+\usepackage{ulem}
+    \renewcommand{\ULdepth}{7pt}
 \usepackage[absolute,overlay]{textpos}
     \setlength{\TPHorizModule}{1in}
     \setlength{\TPVertModule}{1in}
 \begin{document}'''
 
 TEX_IMAGE = r'\begin{textblock}{13}($X,$Y)\includegraphics{$PDF}\end{textblock}'
-TEX_YLABEL = r'\begin{textblock}{13}($X,$Y)\rotatebox{90}{\Large{$T}}\end{textblock}'
+TEX_YLABEL = r'\begin{textblock}{13}($X,$Y)\rotatebox{90}{\Large{\uline{$T}}}\end{textblock}'
 
 TEX_FOOTER = r'\end{document}'
 
@@ -82,11 +84,11 @@ def get_ylabels(pdfs, pdf_sizes, combined_width):
     for pdf, (chrom, subject) in pdfs.items():
         chrom2ys[chrom].append(y if (y != 0) else .32)
         width, height = pdf_sizes[pdf]
-        if pdf != "haplotypes-constrained/5qtel_1-500K_1_12_12_rc-HG001.pdf":
+        if "5qtel_1-500K_1_12_12_rc-HG001" not in pdf:
             chrom2xs[chrom].append(combined_width-width)
         y += height + (Y_MAJOR_SKIP if (subject == "HG007") else Y_MINOR_SKIP)
     for chrom, xs in chrom2xs.items():
-        x = min(xs) - .25
+        x = min(xs) - .3
         y = min(chrom2ys[chrom])
         yield x, y, ADJUSTED_NAMES[chrom].replace("_", r'\_')
 
