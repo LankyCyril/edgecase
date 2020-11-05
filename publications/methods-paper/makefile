@@ -28,6 +28,7 @@ renders/%.pdf: latex/%.tex
 	rm -f $(basename $(@F)).aux $(basename $(@F)).bbl $(basename $(@F)).blg
 	rm -f $(basename $(@F))-blx.bib $(basename $(@F)).log
 	rm -f $(basename $(@F)).toc $(basename $(@F)).run.xml
+	rm -f $(basename $(@F)).bcf
 	mv $(@F) $@
 
 renders/figures/%.pdf: latex/figures/%.tex
