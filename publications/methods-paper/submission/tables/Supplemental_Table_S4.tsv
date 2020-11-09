@@ -1,16 +1,14 @@
-# Description of GIAB datasets used
-Subject	Ethnicity	Status within trio	GIAB PacBio CCS datasets used	Average coverage	GIAB Illumina datasets used	Average coverage
-NA12878/HG001	Utah/Mormon	None	PacBio_SequelII_CCS_11kb	~29x	NIST_NA12878_HG001_HiSeq_300x	~300x
-NA24385/HG002	Ashkenazim Jewish	Son	PacBio_CCS_10kb	~30x	NIST_HiSeq_HG002_Homogeneity-10953946	~300x
-			PacBio_CCS_15kb	~32x		
-			PacBio_CCS_15kb_20kb_chemistry2	~56x		
-NA24149/HG003	Ashkenazim Jewish	Father	PacBio_CCS_Google_15kb	~22x	NIST_HiSeq_HG003_Homogeneity-12389378	~300x
-			PacBio_CCS_15kb_20kb_chemistry2	~68x		
-NA24143/HG004	Ashkenazim Jewish	Mother	PacBio_CCS_Google_15kb	~21x	NIST_HiSeq_HG004_Homogeneity-14572558	~300x
-			PacBio_CCS_15kb_20kb_chemistry2	~69x		
-			PacBio_CCS_HudsonAlpha_15kb_21kb	~48x		
-NA24631/HG005	Chinese	Son	PacBio_SequelII_CCS_11kb	~32x	HG005_NA24631_son_HiSeq_300x	~300x
-NA24694/HG006	Chinese	Father	PacBio_CCS_15kb_20kb_chemistry2	~46x	NA24694_Father_HiSeq100x	~100x
-			PacBio_HiFi_Google	~27x		
-NA24695/HG007	Chinese	Mother	PacBio_CCS_15kb_20kb_chemistry2	~46x	NA24695_Mother_HiSeq100x	~100x
-			PacBio_HiFi_Google	~22x		
+# Adjusted p-values of the Wilcoxon signed-rank tests on relative Levenshtein distances within each chromosomal q arm.
+# For each read, closest distances to groups of reads described in the Comparison column are compared
+# (see Materials and Methods).
+Comparison	Adjusted p-values per chromosome	 	 	 	 	 	 	 	 	 	 	 	 	 
+ 	5	6	7	8	11	12	14	15	17	18	19	21	22	X
+A subject's reads are closer to each other than to other subjects' reads in the trio	4.9e-46	5.0e-27	3.3e-16	[0.37]	5.6e-08	1.3e-03	[1.00]	1.4e-27	[1.00]	5.1e-07	9.1e-08	5.8e-34	3.0e-27	2.4e-14
+A subject's reads are closer to each other than to subjects' reads in other populations	5.3e-87	4.4e-56	4.6e-29	[0.51]	6.5e-13	7.4e-19	[1.00]	2.2e-41	[1.00]	2.3e-16	5.5e-08	4.2e-64	8.9e-51	5.0e-25
+Reads within a population are closer to each other than to reads in other populations	8.7e-16	3.0e-32	5.5e-03	[1.00]	[1.00]	3.2e-12	[0.22]	[1.00]	[1.00]	1.0e-06	5.6e-05	1.2e-17	2.4e-35	[0.38]
+Ashkenazim trio:	 	 	 	 	 	 	 	 	 	 	 	 	 	 
+Father's reads are closer to son's reads than to mother's reads	1.8e-09	5.0e-05	5.9e-04	9.2e-05	2.6e-02	3.7e-07	1.4e-02	1.5e-02	[1.00]	6.3e-03	[0.15]	1.4e-06	6.2e-05	4.2e-03
+Mother's reads are closer to son's reads than to father's reads	1.1e-04	3.8e-04	3.9e-02	9.6e-03	[1.00]	3.1e-03	[0.35]	[1.00]	[1.00]	[0.35]	[1.00]	1.3e-05	4.1e-08	[1.00]
+Chinese trio:	 	 	 	 	 	 	 	 	 	 	 	 	 	 
+Father's reads are closer to son's reads than to mother's reads	1.7e-03	[1.00]	[0.10]	[1.00]	[0.59]	2.1e-02	[1.00]	8.0e-03	[1.00]	[1.00]	[1.00]	[1.00]	5.8e-04	7.1e-03
+Mother's reads are closer to son's reads than to father's reads	[1.00]	9.6e-05	3.8e-02	[1.00]	1.7e-05	[1.00]	[0.61]	3.4e-07	[1.00]	2.1e-02	[1.00]	[1.00]	[1.00]	2.6e-04

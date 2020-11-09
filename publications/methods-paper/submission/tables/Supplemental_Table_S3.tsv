@@ -1,14 +1,19 @@
-# Adjusted p-values of the Wilcoxon signed-rank tests on relative Levenshtein distances within each chromosomal q arm.
-# For each read, closest distances to groups of reads described in the Comparison column are compared
-# (see Materials and Methods).
-Comparison	Adjusted p-values per chromosome	 	 	 	 	 	 	 	 	 	 	 	 	 
- 	5	6	7	8	11	12	14	15	17	18	19	21	22	X
-A subject's reads are closer to each other than to other subjects' reads in the trio	4.9e-46	5.0e-27	3.3e-16	[0.37]	5.6e-08	1.3e-03	[1.00]	1.4e-27	[1.00]	5.1e-07	9.1e-08	5.8e-34	3.0e-27	2.4e-14
-A subject's reads are closer to each other than to subjects' reads in other populations	5.3e-87	4.4e-56	4.6e-29	[0.51]	6.5e-13	7.4e-19	[1.00]	2.2e-41	[1.00]	2.3e-16	5.5e-08	4.2e-64	8.9e-51	5.0e-25
-Reads within a population are closer to each other than to reads in other populations	8.7e-16	3.0e-32	5.5e-03	[1.00]	[1.00]	3.2e-12	[0.22]	[1.00]	[1.00]	1.0e-06	5.6e-05	1.2e-17	2.4e-35	[0.38]
-Ashkenazim trio:	 	 	 	 	 	 	 	 	 	 	 	 	 	 
-Father's reads are closer to son's reads than to mother's reads	1.8e-09	5.0e-05	5.9e-04	9.2e-05	2.6e-02	3.7e-07	1.4e-02	1.5e-02	[1.00]	6.3e-03	[0.15]	1.4e-06	6.2e-05	4.2e-03
-Mother's reads are closer to son's reads than to father's reads	1.1e-04	3.8e-04	3.9e-02	9.6e-03	[1.00]	3.1e-03	[0.35]	[1.00]	[1.00]	[0.35]	[1.00]	1.3e-05	4.1e-08	[1.00]
-Chinese trio:	 	 	 	 	 	 	 	 	 	 	 	 	 	 
-Father's reads are closer to son's reads than to mother's reads	1.7e-03	[1.00]	[0.10]	[1.00]	[0.59]	2.1e-02	[1.00]	8.0e-03	[1.00]	[1.00]	[1.00]	[1.00]	5.8e-04	7.1e-03
-Mother's reads are closer to son's reads than to father's reads	[1.00]	9.6e-05	3.8e-02	[1.00]	1.7e-05	[1.00]	[0.61]	3.4e-07	[1.00]	2.1e-02	[1.00]	[1.00]	[1.00]	2.6e-04
+# Significantly enriched repeating motifs in telomeric candidate reads in short-read sequencing experiments,				
+# subset to motifs also observed in PacBio telomeric reads, with respect to reverse-complemented equivalence.				
+Motif	Illumina datasets	 	10X datasets	
+ 	Median score	Adjusted p-value	Median score	Adjusted p-value
+TTAGGG	0.299068	<1e-300	0.461711	<1e-300
+TGAGGG	0.007484	<1e-300	0.018524	<1e-300
+TTGGGG	0.002495	<1e-300	0.007190	<1e-300
+TTAGGGG	0.003007	<1e-300	0.005024	<1e-300
+TTAAGGG	0.000664	1.39e-55	0.001124	1.58e-59
+TTAGGGTTAGGGG	0.000533	1.04e-51	0.001020	<1e-300
+TAGGG	0.000619	<1e-300	0.001020	<1e-300
+TTGGG	0.000500	<1e-300	0.000989	<1e-300
+TTTAGGG	0.000622	6.40e-55	0.000884	1.02e-57
+TAGGGTTAGGG	0.000312	4.24e-40	0.000503	<1e-300
+TTAGGGTTTAGGG	0.000176	4.41e-38	0.000284	6.22e-59
+TTAGGGTTAAGGG	0.000145	6.63e-36	0.000264	4.15e-57
+TTAGG	0.000241	8.13e-35	0.000213	1.10e-55
+TTGGGTTAGGG	0.000127	4.47e-28	0.000178	3.34e-56
+TTAGGTTAGGG	0.000066	1.99e-18	0.000092	7.82e-48
