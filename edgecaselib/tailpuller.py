@@ -13,7 +13,7 @@ from numpy import isnan, inf
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 
 Usage: {0} tailpuller -x filename [-f flagspec] [-F flagspec] [-q integer]
-       {1}            [-m integer] <bam>
+       {1}            [-M integer] <bam>
 
 Output:
     SAM-formatted file with reads overhanging anchors defined in index
@@ -25,7 +25,7 @@ Required options:
     -x, --index [filename]            location of the reference .ecx index
 
 Options:
-    -m, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
+    -M, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
 
 Input filtering options:
     -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]

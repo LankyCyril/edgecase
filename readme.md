@@ -150,7 +150,7 @@ optional arguments:
   -f f, --flags f            process only entries with all these sam flags present (default: 0)
   -F F, --flag-filter F      process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q      process only entries with MAPQ >= Q (default: 0)
-  -m M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
+  -M M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
 ```
 
 Outputs a subset SAM file that contains only the reads that overhang anchors

@@ -17,7 +17,7 @@ rule tailpuller:
         max_read_length=MAX_READ_LENGTH, flags="-f0x4000"
     shell: """
         ./edgecase tailpuller \
-            -x {HG38EXT_ECX} -m {params.max_read_length} -F3844 {input.bam} \
+            -x {HG38EXT_ECX} -M {params.max_read_length} -F3844 {input.bam} \
         | samtools view -bh {params.flags} > {output.bam}
     """
 

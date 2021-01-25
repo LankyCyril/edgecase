@@ -8,7 +8,7 @@ from gzip import open as gzopen
 __doc__ = """edgeCase basic pipeline: select reads, find enriched motifs, plot
 
 Usage: {0} basic-pipeline-longread -x filename -o dirname [--force] [-j integer]
-       {1}                [-m integer] [-n integer] [--target targetspec]
+       {1}                [-M integer] [-n integer] [--target targetspec]
        {1}                [-q integer] [--min-k integer] [--max-k integer]
        {1}                [--jellyfish filename] [--jellyfish-hash-size string]
        {1}                [--max-p-adjusted float] [--bin-size integer]
@@ -35,7 +35,7 @@ Required options:
 Options:
     --force                          force overwrite files in --output-dir
     -j, --jobs [integer]             number of parallel jobs (for jellyfish and kmerscanner) [default: 1]
-    -m, --max-read-length [integer]  maximum read length to consider when selecting lookup regions
+    -M, --max-read-length [integer]  maximum read length to consider when selecting lookup regions
     -n, --max-motifs [integer]       maximum number of motifs to report [default: 4]
     --target [targetspec]            an ECX flag for heads/tails [default: tract_anchor]
     --min-k [integer]                smallest target repeat length [default: 4]
