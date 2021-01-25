@@ -1,4 +1,4 @@
-from sys import stdout, stderr
+from sys import stdout
 from numpy import zeros, array, cumsum, nan
 from multiprocessing import Pool
 from edgecaselib.util import get_circular_pattern
@@ -16,7 +16,6 @@ __doc__ = """edgeCase kmerscanner: calculation of motif densities
 
 Usage: {0} kmerscanner [-j integer] --motif-file filename
        {1}             [-b integer] [-n integer]
-       {1}             [-c float] [--head-test integer] [--tail-test integer]
        {1}             [-f flagspec] [-F flagspec] [-q integer]
        {1}             [--fmt string] <sequencefile>
 
@@ -34,9 +33,6 @@ Options:
     -b, --bin-size [integer]      size of the rolling window [default: 10]
     -n, --num-reads [integer]     expected number of reads in input (for progress display)
     -j, --jobs [integer]          number of jobs to run in parallel [default: 1]
-    -c, --cutoff [float]          use hard cutoff for density
-    --head-test [integer]         length of head to use for density filter (with --cutoff)
-    --tail-test [integer]         length of tail to use for density filter (with --cutoff)
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
@@ -48,9 +44,6 @@ __docopt_converters__ = [
     lambda bin_size: int(bin_size),
     lambda num_reads: None if (num_reads is None) else int(num_reads),
     lambda jobs: int(jobs),
-    lambda cutoff: None if (cutoff is None) else float(cutoff),
-    lambda head_test: None if (head_test is None) else int(head_test),
-    lambda tail_test: None if (tail_test is None) else int(tail_test),
     lambda min_quality: None if (min_quality is None) else int(min_quality),
 ]
 
@@ -60,35 +53,10 @@ DAT_HEADER = [
     "clip_5prime", "clip_3prime",
 ]
 
-BOTTLENECK_WARNING = (
-    "Warning: no head/tail testing options selected; regardless of " +
-    "the number of jobs (-j/--jobs), this will likely be " +
-    "bottlenecked by disk writing speeds"
-)
 
-
-def get_edge_density(entry, pattern, head_test, tail_test):
-    """Calculate density of pattern in head_test or tail_test of read"""
-    if (entry.query_sequence is None) or (len(entry.query_sequence) == 0):
-        return 0
-    if head_test:
-        subsequence = entry.query_sequence[:head_test]
-    elif tail_test:
-        subsequence = entry.query_sequence[-tail_test:]
-    pattern_matches = pattern.findall(subsequence, overlapped=True)
-    return len(pattern_matches) / len(subsequence)
-
-
-def calculate_density(entry, pattern, cutoff, bin_size, head_test, tail_test, positions_accounted_for):
+def calculate_density(entry, pattern, bin_size, positions_accounted_for):
     """Calculate density of pattern hits in a rolling window along given read"""
-    if cutoff: # if cutoff specified, filter by hard cutoff
-        edge_density = get_edge_density(
-            entry, pattern, head_test, tail_test,
-        )
-        passes_filter = (edge_density > cutoff)
-    else: # otherwise, allow all that have data
-        passes_filter = (entry.query_sequence is not None)
-    if passes_filter: # calculations will make sense
+    if entry.query_sequence is not None: # calculations will make sense
         read_length = len(entry.query_sequence)
         canvas = zeros(read_length, dtype=bool)
         pattern_positions = array([
@@ -109,14 +77,13 @@ def calculate_density(entry, pattern, cutoff, bin_size, head_test, tail_test, po
         return False, zeros(1), array([])
 
 
-def calculate_density_of_patterns(entry, motif_patterns, cutoff, bin_size, head_test, tail_test):
+def calculate_density_of_patterns(entry, motif_patterns, bin_size):
     """Calculate density of hits of each pattern in a rolling window along given read"""
     entry_set = []
     positions_accounted_for = set()
     for motif, pattern in motif_patterns.items():
         passes_filter, density_array, pattern_positions = calculate_density(
-            entry, pattern, cutoff, bin_size, head_test, tail_test,
-            positions_accounted_for=positions_accounted_for,
+            entry, pattern, bin_size, positions_accounted_for,
         )
         if passes_filter:
             entry_set.append([entry, motif, density_array])
@@ -125,7 +92,7 @@ def calculate_density_of_patterns(entry, motif_patterns, cutoff, bin_size, head_
     return entry_set
 
 
-def pattern_scanner(entry_iterator, fmt, samfilters, motif_patterns, cutoff, bin_size, head_test, tail_test, num_reads, jobs):
+def pattern_scanner(entry_iterator, fmt, samfilters, motif_patterns, bin_size, num_reads, jobs):
     """Calculate density of pattern hits in a rolling window along each read"""
     if fmt == "sam":
         filtered_iterator = filter_bam(entry_iterator, samfilters)
@@ -151,8 +118,7 @@ def pattern_scanner(entry_iterator, fmt, samfilters, motif_patterns, cutoff, bin
         # imap_unordered() only accepts single-argument functions:
         density_calculator = partial(
             calculate_density_of_patterns, motif_patterns=motif_patterns,
-            bin_size=bin_size, head_test=head_test, tail_test=tail_test,
-            cutoff=cutoff,
+            bin_size=bin_size,
         )
         # lazy multiprocess evaluation:
         read_density_iterator = pool.imap_unordered(
@@ -165,7 +131,7 @@ def pattern_scanner(entry_iterator, fmt, samfilters, motif_patterns, cutoff, bin
         )
 
 
-def interpret_arguments(fmt, head_test, tail_test, cutoff, motif_file):
+def interpret_arguments(fmt, motif_file):
     """Parse and check arguments"""
     if fmt == "sam":
         manager = AlignmentFile
@@ -173,16 +139,6 @@ def interpret_arguments(fmt, head_test, tail_test, cutoff, motif_file):
         manager = FastxFile
     else:
         raise ValueError("--fmt can only be 'sam' or 'fastx'")
-    if (head_test is not None) and (tail_test is not None):
-        raise ValueError("Can only specify one of --head-test, --tail-test")
-    elif (cutoff is not None) and (head_test is None) and (tail_test is None):
-        raise ValueError("--cutoff has no effect without a head/tail test")
-    elif (head_test is not None) or (tail_test is not None):
-        if cutoff is None:
-            message = "Warning: head/tail test has no effect without --cutoff"
-            print(message, file=stderr)
-    elif (head_test is None) and (tail_test is None) and (cutoff is None):
-        print(BOTTLENECK_WARNING, file=stderr)
     motif_data = read_csv(motif_file, sep="\t", escapechar="#")
     if "motif" not in motif_data.columns:
         if "monomer" in motif_data.columns:
@@ -204,20 +160,16 @@ def interpret_arguments(fmt, head_test, tail_test, cutoff, motif_file):
     return manager, motif_patterns, scores
 
 
-def main(sequencefile, fmt, flags, flag_filter, min_quality, motif_file, head_test, tail_test, cutoff, bin_size, num_reads, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flag_filter, min_quality, motif_file, bin_size, num_reads, jobs=1, file=stdout, **kwargs):
     # parse and check arguments:
-    manager, motif_patterns, scores = interpret_arguments(
-        fmt, head_test, tail_test, cutoff, motif_file,
-    )
+    manager, motif_patterns, scores = interpret_arguments(fmt, motif_file)
     print(*DAT_HEADER, f"b={bin_size}", sep="\t", file=file)
     # scan fastq for target motif queries, parallelizing on reads:
     with manager(sequencefile) as entry_iterator:
         scanner = pattern_scanner(
             entry_iterator, motif_patterns=motif_patterns,
             samfilters=[flags, flag_filter, min_quality],
-            fmt=fmt, bin_size=bin_size,
-            head_test=head_test, tail_test=tail_test,
-            cutoff=cutoff, num_reads=num_reads, jobs=jobs,
+            fmt=fmt, bin_size=bin_size, num_reads=num_reads, jobs=jobs,
         )
         # output densities of reads that pass filter:
         for entry_set in scanner:
