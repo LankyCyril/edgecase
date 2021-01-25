@@ -8,12 +8,13 @@ from copy import deepcopy
 from edgecaselib.util import progressbar
 from itertools import chain
 from numpy import isnan, inf
+from pandas import DataFrame
 
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 
 Usage: {0} tailpuller -x filename [-f flagspec] [-F flagspec] [-q integer]
-       {1}            [-M integer] <bam>
+       {1}            [-M integer] [-m integer] [-a] <bam>
 
 Output:
     SAM-formatted file with reads overhanging anchors defined in index
@@ -26,6 +27,8 @@ Required options:
 
 Options:
     -M, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
+    -m, --min-overlap [integer]       minimum overlap of subtelomere to consider read [default: 0]
+    -a, --allow-ambiguous             include reads that map to multiple terminal positions / other arms
 
 Input filtering options:
     -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
@@ -36,6 +39,8 @@ Input filtering options:
 __docopt_converters__ = [
     lambda min_quality:
         None if (min_quality is None) else int(min_quality),
+    lambda min_overlap:
+        0 if (min_overlap is None) else int(min_overlap),
     lambda max_read_length:
         inf if (max_read_length is None) else int(max_read_length),
 ]
@@ -74,23 +79,24 @@ def updated_entry(entry, flags, is_q=False):
     return new_entry
 
 
-def filter_entries(bam_data, ecxfd, samfilters):
+def filter_entries(bam_data, ecxfd, min_overlap, samfilters):
     """Only pass reads extending past regions specified in the ECX"""
     for entry in filter_bam(bam_data, samfilters):
         if entry.reference_name in ecxfd:
-            # find positions of start and end of read relative to reference:
-            p_pos = get_terminal_pos(entry, cigarpos=0)
-            q_pos = get_terminal_pos(entry, cigarpos=-1)
-            # collect ECX flags where anchor is to right of read start:
-            ecx_t_p5 = ecxfd[entry.reference_name][5]
-            p_flags = set(ecx_t_p5.loc[ecx_t_p5["pos"]>=p_pos, "flag"])
-            if p_flags:
-                yield updated_entry(entry, p_flags)
-            # collect ECX flags where anchor is to left of read end
-            ecx_t_p3 = ecxfd[entry.reference_name][3]
-            q_flags = set(ecx_t_p3.loc[ecx_t_p3["pos"]<q_pos, "flag"])
-            if q_flags:
-                yield updated_entry(entry, q_flags, is_q=True)
+            if (entry.reference_length or 0) >= min_overlap:
+                # find positions of start and end of read relative to reference:
+                p_pos = get_terminal_pos(entry, cigarpos=0)
+                q_pos = get_terminal_pos(entry, cigarpos=-1)
+                # collect ECX flags where anchor is to right of read start:
+                ecx_t_p5 = ecxfd[entry.reference_name][5]
+                p_flags = set(ecx_t_p5.loc[ecx_t_p5["pos"]>=p_pos, "flag"])
+                if p_flags:
+                    yield updated_entry(entry, p_flags)
+                # collect ECX flags where anchor is to left of read end
+                ecx_t_p3 = ecxfd[entry.reference_name][3]
+                q_flags = set(ecx_t_p3.loc[ecx_t_p3["pos"]<q_pos, "flag"])
+                if q_flags:
+                    yield updated_entry(entry, q_flags, is_q=True)
 
 
 def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
@@ -125,19 +131,55 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
             )
 
 
-def main(bam, index, flags, flag_filter, min_quality, max_read_length, file=stdout, **kwargs):
+def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, min_overlap, samfilters):
+    """Parse BAM file, select overhanging reads, possibly mapping to more than one arm"""
+    with AlignmentFile(bam) as bam_data:
+        reflens = dict(zip(bam_data.references, bam_data.lengths))
+        bam_header_string = str(bam_data.header).rstrip("\n")
+        decorated_bam_iterator = progressbar(
+            ecxfd, total=len(ecxfd), desc="Pulling", unit="chromosome",
+        )
+        candidates = []
+        for chrom in decorated_bam_iterator:
+            bam_chunk = get_bam_chunk(
+                bam_data, chrom, ecxfd, reflens, max_read_length,
+            )
+            candidates.extend(
+                filter_entries(bam_chunk, ecxfd, min_overlap, samfilters),
+            )
+    return bam_header_string, candidates
+
+
+def get_unambiguous_candidates(candidates):
+    """Subset candidate entries to those that map unambiguously"""
+    dispatcher = DataFrame(
+        columns=["qname", "flag"],
+        data=[[entry.qname, entry.flag] for entry in candidates],
+    )
+    primaries = set(dispatcher.loc[
+        dispatcher["flag"] & 3844 == 0, "qname",
+    ])
+    primaries_with_duplicates = dispatcher.loc[
+        dispatcher["qname"].isin(primaries), "qname",
+    ]
+    name_counts = primaries_with_duplicates.value_counts()
+    unique_candidate_names = set(name_counts[name_counts==1].index)
+    for entry in candidates:
+        if entry.qname in unique_candidate_names:
+            yield entry
+
+
+def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overlap, allow_ambiguous, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
     samfilters = [flags, flag_filter, min_quality]
-    with AlignmentFile(bam) as bam_data:
-        reflens = dict(zip(bam_data.references, bam_data.lengths))
-        print(str(bam_data.header).rstrip("\n"), file=file)
-        decorated_bam_iterator = progressbar(
-            ecxfd, total=len(ecxfd), desc="Pulling", unit="chromosome"
-        )
-        for chrom in decorated_bam_iterator:
-            bam_chunk = get_bam_chunk(
-                bam_data, chrom, ecxfd, reflens, max_read_length
-            )
-            for entry in filter_entries(bam_chunk, ecxfd, samfilters):
-                print(entry.to_string(), file=file)
+    bam_header_string, candidates = parse_bam_with_ambiguity(
+        bam, ecxfd, max_read_length, min_overlap, samfilters,
+    )
+    print(bam_header_string, file=file)
+    if allow_ambiguous:
+        for entry in candidates:
+            print(entry.to_string(), file=file)
+    else:
+        for entry in get_unambiguous_candidates(candidates):
+            print(entry.to_string(), file=file)
