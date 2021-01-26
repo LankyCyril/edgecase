@@ -14,10 +14,12 @@ rule tailpuller:
     output:
         bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
     params:
-        max_read_length=MAX_READ_LENGTH, flags="-f0x4000"
+        max_read_length=MAX_READ_LENGTH,
+        min_overlap=MIN_OVERLAP,
+        flags="-f0x4000",
     shell: """
-        ./edgecase tailpuller \
-            -x {HG38EXT_ECX} -M {params.max_read_length} -F3844 {input.bam} \
+        ./edgecase tailpuller -x {HG38EXT_ECX} \
+            -M {params.max_read_length} -m {params.min_overlap} {input.bam} \
         | samtools view -bh {params.flags} > {output.bam}
     """
 

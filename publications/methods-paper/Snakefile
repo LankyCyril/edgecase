@@ -3,7 +3,8 @@ from io import StringIO
 
 
 HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
-DATA_DIR = "data/datasets/2020"
+DATA_DIR = "data/datasets/2021"
+MIN_OVERLAP = 3000
 MAX_READ_LENGTH = 100000
 MIN_PLOT_COVERAGE = 25
 SMALLEST_P_VALUE = 5e-324
@@ -93,3 +94,18 @@ rule kmerscanner_all_motifs_all_subjects:
             for _, (group, subject)
             in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
         ],
+
+
+rule levenshtein_all:
+    input: bam=DATA_DIR+"/PacBio/tailpuller.bam",
+    output: tsv=DATA_DIR+"/PacBio/haplotypes/levenshtein-q_arm.tsv",
+    params: directory=DATA_DIR+"/PacBio/haplotypes/levenshtein-q_arm",
+    threads: 96,
+    run:
+        flags = get_sam_flags("q_arm", target="tract_anchor")
+        shell("""
+            mkdir {params.directory} 2>/dev/null || :
+            ./edgecase levenshtein -j {threads} {flags} \
+                --output-dir {params.directory} \
+                {input.bam} > {output.tsv}
+        """)
