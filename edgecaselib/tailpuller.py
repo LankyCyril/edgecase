@@ -32,7 +32,7 @@ Options:
 
 Input filtering options:
     -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
-    -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 2048]
     -q, --min-quality [integer]       process only entries with this MAPQ or higher [default: 0]
 """
 
@@ -79,24 +79,23 @@ def updated_entry(entry, flags, is_q=False):
     return new_entry
 
 
-def filter_entries(bam_data, ecxfd, min_overlap, samfilters):
+def filter_entries(bam_data, ecxfd, samfilters):
     """Only pass reads extending past regions specified in the ECX"""
     for entry in filter_bam(bam_data, samfilters):
         if entry.reference_name in ecxfd:
-            if (entry.reference_length or 0) >= min_overlap:
-                # find positions of start and end of read relative to reference:
-                p_pos = get_terminal_pos(entry, cigarpos=0)
-                q_pos = get_terminal_pos(entry, cigarpos=-1)
-                # collect ECX flags where anchor is to right of read start:
-                ecx_t_p5 = ecxfd[entry.reference_name][5]
-                p_flags = set(ecx_t_p5.loc[ecx_t_p5["pos"]>=p_pos, "flag"])
-                if p_flags:
-                    yield updated_entry(entry, p_flags)
-                # collect ECX flags where anchor is to left of read end
-                ecx_t_p3 = ecxfd[entry.reference_name][3]
-                q_flags = set(ecx_t_p3.loc[ecx_t_p3["pos"]<q_pos, "flag"])
-                if q_flags:
-                    yield updated_entry(entry, q_flags, is_q=True)
+            # find positions of start and end of read relative to reference:
+            p_pos = get_terminal_pos(entry, cigarpos=0)
+            q_pos = get_terminal_pos(entry, cigarpos=-1)
+            # collect ECX flags where anchor is to right of read start:
+            ecx_t_p5 = ecxfd[entry.reference_name][5]
+            p_flags = set(ecx_t_p5.loc[ecx_t_p5["pos"]>=p_pos, "flag"])
+            if p_flags:
+                yield updated_entry(entry, p_flags)
+            # collect ECX flags where anchor is to left of read end
+            ecx_t_p3 = ecxfd[entry.reference_name][3]
+            q_flags = set(ecx_t_p3.loc[ecx_t_p3["pos"]<q_pos, "flag"])
+            if q_flags:
+                yield updated_entry(entry, q_flags, is_q=True)
 
 
 def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
@@ -131,7 +130,7 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
             )
 
 
-def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, min_overlap, samfilters):
+def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, samfilters):
     """Parse BAM file, select overhanging reads, possibly mapping to more than one arm"""
     with AlignmentFile(bam) as bam_data:
         reflens = dict(zip(bam_data.references, bam_data.lengths))
@@ -145,7 +144,7 @@ def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, min_overlap, samfilter
                 bam_data, chrom, ecxfd, reflens, max_read_length,
             )
             candidates.extend(
-                filter_entries(bam_chunk, ecxfd, min_overlap, samfilters),
+                filter_entries(bam_chunk, ecxfd, samfilters),
             )
     return bam_header_string, candidates
 
@@ -174,12 +173,13 @@ def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overl
     ecxfd = load_index(index, as_filter_dict=True)
     samfilters = [flags, flag_filter, min_quality]
     bam_header_string, candidates = parse_bam_with_ambiguity(
-        bam, ecxfd, max_read_length, min_overlap, samfilters,
+        bam, ecxfd, max_read_length, samfilters,
     )
     print(bam_header_string, file=file)
     if allow_ambiguous:
-        for entry in candidates:
-            print(entry.to_string(), file=file)
+        candidate_iterator = candidates
     else:
-        for entry in get_unambiguous_candidates(candidates):
+        candidate_iterator = get_unambiguous_candidates(candidates)
+    for entry in candidate_iterator:
+        if (entry.reference_length or 0) >= min_overlap:
             print(entry.to_string(), file=file)
