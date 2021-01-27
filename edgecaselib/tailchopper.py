@@ -27,6 +27,11 @@ Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
     -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+
+Notes:
+  * Depending on the aligner used, MAPQ of secondary reads may have been set to
+    zero regardless of real mapping quality; use this filtering option with
+    caution.
 """
 
 __docopt_converters__ = [

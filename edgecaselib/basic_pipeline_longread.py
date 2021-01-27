@@ -50,6 +50,11 @@ Options:
 
 Input filtering options:
     -q, --min-quality [integer]      process only entries with this MAPQ or higher [default: 0]
+
+Notes:
+  * Depending on the aligner used, MAPQ of secondary reads may have been set to
+    zero regardless of real mapping quality; use this filtering option with
+    caution.
 """
 
 __docopt_converters__ = [
@@ -84,20 +89,15 @@ __docopt_tests__ = {
 
 
 get_tailpuller_kws = lambda min_quality, max_read_length, file: dict(
-    flags=[0], flag_filter=[3844],
+    flags=[0], flag_filter=[0],
     min_quality=min_quality, max_read_length=max_read_length, file=file,
 )
 
 
 get_tailchopper_kws = lambda target, min_quality, file: dict(
-    target=target, flags=[target], flag_filter=[3844],
+    target=target, flags=[target], flag_filter=[0],
     min_quality=min_quality, file=file,
 )
-
-
-get_per_arm_args = lambda target: [
-    ("p", [target], ["is_q", 3840]), ("q", [target, "is_q"], [3840]),
-]
 
 
 get_repeatfinder_kws = lambda f, F, q, max_motifs, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, jobs, file: dict(
@@ -139,7 +139,7 @@ def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_
         tailchopper.main(tailpuller_sam, index, **get_tailchopper_kws(
             target, min_quality, sam,
         ))
-    for arm, f, F in get_per_arm_args(target):
+    for arm, f, F in [("p", [target], ["is_q"]), ("q", [target, "is_q"], [0])]:
         repeatfinder_tsv = get_filename(f"repeatfinder-{arm}_arm.tsv")
         with open(repeatfinder_tsv, mode="wt") as tsv:
             repeatfinder.main(tailchopper_sam, **get_repeatfinder_kws(

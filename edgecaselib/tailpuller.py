@@ -32,8 +32,21 @@ Options:
 
 Input filtering options:
     -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
-    -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 2048]
+    -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]       process only entries with this MAPQ or higher [default: 0]
+
+Notes:
+  * It is recommended to include secondary and supplementary reads (simply put,
+    leave the -F flag as default [0]), because:
+    * edgeCase determines unambiguously mapped reads on its own; aligners assign
+      the 'supplementary' flag to multi-mapping reads arbitrarily, and removing
+      such supplementary reads upstream may lead to loss of information in
+      telomeric regions;
+    * edgeCase will discard chimeric reads in terminal regions if information
+      about supplementary alignments is present;
+  * Depending on the aligner used, MAPQ of secondary reads may have been set to
+    zero regardless of real mapping quality; use this filtering option with
+    caution.
 """
 
 __docopt_converters__ = [
