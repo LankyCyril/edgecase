@@ -7,8 +7,8 @@ from edgecaselib.util import progressbar
 
 __doc__ = """edgeCase tailchopper: selection of overhanging heads/tails of reads
 
-Usage: {0} tailchopper -x filename [-t targetspec] [-f flagspec] [-F flagspec]
-       {1}             [-q integer] <bam>
+Usage: {0} tailchopper -x filename [-t targetspec]
+       {1}             [-f flagspec]... [-F flagspec]... [-q integer] <bam>
 
 Output:
     SAM-formatted file with tails of candidate reads overhanging anchors defined

@@ -16,7 +16,7 @@ __doc__ = """edgeCase kmerscanner: calculation of motif densities
 
 Usage: {0} kmerscanner [-j integer] --motif-file filename
        {1}             [-b integer] [-n integer]
-       {1}             [-f flagspec] [-F flagspec] [-q integer]
+       {1}             [-f flagspec]... [-F flagspec]... [-q integer]
        {1}             [--fmt string] <sequencefile>
 
 Output:

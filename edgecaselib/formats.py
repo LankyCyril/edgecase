@@ -52,28 +52,30 @@ class EmptyKmerscanError(ValueError):
     pass
 
 
-def explain_sam_flags(flag, sep="|"):
-    """Convert an integer flag into string"""
-    return sep.join(ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0)
+def explain_sam_flags(flag):
+    """Convert an integer flag into list of identifiers"""
+    return [ALL_SAM_FLAGS[i] for i in range(16) if flag & 2**i != 0]
 
 
 def interpret_flags(flags):
     """If flags are not a decimal number, assume strings and convert to number"""
-    if isinstance(flags, int) or flags.isdigit():
-        return int(flags)
-    elif not isinstance(flags, str):
-        raise ValueError("Unknown flags: {}".format(repr(flags)))
-    elif flags[:2] == "0x":
-        return int(flags, 16)
-    elif flags[:2] == "0b":
-        return int(flags, 2)
-    elif "|" in flags:
-        flag_set = set(map(interpret_flags, flags.split("|")))
-        return reduce(__or__, flag_set | {0})
-    elif flags in ALL_SAM_FLAGS:
-        return 2**ALL_SAM_FLAGS.index(flags)
+    if isinstance(flags, int):
+        return flags
+    elif isinstance(flags, str):
+        if flags.isdigit():
+            return int(flags)
+        if flags[:2] == "0x":
+            return int(flags, 16)
+        elif flags[:2] == "0b":
+            return int(flags, 2)
+        elif flags in ALL_SAM_FLAGS:
+            return 2**ALL_SAM_FLAGS.index(flags)
+        else:
+            raise ValueError("Unknown flag(s): {}".format(repr(flags)))
+    elif isinstance(flags, (tuple, set, list)):
+        return reduce(__or__, set(map(interpret_flags, flags)) | {0})
     else:
-        raise ValueError("Unknown flags: {}".format(repr(flags)))
+        raise ValueError("Unknown flag(s): {}".format(repr(flags)))
 
 
 def entry_filters_ok(entry_flag, entry_mapq, integer_samfilters):
@@ -91,14 +93,13 @@ def entry_filters_ok(entry_flag, entry_mapq, integer_samfilters):
         )
 
 
-def filter_and_read_tsv(dat, gzipped, samfilters):
+def filter_and_read_tsv(dat, gzipped, integer_samfilters):
     """If filters supplied, subset DAT first, then read with pandas"""
     number_retained = 0
     if gzipped:
         opener = gzopen
     else:
         opener = open
-    integer_samfilters = list(map(interpret_flags, samfilters))
     with opener(dat, mode="rt") as dat_handle:
         with TemporaryDirectory() as tempdir:
             datflt_name = path.join(tempdir, "dat.gz")
@@ -181,11 +182,12 @@ def are_motifs_consistent(raw_densities):
 
 def load_kmerscan(dat, gzipped, samfilters, bin_size=None, no_align=False, each_once=True):
     """Load densities from dat file, split into dataframes per chromosome"""
-    if not any(samfilters): # all zero / None
+    integer_samfilters = list(map(interpret_flags, samfilters))
+    if not any(integer_samfilters): # all zero / None
         print("Loading DAT...", file=stderr, flush=True)
         raw_densities = read_csv(dat, sep="\t", escapechar="#")
     else:
-        raw_densities = filter_and_read_tsv(dat, gzipped, samfilters)
+        raw_densities = filter_and_read_tsv(dat, gzipped, integer_samfilters)
     if len(raw_densities) == 0:
         raise EmptyKmerscanError
     if not are_motifs_consistent(raw_densities):

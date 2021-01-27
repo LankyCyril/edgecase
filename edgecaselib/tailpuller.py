@@ -13,7 +13,7 @@ from pandas import DataFrame
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 
-Usage: {0} tailpuller -x filename [-f flagspec] [-F flagspec] [-q integer]
+Usage: {0} tailpuller -x filename [-f flagspec]... [-F flagspec]... [-q integer]
        {1}            [-M integer] [-m integer] [-a] <bam>
 
 Output:

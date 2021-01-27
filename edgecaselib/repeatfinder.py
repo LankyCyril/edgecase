@@ -17,8 +17,8 @@ __doc__ = """edgeCase repeatfinder: de novo repeat discovery
 
 Usage: {0} repeatfinder [-m integer] [-M integer] [-r integer] [-P float]
        {1}              [--jellyfish filename] [--jellyfish-hash-size string]
-       {1}              [-n integer] [-j integer] [-f flagspec] [-F flagspec]
-       {1}              [-q integer] [--fmt string]
+       {1}              [-n integer] [-j integer] [-q integer]
+       {1}              [-f flagspec]... [-F flagspec]... [--fmt string]
        {1}              [--collapse-reverse-complement] <sequencefile>
 
 Output:

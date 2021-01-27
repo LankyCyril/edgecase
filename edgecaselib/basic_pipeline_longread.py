@@ -83,54 +83,81 @@ __docopt_tests__ = {
 }
 
 
+get_tailpuller_kws = lambda min_quality, max_read_length, file: dict(
+    flags=[0], flag_filter=[3844],
+    min_quality=min_quality, max_read_length=max_read_length, file=file,
+)
+
+
+get_tailchopper_kws = lambda target, min_quality, file: dict(
+    target=target, flags=[target], flag_filter=[3844],
+    min_quality=min_quality, file=file,
+)
+
+
+get_per_arm_args = lambda target: [
+    ("p", [target], ["is_q", 3840]), ("q", [target, "is_q"], [3840]),
+]
+
+
+get_repeatfinder_kws = lambda f, F, q, max_motifs, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, jobs, file: dict(
+    fmt="sam", collapse_reverse_complement=False, flags=f, flag_filter=F,
+    min_quality=q, min_repeats=2, max_motifs=max_motifs,
+    min_k=min_k, max_k=max_k, no_context=False, max_p_adjusted=max_p_adjusted,
+    jellyfish=jellyfish, jellyfish_hash_size=jellyfish_hash_size,
+    jobs=jobs, file=file,
+)
+
+
+get_kmerscanner_kws = lambda f, F, q, motif_file, bin_size, jobs, file: dict(
+    fmt="sam", flags=f, flag_filter=F,
+    min_quality=q, motif_file=motif_file, bin_size=bin_size,
+    head_test=None, tail_test=None, cutoff=None, num_reads=None,
+    jobs=jobs, file=file,
+)
+
+
+get_densityplot_kws = lambda f, F, q, bin_size, n_boot, palette, title, arm, file: dict(
+    gzipped=True, flags=f, flag_filter=F, min_quality=q,
+    exploded=False, zoomed_in=False,
+    bin_size=bin_size, n_boot=n_boot,
+    title=None if title is None else f"{title}, {arm} arm",
+    palette=palette, file=file,
+)
+
+
 def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, bin_size, n_boot, palette, title, min_quality, **kwargs):
     """basic pipeline: select reads, find enriched motifs, plot"""
     get_filename = lambda fn: path.join(output_dir, fn)
     tailpuller_sam = get_filename("tailpuller.sam")
     with open(tailpuller_sam, mode="wt") as sam:
-        tailpuller.main(
-            bam, index, flags=0, flag_filter=3844,
-            min_quality=min_quality, max_read_length=max_read_length, file=sam,
-        )
+        tailpuller.main(bam, index, **get_tailpuller_kws(
+            min_quality, max_read_length, sam,
+        ))
     tailchopper_sam = get_filename("tailchopper.sam")
     with open(tailchopper_sam, mode="wt") as sam:
-        tailchopper.main(
-            tailpuller_sam, index, target=target, flags=target,
-            flag_filter=3844, min_quality=min_quality, file=sam,
-        )
-    for arm, f, F in [("p", target, "is_q|3840"), ("q", target+"|is_q", 3840)]:
-        repeatfinder_tsv = get_filename("repeatfinder-{}_arm.tsv".format(arm))
+        tailchopper.main(tailpuller_sam, index, **get_tailchopper_kws(
+            target, min_quality, sam,
+        ))
+    for arm, f, F in get_per_arm_args(target):
+        repeatfinder_tsv = get_filename(f"repeatfinder-{arm}_arm.tsv")
         with open(repeatfinder_tsv, mode="wt") as tsv:
-            repeatfinder.main(
-                tailchopper_sam, fmt="sam",
-                flags=f, flag_filter=F, collapse_reverse_complement=False,
-                min_quality=min_quality, min_k=min_k, max_k=max_k,
-                max_motifs=max_motifs, max_p_adjusted=max_p_adjusted,
-                no_context=False, jellyfish=jellyfish, min_repeats=2,
-                jellyfish_hash_size=jellyfish_hash_size, jobs=jobs, file=tsv,
-            )
+            repeatfinder.main(tailchopper_sam, **get_repeatfinder_kws(
+                f, F, min_quality, max_motifs, min_k, max_k, max_p_adjusted,
+                jellyfish, jellyfish_hash_size, jobs, tsv,
+            ))
         kmerscanner_dat = get_filename("kmerscanner-{}_arm.dat.gz".format(arm))
         with gzopen(kmerscanner_dat, mode="wt") as dat:
-            kmerscanner.main(
-                tailpuller_sam, fmt="sam", flags=f, flag_filter=F,
-                min_quality=min_quality, motif_file=repeatfinder_tsv,
-                head_test=None, tail_test=None, cutoff=None, num_reads=None,
-                bin_size=bin_size, jobs=jobs, file=dat,
-            )
-        densityplot_pdf = get_filename("densityplot-{}_arm.pdf".format(arm))
+            kmerscanner.main(tailpuller_sam, **get_kmerscanner_kws(
+                f, F, min_quality, repeatfinder_tsv, bin_size, jobs, dat,
+            ))
+        densityplot_pdf = get_filename(f"densityplot-{arm}_arm.pdf")
         with open(densityplot_pdf, mode="wb") as pdf:
             try:
-                if title is None:
-                    plot_title = None
-                else:
-                    plot_title = "{}, {} arm".format(title, arm)
-                densityplot.main(
-                    kmerscanner_dat, gzipped=True, index=index, flags=f,
-                    flag_filter=F, min_quality=min_quality,
-                    bin_size=bin_size, n_boot=n_boot, exploded=False,
-                    zoomed_in=False, palette=palette, title=plot_title,
-                    file=pdf,
-                )
+                densityplot.main(kmerscanner_dat, index, **get_densityplot_kws(
+                    f, F, min_quality, bin_size, n_boot, palette, title,
+                    arm, pdf,
+                ))
             except EmptyKmerscanError:
                 pass
     return 0
