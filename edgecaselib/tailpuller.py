@@ -1,4 +1,4 @@
-from sys import stdout
+from sys import stdout, stderr
 from os import path
 from edgecaselib.formats import load_index, filter_bam
 from pysam import AlignmentFile
@@ -8,13 +8,13 @@ from copy import deepcopy
 from edgecaselib.util import progressbar
 from itertools import chain
 from numpy import isnan, inf
-from pandas import DataFrame
+from collections import Counter
 
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 
 Usage: {0} tailpuller -x filename [-f flagspec]... [-F flagspec]... [-q integer]
-       {1}            [-M integer] [-m integer] [-a] <bam>
+       {1}            [-M integer] [-m integer] <bam>
 
 Output:
     SAM-formatted file with reads overhanging anchors defined in index
@@ -28,7 +28,6 @@ Required options:
 Options:
     -M, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
     -m, --min-overlap [integer]       minimum overlap of subtelomere to consider read [default: 0]
-    -a, --allow-ambiguous             include reads that map to multiple terminal positions / other arms
 
 Input filtering options:
     -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
@@ -151,48 +150,48 @@ def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, samfilters):
         decorated_bam_iterator = progressbar(
             ecxfd, total=len(ecxfd), desc="Pulling", unit="chromosome",
         )
-        candidates = []
+        entries = []
         for chrom in decorated_bam_iterator:
             bam_chunk = get_bam_chunk(
                 bam_data, chrom, ecxfd, reflens, max_read_length,
             )
-            candidates.extend(
+            entries.extend(
                 filter_entries(bam_chunk, ecxfd, samfilters),
             )
-    return bam_header_string, candidates
+    return bam_header_string, entries
 
 
-def get_unambiguous_candidates(candidates):
+def get_unambiguous_entries(entries, min_overlap):
     """Subset candidate entries to those that map unambiguously"""
-    dispatcher = DataFrame(
-        columns=["qname", "flag"],
-        data=[[entry.qname, entry.flag] for entry in candidates],
-    )
-    primaries = set(dispatcher.loc[
-        dispatcher["flag"] & 3844 == 0, "qname",
-    ])
-    primaries_with_duplicates = dispatcher.loc[
-        dispatcher["qname"].isin(primaries), "qname",
-    ]
-    name_counts = primaries_with_duplicates.value_counts()
-    unique_candidate_names = set(name_counts[name_counts==1].index)
-    for entry in candidates:
-        if entry.qname in unique_candidate_names:
-            yield entry
+    unique_qnames = {
+        qname for qname, count
+        in Counter([e.qname for e in entries]).items()
+        if count == 1
+    }
+    for entry in entries:
+        if entry.qname in unique_qnames:
+            if entry.flag & 0x800 == 0: # non-supplementary
+                if entry.reference_length >= min_overlap:
+                    yield entry
 
 
-def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overlap, allow_ambiguous, file=stdout, **kwargs):
+def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overlap, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
-    samfilters = [flags, flag_filter, min_quality]
-    bam_header_string, candidates = parse_bam_with_ambiguity(
-        bam, ecxfd, max_read_length, samfilters,
+    bam_header_string, entries = parse_bam_with_ambiguity(
+        bam, ecxfd, max_read_length, [flags, flag_filter, min_quality],
     )
     print(bam_header_string, file=file)
-    if allow_ambiguous:
-        candidate_iterator = candidates
+    n_orphaned_entries = 0
+    for entry in get_unambiguous_entries(entries, min_overlap):
+        print(entry.to_string(), file=file)
+        if entry.seq is None:
+            n_orphaned_entries += 1
+    if n_orphaned_entries == 0:
+        return 0
     else:
-        candidate_iterator = get_unambiguous_candidates(candidates)
-    for entry in candidate_iterator:
-        if (entry.reference_length or 0) >= min_overlap:
-            print(entry.to_string(), file=file)
+        warning = f"""!!! {n_orphaned_entries} entries have no sequence data;
+            ... this will cause information loss downstream. Please re-submit
+            ... a SAM/BAM with sequences reported for secondary alignments."""
+        print("\n".join(w.strip() for w in warning.split("\n")), file=stderr)
+        return 1
