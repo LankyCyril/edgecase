@@ -87,7 +87,7 @@ def cigar_chopper(entry, ecx, integer_target):
     else:
         cigar_clip = search(r'^(\d+[SH])+', entry.cigarstring)
     if not cigar_clip:
-        update_aligned_segment(entry, None, 0, 0)
+        update_aligned_segment(entry, map_pos=None, start=0, end=0)
         error = "No clipped sequence"
     else:
         clip_length = sum(
@@ -96,13 +96,17 @@ def cigar_chopper(entry, ecx, integer_target):
         )
         if clip_length > 0:
             if is_q:
-                map_pos = entry.reference_end - 1
-                update_aligned_segment(entry, map_pos, -clip_length, None)
+                update_aligned_segment(
+                    entry, map_pos=entry.reference_end-1,
+                    start=-clip_length, end=None,
+                )
             else:
-                map_pos = entry.reference_start
-                update_aligned_segment(entry, map_pos, None, clip_length)
+                update_aligned_segment(
+                    entry, map_pos=entry.reference_start,
+                    start=None, end=clip_length,
+                )
         else:
-            update_aligned_segment(entry, None, 0, 0)
+            update_aligned_segment(entry, map_pos=None, start=0, end=0)
             error = "No clipped sequence"
     return entry, error
 
@@ -160,7 +164,7 @@ def relative_chopper(entry, ecx, integer_target):
     if len(anchor_positions) > 1:
         raise ValueError("Ambiguous index entry: {}".format(anchor_positions))
     elif len(anchor_positions) == 0:
-        update_aligned_segment(entry, None, 0, 0)
+        update_aligned_segment(entry, map_pos=None, start=0, end=0)
         error = "No anchor data in index"
     else:
         anchor_pos = anchor_positions.iloc[0]
@@ -169,13 +173,13 @@ def relative_chopper(entry, ecx, integer_target):
                 entry, anchor_pos, is_q,
             )
         except ValueError as e:
-            update_aligned_segment(entry, None, 0, 0)
+            update_aligned_segment(entry, map_pos=None, start=0, end=0)
             error = str(e)
         else:
             if is_q:
-                update_aligned_segment(entry, map_pos, cut_pos, None)
+                update_aligned_segment(entry, map_pos, start=cut_pos, end=None)
             else:
-                update_aligned_segment(entry, map_pos, None, -cut_pos)
+                update_aligned_segment(entry, map_pos, start=None, end=-cut_pos)
     return entry, error
 
 
