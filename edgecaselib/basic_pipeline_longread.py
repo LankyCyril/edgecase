@@ -8,12 +8,12 @@ from gzip import open as gzopen
 __doc__ = """edgeCase basic pipeline: select reads, find enriched motifs, plot
 
 Usage: {0} basic-pipeline-longread -x filename -o dirname [--force] [-j integer]
-       {1}                [-M integer] [-n integer] [--target targetspec]
-       {1}                [-q integer] [--min-k integer] [--max-k integer]
-       {1}                [--jellyfish filename] [--jellyfish-hash-size string]
-       {1}                [--max-p-adjusted float] [--bin-size integer]
-       {1}                [--n-boot integer] [--palette palettespec]
-       {1}                [--title string] <bam>
+       {1}       [-M integer] [-m integer] [--target targetspec] [-q integer]
+       {1}       [-n integer] [--min-k integer] [--max-k integer]
+       {1}       [--jellyfish filename] [--jellyfish-hash-size string]
+       {1}       [--max-p-adjusted float] [--bin-size integer]
+       {1}       [--n-boot integer] [--palette palettespec]
+       {1}       [--title string] <bam>
 
 Output (in --output-dir):
     * tailpuller.sam                 candidate reads
@@ -36,8 +36,9 @@ Options:
     --force                          force overwrite files in --output-dir
     -j, --jobs [integer]             number of parallel jobs (for jellyfish and kmerscanner) [default: 1]
     -M, --max-read-length [integer]  maximum read length to consider when selecting lookup regions
-    -n, --max-motifs [integer]       maximum number of motifs to report [default: 4]
+    -m, --min-overlap [integer]      minimum overlap of subtelomere to consider read [default: 0]
     --target [targetspec]            an ECX flag for heads/tails [default: tract_anchor]
+    -n, --max-motifs [integer]       maximum number of motifs to report [default: 4]
     --min-k [integer]                smallest target repeat length [default: 4]
     --max-k [integer]                largest target repeat length [default: 16]
     --max-p-adjusted [float]         cutoff adjusted p-value [default: .05]
@@ -61,6 +62,7 @@ __docopt_converters__ = [
     lambda jobs: int(jobs),
     lambda max_read_length:
         inf if (max_read_length is None) else int(max_read_length),
+    lambda min_overlap: 0 if (min_overlap is None) else int(min_overlap),
     lambda max_motifs: int(max_motifs),
     lambda min_k: int(min_k),
     lambda max_k: int(max_k),
@@ -88,9 +90,11 @@ __docopt_tests__ = {
 }
 
 
-get_tailpuller_kws = lambda min_quality, max_read_length, file: dict(
-    flags=[0], flag_filter=[0],
-    min_quality=min_quality, max_read_length=max_read_length, file=file,
+get_tailpuller_kws = lambda min_quality, max_read_length, min_overlap, file: dict(
+    flags=[0], flag_filter=[3844],
+    min_quality=min_quality, max_read_length=max_read_length,
+    min_overlap=min_overlap,
+    file=file,
 )
 
 
@@ -126,13 +130,13 @@ get_densityplot_kws = lambda f, F, q, bin_size, n_boot, palette, title, arm, fil
 )
 
 
-def main(bam, index, output_dir, jobs, max_read_length, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, bin_size, n_boot, palette, title, min_quality, **kwargs):
+def main(bam, index, output_dir, jobs, max_read_length, min_overlap, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, bin_size, n_boot, palette, title, min_quality, **kwargs):
     """basic pipeline: select reads, find enriched motifs, plot"""
     get_filename = lambda fn: path.join(output_dir, fn)
     tailpuller_sam = get_filename("tailpuller.sam")
     with open(tailpuller_sam, mode="wt") as sam:
         tailpuller.main(bam, index, **get_tailpuller_kws(
-            min_quality, max_read_length, sam,
+            min_quality, max_read_length, min_overlap, sam,
         ))
     tailchopper_sam = get_filename("tailchopper.sam")
     with open(tailchopper_sam, mode="wt") as sam:

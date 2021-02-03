@@ -229,6 +229,6 @@ def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overl
     else:
         warning = f"""!!! {n_orphaned_entries} entries have no sequence data;
             ... this will cause information loss downstream. Please re-submit
-            ... a SAM/BAM with sequences reported for secondary alignments."""
+            ... a SAM/BAM with sequences reported for all alignments."""
         print("\n".join(w.strip() for w in warning.split("\n")), file=stderr)
         return 1
