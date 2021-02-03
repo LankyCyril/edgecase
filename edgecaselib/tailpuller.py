@@ -8,7 +8,7 @@ from copy import deepcopy
 from edgecaselib.util import progressbar
 from itertools import chain
 from numpy import isnan, inf
-from collections import Counter
+from pandas import DataFrame, merge
 
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
@@ -161,29 +161,66 @@ def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, samfilters):
     return bam_header_string, entries
 
 
-def get_unambiguous_entries(entries, min_overlap):
+def make_entry_dispatchers(entries, ecx):
+    """Prepare entry descriptions for ambiguity resolution"""
+    entry_dispatcher = DataFrame(
+        columns=["qname", "rname", "mappos", "flag", "entry"],
+        data=[[e.qname, e.reference_name, e.pos, e.flag, e] for e in entries],
+    )
+    entry_dispatcher["prime"] = (entry_dispatcher["flag"] & 0x8000 == 0) * 2 + 3
+    rname_dispatcher = merge(
+        entry_dispatcher[["qname", "rname", "prime"]],
+        ecx[["rname", "prime", "chromosome"]].drop_duplicates(), how="outer",
+    )
+    arm_counts = (
+        rname_dispatcher.groupby("qname")[["chromosome", "prime"]]
+        .nunique().reset_index()
+    )
+    valid_qnames = arm_counts.loc[
+        (arm_counts["chromosome"]==1) & (arm_counts["prime"]==1), "qname",
+    ]
+    assert valid_qnames.value_counts().max() == 1
+    return entry_dispatcher, valid_qnames
+
+
+def get_unambiguous_entries(entries, ecx, min_overlap):
     """Subset candidate entries to those that map unambiguously"""
-    unique_qnames = {
-        qname for qname, count
-        in Counter([e.qname for e in entries]).items()
-        if count == 1
-    }
-    for entry in entries:
-        if entry.qname in unique_qnames:
-            if entry.flag & 0x800 == 0: # non-supplementary
-                if entry.reference_length >= min_overlap:
-                    yield entry
+    entry_dispatcher, valid_qnames = make_entry_dispatchers(entries, ecx)
+    chromosomes = set(ecx["chromosome"].drop_duplicates())
+    for qname in progressbar(valid_qnames, desc="Resolving", unit="read"):
+        entry_mappings = entry_dispatcher[entry_dispatcher["qname"]==qname]
+        entry_mapped_to_main = entry_mappings["rname"].isin(chromosomes)
+        if entry_mapped_to_main.any(): # prefer canonical chromosomes
+            target_entry_mappings = entry_mappings[entry_mapped_to_main]
+        else: # fall back to forks / subtelomeres
+            target_entry_mappings = entry_mappings
+        rnames = target_entry_mappings["rname"].drop_duplicates()
+        primes = target_entry_mappings["prime"].drop_duplicates()
+        if (len(rnames) == 1) and (len(primes) == 1):
+            if primes.iloc[0] == 3: # find innermost mappos on same q arm
+                target_mappos = target_entry_mappings["mappos"].min()
+            else: # find innermost mappos on same p arm
+                target_mappos = target_entry_mappings["mappos"].max()
+            entry_candidates = target_entry_mappings.loc[
+                target_entry_mappings["mappos"]==target_mappos, "entry",
+            ]
+            if len(entry_candidates) == 1:
+                entry = entry_candidates.iloc[0]
+                if entry.flag & 0x800 == 0: # non-supplementary
+                    if entry.reference_length >= min_overlap:
+                        yield entry
 
 
 def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overlap, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
+    ecx = load_index(index, as_filter_dict=False)
     bam_header_string, entries = parse_bam_with_ambiguity(
         bam, ecxfd, max_read_length, [flags, flag_filter, min_quality],
     )
     print(bam_header_string, file=file)
     n_orphaned_entries = 0
-    for entry in get_unambiguous_entries(entries, min_overlap):
+    for entry in get_unambiguous_entries(entries, ecx, min_overlap):
         print(entry.to_string(), file=file)
         if entry.seq is None:
             n_orphaned_entries += 1
