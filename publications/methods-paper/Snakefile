@@ -45,16 +45,16 @@ wildcard_constraints:
 def get_sam_flags(arm, target=None):
     if target:
         if arm == "p_arm":
-            return "-f '{}' -F is_q -F 3844".format(target)
+            return "-f '{}' -F is_q".format(target)
         elif arm == "q_arm":
-            return "-f is_q -f '{}' -F 3844".format(target)
+            return "-f is_q -f '{}'".format(target)
         else:
             raise ValueError("arm", arm)
     else:
         if arm == "p_arm":
-            return "-F is_q -F 3844"
+            return "-F is_q"
         elif arm == "q_arm":
-            return "-f is_q -F 3844"
+            return "-f is_q"
         else:
             raise ValueError("arm", arm)
 

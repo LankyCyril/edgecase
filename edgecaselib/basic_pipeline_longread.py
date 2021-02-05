@@ -91,7 +91,7 @@ __docopt_tests__ = {
 
 
 get_tailpuller_kws = lambda min_quality, max_read_length, min_overlap, file: dict(
-    flags=[0], flag_filter=[3844],
+    flags=[0], flag_filter=[0],
     min_quality=min_quality, max_read_length=max_read_length,
     min_overlap=min_overlap,
     file=file,
