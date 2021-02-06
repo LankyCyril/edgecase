@@ -1,6 +1,6 @@
 from sys import stdout, stderr
 from os import path
-from edgecaselib.formats import load_index, filter_bam
+from edgecaselib.formats import interpret_flags, load_index, filter_bam
 from pysam import AlignmentFile
 from functools import reduce
 from operator import __or__
@@ -13,26 +13,28 @@ from pandas import DataFrame, merge
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 
-Usage: {0} tailpuller -x filename [-f flagspec]... [-F flagspec]... [-q integer]
-       {1}            [-M integer] [-m integer] <bam>
+Usage: {0} tailpuller -x filename
+       {1}            [-M integer] [-m integer] [-t targetspec]...
+       {1}            [-f flagspec]... [-F flagspec]... [-q integer] <bam>
 
 Output:
     SAM-formatted file with reads overhanging anchors defined in index
 
 Positional arguments:
-    <bam>                             name of input BAM/SAM file; must have a .bai index
+    <bam>                            name of input BAM/SAM file; must have a .bai index
 
 Required options:
-    -x, --index [filename]            location of the reference .ecx index
+    -x, --index [filename]           location of the reference .ecx index
 
 Options:
-    -M, --max-read-length [integer]   maximum read length to consider when selecting lookup regions
-    -m, --min-overlap [integer]       minimum overlap of subtelomere to consider read [default: 0]
+    -M, --max-read-length [integer]  maximum read length to consider when selecting lookup regions
+    -m, --min-overlap [integer]      minimum overlap of subtelomere to consider read [default: 0]
+    -t, --target [targetspec]        target reads overlapping these features (ECX flags) [default: tract_anchor]
 
 Input filtering options:
-    -f, --flags [flagspec]            process only entries with all these sam flags present [default: 0]
-    -F, --flag-filter [flagspec]      process only entries with none of these sam flags present [default: 0]
-    -q, --min-quality [integer]       process only entries with this MAPQ or higher [default: 0]
+    -f, --flags [flagspec]           process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]     process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]      process only entries with this MAPQ or higher [default: 0]
 
 Notes:
   * It is recommended to include secondary and supplementary reads (simply put,
@@ -62,6 +64,9 @@ __docopt_tests__ = {
         path.isfile(bam + ".bai"): "BAM index (.bai) not found",
     lambda max_read_length:
         max_read_length > 0: "--max-read-length below 0",
+    lambda target:
+        set(target) <= {"mask_anchor", "fork", "tract_anchor"}:
+            "unknown value of --target",
 }
 
 
@@ -91,7 +96,7 @@ def updated_entry(entry, flags, is_q=False):
     return new_entry
 
 
-def filter_entries(bam_data, ecxfd, samfilters):
+def filter_entries(bam_data, ecxfd, targets, samfilters):
     """Only pass reads extending past regions specified in the ECX"""
     for entry in filter_bam(bam_data, samfilters):
         if entry.reference_name in ecxfd:
@@ -101,12 +106,12 @@ def filter_entries(bam_data, ecxfd, samfilters):
             # collect ECX flags where anchor is to right of read start:
             ecx_t_p5 = ecxfd[entry.reference_name][5]
             p_flags = set(ecx_t_p5.loc[ecx_t_p5["pos"]>=p_pos, "flag"])
-            if p_flags:
+            if targets & p_flags:
                 yield updated_entry(entry, p_flags)
             # collect ECX flags where anchor is to left of read end
             ecx_t_p3 = ecxfd[entry.reference_name][3]
             q_flags = set(ecx_t_p3.loc[ecx_t_p3["pos"]<q_pos, "flag"])
-            if q_flags:
+            if targets & q_flags:
                 yield updated_entry(entry, q_flags, is_q=True)
 
 
@@ -142,7 +147,7 @@ def get_bam_chunk(bam_data, chrom, ecxfd, reflens, max_read_length):
             )
 
 
-def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, samfilters):
+def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, targets, samfilters):
     """Parse BAM file, select overhanging reads, possibly mapping to more than one arm"""
     with AlignmentFile(bam) as bam_data:
         reflens = dict(zip(bam_data.references, bam_data.lengths))
@@ -156,7 +161,7 @@ def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, samfilters):
                 bam_data, chrom, ecxfd, reflens, max_read_length,
             )
             entries.extend(
-                filter_entries(bam_chunk, ecxfd, samfilters),
+                filter_entries(bam_chunk, ecxfd, targets, samfilters),
             )
     return bam_header_string, entries
 
@@ -187,7 +192,7 @@ def get_unambiguous_entries(entries, ecx, min_overlap):
     """Subset candidate entries to those that map unambiguously"""
     entry_dispatcher, valid_qnames = make_entry_dispatchers(entries, ecx)
     chromosomes = set(ecx["chromosome"].drop_duplicates())
-    for qname in progressbar(valid_qnames, desc="Resolving", unit="read"):
+    for qname in progressbar(valid_qnames, desc="Filtering", unit="read"):
         entry_mappings = entry_dispatcher[entry_dispatcher["qname"]==qname]
         entry_mapped_to_main = entry_mappings["rname"].isin(chromosomes)
         if entry_mapped_to_main.any(): # prefer canonical chromosomes
@@ -211,12 +216,14 @@ def get_unambiguous_entries(entries, ecx, min_overlap):
                         yield entry
 
 
-def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overlap, file=stdout, **kwargs):
+def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overlap, target, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
     ecx = load_index(index, as_filter_dict=False)
     bam_header_string, entries = parse_bam_with_ambiguity(
-        bam, ecxfd, max_read_length, [flags, flag_filter, min_quality],
+        bam, ecxfd, max_read_length,
+        targets={interpret_flags(t) for t in target},
+        samfilters=[flags, flag_filter, min_quality],
     )
     print(bam_header_string, file=file)
     n_orphaned_entries = 0
@@ -227,8 +234,11 @@ def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_overl
     if n_orphaned_entries == 0:
         return 0
     else:
-        warning = f"""!!! {n_orphaned_entries} entries have no sequence data;
-            ... this will cause information loss downstream. Please re-submit
-            ... a SAM/BAM with sequences reported for all alignments."""
-        print("\n".join(w.strip() for w in warning.split("\n")), file=stderr)
+        warning = [
+            f"CRITICAL: {n_orphaned_entries} entries have no sequence data;",
+            "          this will cause information loss downstream.",
+            "          Please re-submit a SAM/BAM with sequences reported for ",
+            "          all alignments.",
+        ]
+        print("\n".join(warning), file=stderr)
         return 1

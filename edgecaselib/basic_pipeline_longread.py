@@ -84,16 +84,15 @@ __docopt_tests__ = {
         max_read_length > 0: "--max-read-length below 0",
     lambda target:
         target in {"mask_anchor", "fork", "tract_anchor"}:
-            "unknown value of --target",
+            "unsupported value of --target",
     lambda min_k, max_k:
         0 < min_k < max_k: "not satisfied: 0 < m < M",
 }
 
 
-get_tailpuller_kws = lambda min_quality, max_read_length, min_overlap, file: dict(
-    flags=[0], flag_filter=[0],
-    min_quality=min_quality, max_read_length=max_read_length,
-    min_overlap=min_overlap,
+get_tailpuller_kws = lambda min_quality, max_read_length, min_overlap, target, file: dict(
+    max_read_length=max_read_length, min_overlap=min_overlap, target={target},
+    flags=[0], flag_filter=[0], min_quality=min_quality,
     file=file,
 )
 
@@ -136,7 +135,7 @@ def main(bam, index, output_dir, jobs, max_read_length, min_overlap, max_motifs,
     tailpuller_sam = get_filename("tailpuller.sam")
     with open(tailpuller_sam, mode="wt") as sam:
         tailpuller.main(bam, index, **get_tailpuller_kws(
-            min_quality, max_read_length, min_overlap, sam,
+            min_quality, max_read_length, min_overlap, target, sam,
         ))
     tailchopper_sam = get_filename("tailchopper.sam")
     with open(tailchopper_sam, mode="wt") as sam:

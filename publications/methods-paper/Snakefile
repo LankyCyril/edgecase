@@ -6,6 +6,7 @@ HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
 DATA_DIR = "data/datasets/2021"
 MIN_OVERLAP = 3000
 MAX_READ_LENGTH = 100000
+TARGET = "tract_anchor"
 MIN_PLOT_COVERAGE = 25
 SMALLEST_P_VALUE = 5e-324
 

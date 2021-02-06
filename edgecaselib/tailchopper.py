@@ -207,10 +207,11 @@ def main(bam, index, flags, flag_filter, min_quality, target, file=stdout, **kwa
                 else:
                     n_skipped += 1
     if n_skipped:
-        print(n_skipped, "reads skipped", file=stderr)
-    warnings = [
+        msg_mask = "Skipped {} reads to be safe (unsure where to chop)"
+        print(msg_mask.format(n_skipped), file=stderr)
+    warning = [
         "WARNING: Read mapping positions were adjusted and retained;",
         "         this is needed to comply with the SAM spec.",
-        "         Do not use these positions for analyses outside of edgeCase!"
+        "         Do not use these positions for analyses outside of edgeCase!",
     ]
-    print("\n".join(warnings), file=stderr)
+    print("\n".join(warning), file=stderr)

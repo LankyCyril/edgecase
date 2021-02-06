@@ -16,11 +16,12 @@ rule tailpuller:
     params:
         max_read_length=MAX_READ_LENGTH,
         min_overlap=MIN_OVERLAP,
-        target_flags="-f0x4000",
+        target=TARGET,
+        samtools_flags="-f0x4000",
     shell: """
-        ./edgecase tailpuller -x {HG38EXT_ECX} \
+        ./edgecase tailpuller -x {HG38EXT_ECX} -t {params.target} \
             -M {params.max_read_length} -m {params.min_overlap} {input.bam} \
-        | samtools view -bh {params.target_flags} > {output.bam}
+        | samtools view -bh {params.samtools_flags} > {output.bam}
     """
 
 rule tailchopper:
@@ -28,9 +29,11 @@ rule tailchopper:
         bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
     output:
         bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailchopper.bam",
+    params:
+        target=TARGET,
     shell: """
         ./edgecase tailchopper -x {HG38EXT_ECX} \
-            -f tract_anchor -t tract_anchor {input.bam} \
+            -f {params.target} -t {params.target} {input.bam} \
         | samtools view -bh > {output.bam}
     """
 
