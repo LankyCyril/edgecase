@@ -1,6 +1,7 @@
 __pycache__
 .snakemake
 .ipynb_checkpoints
+.sourcetrail
 data
 tools
 sandbox
