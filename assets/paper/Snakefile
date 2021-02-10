@@ -61,13 +61,13 @@ def get_sam_flags(arm, target=None):
             raise ValueError("arm", arm)
 
 
-include: "publications/methods-paper/snakefiles/longread-motifs.snake"
-include: "publications/methods-paper/snakefiles/shortread-support.snake"
-include: "publications/methods-paper/snakefiles/shortread-motifs.snake"
-include: "publications/methods-paper/snakefiles/bonferroni.snake"
-include: "publications/methods-paper/snakefiles/densityplots.snake"
-include: "publications/methods-paper/snakefiles/kmerscanner-all.snake"
-include: "publications/methods-paper/snakefiles/levenshtein.snake"
+include: "assets/paper/snakefiles/longread-motifs.snake"
+include: "assets/paper/snakefiles/shortread-support.snake"
+include: "assets/paper/snakefiles/shortread-motifs.snake"
+include: "assets/paper/snakefiles/bonferroni.snake"
+include: "assets/paper/snakefiles/densityplots.snake"
+include: "assets/paper/snakefiles/kmerscanner-all.snake"
+include: "assets/paper/snakefiles/levenshtein.snake"
 
 
 rule densityplot_all:
