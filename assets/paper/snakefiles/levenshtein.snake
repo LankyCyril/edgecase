@@ -54,3 +54,14 @@ rule all_bam:
             """)
         shell("samtools view -bh {params.sam} > {output.bam}")
         shell("rm {params.sam}")
+
+rule kmerscanner_for_haploplots:
+    input:
+        bam=f"{DATA_DIR}/PacBio/tailpuller.bam",
+        tsv=f"{DATA_DIR}/PacBio/repeatfinder-q_arm-plottable.tsv",
+    output:
+        dat=f"{DATA_DIR}/PacBio/kmerscanner-q_arm.dat.gz",
+    shell: """
+        ./edgecase kmerscanner --motif-file {input.tsv} -b 10 \
+            -f0x4000 -f0x8000 {input.bam} | gzip -2 > {output.dat}
+    """

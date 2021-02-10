@@ -111,3 +111,10 @@ rule levenshtein_all:
                 --output-dir {params.directory} \
                 {input.bam} > {output.tsv}
         """)
+
+rule all:
+    input:
+        rules.densityplot_all.input,
+        rules.kmerscanner_all_motifs_all_subjects.input,
+        rules.levenshtein_all.input,
+        rules.kmerscanner_for_haploplots.input,
