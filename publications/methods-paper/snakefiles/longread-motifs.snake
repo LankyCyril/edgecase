@@ -14,11 +14,18 @@ rule tailpuller:
     output:
         bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
     params:
-        max_read_length=MAX_READ_LENGTH, flags="-f0x4000"
+        max_read_length=MAX_READ_LENGTH,
+        min_map_overlap=MIN_MAP_OVERLAP,
+        min_candidate_overlap=MIN_CANDIDATE_OVERLAP,
+        target=TARGET,
+        samtools_flags="-f0x4000",
     shell: """
-        ./edgecase tailpuller \
-            -x {HG38EXT_ECX} -m {params.max_read_length} -F3844 {input.bam} \
-        | samtools view -bh {params.flags} > {output.bam}
+        ./edgecase tailpuller -x {HG38EXT_ECX} -t {params.target} \
+            -M {params.max_read_length} \
+            --min-map-overlap {params.min_map_overlap} \
+            -m {params.min_candidate_overlap} \
+            {input.bam} \
+        | samtools view -bh {params.samtools_flags} > {output.bam}
     """
 
 rule tailchopper:
@@ -26,8 +33,11 @@ rule tailchopper:
         bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
     output:
         bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailchopper.bam",
+    params:
+        target=TARGET,
     shell: """
-        ./edgecase tailchopper -x {HG38EXT_ECX} -t tract_anchor {input.bam} \
+        ./edgecase tailchopper -x {HG38EXT_ECX} \
+            -f {params.target} -t {params.target} {input.bam} \
         | samtools view -bh > {output.bam}
     """
 
@@ -70,8 +80,8 @@ rule combined_bam:
 rule repeatfinder_pacbio:
     input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailchopper.bam",
     output: tsv=DATA_DIR+"/PacBio/{group}/{subject}/repeatfinder-{arm}.tsv",
-    params: s="4G", min_k=4, max_k=16, max_p_adjusted=1.1,
-    threads: 12,
+    params: s="24G", min_k=4, max_k=16, max_p_adjusted=1.1,
+    threads: 24,
     run:
         flags = get_sam_flags(wildcards.arm)
         shell("""

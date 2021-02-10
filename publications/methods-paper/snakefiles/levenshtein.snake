@@ -54,18 +54,3 @@ rule all_bam:
             """)
         shell("samtools view -bh {params.sam} > {output.bam}")
         shell("rm {params.sam}")
-
-
-rule all_levenshtein:
-    input: bam=DATA_DIR+"/PacBio/tailpuller.bam",
-    output: tsv=DATA_DIR+"/PacBio/haplotypes/levenshtein-{arm}.tsv",
-    params: directory=DATA_DIR+"/PacBio/haplotypes/levenshtein-{arm}",
-    threads: 96,
-    run:
-        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
-        shell("""
-            mkdir {params.directory} 2>/dev/null || :
-            ./edgecase levenshtein -j {threads} {flags} \
-                --output-dir {params.directory} \
-                {input.bam} > {output.tsv}
-        """)

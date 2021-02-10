@@ -7,8 +7,8 @@ from edgecaselib.util import progressbar
 
 __doc__ = """edgeCase tailchopper: selection of overhanging heads/tails of reads
 
-Usage: {0} tailchopper -x filename [-t targetspec] [-f flagspec] [-F flagspec]
-       {1}             [-q integer] <bam>
+Usage: {0} tailchopper -x filename [-t targetspec]
+       {1}             [-f flagspec]... [-F flagspec]... [-q integer] <bam>
 
 Output:
     SAM-formatted file with tails of candidate reads overhanging anchors defined
@@ -27,6 +27,11 @@ Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
     -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+
+Notes:
+  * Depending on the aligner used, MAPQ of secondary reads may have been set to
+    zero regardless of real mapping quality; use this filtering option with
+    caution.
 """
 
 __docopt_converters__ = [
@@ -82,7 +87,7 @@ def cigar_chopper(entry, ecx, integer_target):
     else:
         cigar_clip = search(r'^(\d+[SH])+', entry.cigarstring)
     if not cigar_clip:
-        update_aligned_segment(entry, None, 0, 0)
+        update_aligned_segment(entry, map_pos=None, start=0, end=0)
         error = "No clipped sequence"
     else:
         clip_length = sum(
@@ -91,13 +96,17 @@ def cigar_chopper(entry, ecx, integer_target):
         )
         if clip_length > 0:
             if is_q:
-                map_pos = entry.reference_end - 1
-                update_aligned_segment(entry, map_pos, -clip_length, None)
+                update_aligned_segment(
+                    entry, map_pos=entry.reference_end-1,
+                    start=-clip_length, end=None,
+                )
             else:
-                map_pos = entry.reference_start
-                update_aligned_segment(entry, map_pos, None, clip_length)
+                update_aligned_segment(
+                    entry, map_pos=entry.reference_start,
+                    start=None, end=clip_length,
+                )
         else:
-            update_aligned_segment(entry, None, 0, 0)
+            update_aligned_segment(entry, map_pos=None, start=0, end=0)
             error = "No clipped sequence"
     return entry, error
 
@@ -155,7 +164,7 @@ def relative_chopper(entry, ecx, integer_target):
     if len(anchor_positions) > 1:
         raise ValueError("Ambiguous index entry: {}".format(anchor_positions))
     elif len(anchor_positions) == 0:
-        update_aligned_segment(entry, None, 0, 0)
+        update_aligned_segment(entry, map_pos=None, start=0, end=0)
         error = "No anchor data in index"
     else:
         anchor_pos = anchor_positions.iloc[0]
@@ -164,13 +173,13 @@ def relative_chopper(entry, ecx, integer_target):
                 entry, anchor_pos, is_q,
             )
         except ValueError as e:
-            update_aligned_segment(entry, None, 0, 0)
+            update_aligned_segment(entry, map_pos=None, start=0, end=0)
             error = str(e)
         else:
             if is_q:
-                update_aligned_segment(entry, map_pos, cut_pos, None)
+                update_aligned_segment(entry, map_pos, start=cut_pos, end=None)
             else:
-                update_aligned_segment(entry, map_pos, None, -cut_pos)
+                update_aligned_segment(entry, map_pos, start=None, end=-cut_pos)
     return entry, error
 
 
@@ -198,10 +207,12 @@ def main(bam, index, flags, flag_filter, min_quality, target, file=stdout, **kwa
                 else:
                     n_skipped += 1
     if n_skipped:
-        print(n_skipped, "reads skipped", file=stderr)
-    warnings = [
+        msg_mask = "Skipped {} reads to be safe (unsure where to chop)"
+        print(msg_mask.format(n_skipped), file=stderr)
+    warning = [
         "WARNING: Read mapping positions were adjusted and retained;",
         "         this is needed to comply with the SAM spec.",
-        "         Do not use these positions for analyses outside of edgeCase!"
+        "         Do not use these positions for analyses outside of edgeCase!",
     ]
-    print("\n".join(warnings), file=stderr)
+    print("\n".join(warning), file=stderr)
+    return 0

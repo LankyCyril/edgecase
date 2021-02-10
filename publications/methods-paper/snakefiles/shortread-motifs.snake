@@ -2,7 +2,7 @@ make_pvals_worse = lambda p: p if p != 0 else SMALLEST_P_VALUE
 
 
 rule repeatfinder_illumina:
-    input: fq=DATA_DIR+"/NASA/Illumina/{subject}/telbam.fq.gz",
+    input: fq=DATA_DIR+"/NASA/Illumina/{subject}/telbam.fa",
     output: tsv=DATA_DIR+"/NASA/Illumina/{subject}/repeatfinder.tsv",
     params: s="32G", min_k=4, max_k=16, max_p_adjusted=1.1,
     threads: 12,

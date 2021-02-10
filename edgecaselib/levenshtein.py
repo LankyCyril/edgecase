@@ -29,7 +29,7 @@ experiments."""
 __doc__ = """edgeCase levenshtein: clustering of telomeric reads by distance
 
 Usage: {0} levenshtein [-j integer] [-m integer] [-o dirname]
-       {1}             [-f flagspec] [-F flagspec] [-q integer]
+       {1}             [-f flagspec]... [-F flagspec]... [-q integer]
        {1}             [--kmerscanner-file filename] <sequencedata>
 
 Output:
