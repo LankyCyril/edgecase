@@ -146,34 +146,41 @@ def main(bam, index, output_dir, jobs, max_read_length, min_map_overlap, min_can
     get_filename = lambda fn: path.join(output_dir, fn)
     tailpuller_sam = get_filename("tailpuller.sam")
     with open(tailpuller_sam, mode="wt") as sam:
-        tailpuller.main(bam, index, **get_tailpuller_kws(
+        ret = tailpuller.main(bam, index, **get_tailpuller_kws(
             min_quality, max_read_length, min_map_overlap,
             min_candidate_overlap, target, sam,
         ))
+        if ret != 0: return ret
     tailchopper_sam = get_filename("tailchopper.sam")
     with open(tailchopper_sam, mode="wt") as sam:
-        tailchopper.main(tailpuller_sam, index, **get_tailchopper_kws(
+        ret = tailchopper.main(tailpuller_sam, index, **get_tailchopper_kws(
             target, min_quality, sam,
         ))
+        if ret != 0: return ret
     for arm, f, F in [("p", [target], ["is_q"]), ("q", [target, "is_q"], [0])]:
         repeatfinder_tsv = get_filename(f"repeatfinder-{arm}_arm.tsv")
         with open(repeatfinder_tsv, mode="wt") as tsv:
-            repeatfinder.main(tailchopper_sam, **get_repeatfinder_kws(
+            ret = repeatfinder.main(tailchopper_sam, **get_repeatfinder_kws(
                 f, F, min_quality, max_motifs, min_k, max_k, max_p_adjusted,
                 jellyfish, jellyfish_hash_size, jobs, tsv,
             ))
+            if ret != 0: return ret
         kmerscanner_dat = get_filename("kmerscanner-{}_arm.dat.gz".format(arm))
         with gzopen(kmerscanner_dat, mode="wt") as dat:
-            kmerscanner.main(tailpuller_sam, **get_kmerscanner_kws(
+            ret = kmerscanner.main(tailpuller_sam, **get_kmerscanner_kws(
                 f, F, min_quality, repeatfinder_tsv, bin_size, jobs, dat,
             ))
+            if ret != 0: return ret
         densityplot_pdf = get_filename(f"densityplot-{arm}_arm.pdf")
         with open(densityplot_pdf, mode="wb") as pdf:
             try:
-                densityplot.main(kmerscanner_dat, index, **get_densityplot_kws(
-                    f, F, min_quality, bin_size, n_boot, palette, title,
-                    arm, pdf,
-                ))
+                ret = densityplot.main(
+                    kmerscanner_dat, index, **get_densityplot_kws(
+                        f, F, min_quality, bin_size, n_boot, palette, title,
+                        arm, pdf,
+                    ),
+                )
+                if ret != 0: return ret
             except EmptyKmerscanError:
                 pass
     return 0
