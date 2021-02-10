@@ -70,51 +70,11 @@ include: "assets/paper/snakefiles/kmerscanner-all.snake"
 include: "assets/paper/snakefiles/levenshtein.snake"
 
 
-rule densityplot_all:
-    input:
-        p_arm=[
-            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-p_arm.pdf"
-            for _, (group, subject)
-            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
-        ],
-        q_arm=[
-            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-q_arm.pdf"
-            for _, (group, subject)
-            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
-        ],
-
-
-rule kmerscanner_all_motifs_all_subjects:
-    input:
-        p_arm=[
-            DATA_DIR+f"/PacBio/{group}/{subject}/kmerscanner-all-p_arm.dat.gz"
-            for _, (group, subject)
-            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
-        ],
-        q_arm=[
-            DATA_DIR+f"/PacBio/{group}/{subject}/kmerscanner-all-q_arm.dat.gz"
-            for _, (group, subject)
-            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
-        ],
-
-
-rule levenshtein_all:
-    input: bam=DATA_DIR+"/PacBio/tailpuller.bam",
-    output: tsv=DATA_DIR+"/PacBio/haplotypes/levenshtein-q_arm.tsv",
-    params: directory=DATA_DIR+"/PacBio/haplotypes/levenshtein-q_arm",
-    threads: 96,
-    run:
-        flags = get_sam_flags("q_arm", target="tract_anchor")
-        shell("""
-            mkdir {params.directory} 2>/dev/null || :
-            ./edgecase levenshtein -j {threads} {flags} \
-                --output-dir {params.directory} \
-                {input.bam} > {output.tsv}
-        """)
-
 rule all:
     input:
         rules.densityplot_all.input,
+        rules.telbam_support_all.input,
         rules.kmerscanner_all_motifs_all_subjects.input,
-        rules.levenshtein_all.input,
         rules.kmerscanner_for_haploplots.input,
+        rules.levenshtein_all.input,
+        rules.repeatfinder_all_shortread.input,

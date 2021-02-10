@@ -81,3 +81,17 @@ rule densityplot:
                     -x {HG38EXT_ECX} --palette paper --title ' ' {flags} \
                     -z {input} > {output}
             """)
+
+
+rule densityplot_all:
+    input:
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-p_arm.pdf"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-q_arm.pdf"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],

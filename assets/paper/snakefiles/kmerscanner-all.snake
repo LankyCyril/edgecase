@@ -21,3 +21,17 @@ rule kmerscanner_all_motifs:
             ./edgecase kmerscanner --motif-file {input.tsv} -b 10 \
                 {flags} {input.bam} | gzip -2 > {output.dat}
         """)
+
+
+rule kmerscanner_all_motifs_all_subjects:
+    input:
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/kmerscanner-all-p_arm.dat.gz"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/kmerscanner-all-q_arm.dat.gz"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],

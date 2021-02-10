@@ -1,6 +1,7 @@
 from pysam import AlignmentFile
 from gzip import open as gzopen
 
+
 rule bam_to_fastq:
     input: bam="{prefix}/telbam.bam"
     output: fq="{prefix}/telbam.fq.gz"
@@ -52,3 +53,11 @@ rule telbam_support:
             {input.tailchopper} {input.telbam_fq} \
         | samtools view -F4 -bh > {output.bam}
     """
+
+rule telbam_support_all:
+    input:
+        bams=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/telbam2tailchopper.bam"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
