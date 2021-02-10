@@ -215,3 +215,4 @@ def main(bam, index, flags, flag_filter, min_quality, target, file=stdout, **kwa
         "         Do not use these positions for analyses outside of edgeCase!",
     ]
     print("\n".join(warning), file=stderr)
+    return 0

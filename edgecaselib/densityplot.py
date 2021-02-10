@@ -581,3 +581,4 @@ def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot,
             densities, n_boot, ecx, title, palette, legend, target_anchor,
             is_q, zoomed_in, file,
         )
+    return 0

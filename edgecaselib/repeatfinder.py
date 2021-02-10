@@ -344,3 +344,4 @@ def main(sequencefile, fmt, flags, flag_filter, min_quality, min_k, max_k, min_r
                 explained_analysis, min_k, max_motifs, total_bases,
             )
             formatted_analysis.to_csv(file, sep="\t", index=False)
+    return 0

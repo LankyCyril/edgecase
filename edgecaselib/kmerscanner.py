@@ -184,3 +184,4 @@ def main(sequencefile, fmt, flags, flag_filter, min_quality, motif_file, bin_siz
                     ]
                     print(*meta_fields, sep="\t", end="\t", file=file)
                     print(*density_array, sep=",", file=file)
+    return 0
