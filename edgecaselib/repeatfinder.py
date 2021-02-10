@@ -17,8 +17,8 @@ __doc__ = """edgeCase repeatfinder: de novo repeat discovery
 
 Usage: {0} repeatfinder [-m integer] [-M integer] [-r integer] [-P float]
        {1}              [--jellyfish filename] [--jellyfish-hash-size string]
-       {1}              [-n integer] [-j integer] [-f flagspec] [-F flagspec]
-       {1}              [-q integer] [--fmt string]
+       {1}              [-n integer] [-j integer] [-q integer]
+       {1}              [-f flagspec]... [-F flagspec]... [--fmt string]
        {1}              [--collapse-reverse-complement] <sequencefile>
 
 Output:
@@ -43,6 +43,11 @@ Input filtering options:
     -f, --flags [flagspec]              process only entries with all these sam flags present [default: 0]
     -F, --flag-filter [flagspec]        process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]         process only entries with this MAPQ or higher [default: 0]
+
+Notes:
+  * Depending on the aligner used, MAPQ of secondary reads may have been set to
+    zero regardless of real mapping quality; use this filtering option with
+    caution.
 """
 
 __docopt_converters__ = [
@@ -339,3 +344,4 @@ def main(sequencefile, fmt, flags, flag_filter, min_quality, min_k, max_k, min_r
                 explained_analysis, min_k, max_motifs, total_bases,
             )
             formatted_analysis.to_csv(file, sep="\t", index=False)
+    return 0

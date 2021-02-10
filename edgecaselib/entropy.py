@@ -9,7 +9,7 @@ from itertools import chain
 
 __doc__ = """edgeCase entropy: calculation of motif entropy among reads
 
-Usage: {0} entropy [-b integer] [-f flagspec] [-F flagspec] [-q integer]
+Usage: {0} entropy [-b integer] [-f flagspec]... [-F flagspec]... [-q integer]
        {1}         [-z] <dat>...
 
 Output:

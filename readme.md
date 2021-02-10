@@ -118,8 +118,8 @@ tract_anchor       | 16384 | 0x4000    | edgeCase-specific flag; added during pi
 is_q               | 32768 | 0x8000    | edgeCase-specific flag; added during pipeline
 
 *Note:* All edgeCase routines that allow flag filtering recognize both the
-numeric flag format (such as 3844) and the "human-readable" format such as "rev"
-or "is_q|paired". Combinations are also understood, for example, "3844|is_q".
+numeric flag format (such as 3844) and the "human-readable" format such as "rev".
+Combinations are also understood, for example, "-F 3844 -F is_q".
 
 
 ## The edgeCase pipeline
