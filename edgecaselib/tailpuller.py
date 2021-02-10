@@ -13,8 +13,8 @@ from pandas import DataFrame, merge
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 
-Usage: {0} tailpuller -x filename
-       {1}            [-M integer] [-m integer] [-t targetspec]...
+Usage: {0} tailpuller -x filename [-t targetspec]...
+       {1}            [-M integer] [--min-map-overlap integer] [-m integer]
        {1}            [-f flagspec]... [-F flagspec]... [-q integer] <bam>
 
 Output:

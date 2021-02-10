@@ -8,7 +8,8 @@ from gzip import open as gzopen
 __doc__ = """edgeCase basic pipeline: select reads, find enriched motifs, plot
 
 Usage: {0} basic-pipeline-longread -x filename -o dirname [--force] [-j integer]
-       {1}       [-M integer] [-m integer] [--target targetspec] [-q integer]
+       {1}       [-M integer] [--min-map-overlap integer] [-m integer]
+       {1}       [--target targetspec] [-q integer]
        {1}       [-n integer] [--min-k integer] [--max-k integer]
        {1}       [--jellyfish filename] [--jellyfish-hash-size string]
        {1}       [--max-p-adjusted float] [--bin-size integer]
