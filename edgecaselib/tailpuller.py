@@ -21,28 +21,28 @@ Output:
     SAM-formatted file with reads overhanging anchors defined in index
 
 Positional arguments:
-    <bam>                                  name of input BAM/SAM file; must have a .bai index
+    <bam>                                    name of input BAM/SAM file; must have a .bai index
 
 Required options:
-    -x, --index [filename]                 location of the reference .ecx index
+    -x, --index [filename]                   location of the reference .ecx index
 
 Options:
-    -M, --max-read-length [integer]        maximum read length to consider when selecting lookup regions *
-    --min-map-overlap [integer]            minimum overlap of reference to consider read as mapped [default: 1] **
-    -m, --min-candidate-overlap [integer]  minimum overlap of subtelomere to consider read as candidate [default: 1] ***
-    -t, --target [targetspec]              target reads overlapping these features (ECX flags) [default: tract_anchor]
+    -t, --target [targetspec]                target reads overlapping these features (ECX flags) [default: tract_anchor]
+    -M, --max-read-length [integer]          maximum read length to consider when selecting lookup regions *
+    --min-map-overlap [integer]              minimum overlap of reference to consider read as mapped [default: 1] **
+    -m, --min-subtelomere-overlap [integer]  minimum overlap of subtelomere to consider read as candidate [default: 1] ***
 
 Input filtering options:
-    -f, --flags [flagspec]                 process only entries with all these sam flags present [default: 0]
-    -F, --flag-filter [flagspec]           process only entries with none of these sam flags present [default: 0] ****
-    -q, --min-quality [integer]            process only entries with this MAPQ or higher [default: 0] *****
+    -f, --flags [flagspec]                   process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]             process only entries with none of these sam flags present [default: 0] ****
+    -q, --min-quality [integer]              process only entries with this MAPQ or higher [default: 0] *****
 
 Notes:
-    * Suggested value of --max-read-length for PacBio: 200000;
+    * Suggested value of --max-read-length for PacBio HiFi: 30000;
       if not specified, will assume +infinity (will be slow).
-   ** Suggested value of --min-map-overlap for PacBio: 500;
+   ** Suggested value of --min-map-overlap for PacBio HiFi: 500;
       if not specified, will assume 1.
-  *** Suggested value of --min-candidate-overlap for PacBio: 3000;
+  *** Suggested value of --min-subtelomere-overlap for PacBio HiFi: 3000;
       if not specified, will assume 1.
  **** It is recommended to include secondary and supplementary reads (i.e.,
       leave the -F flag as default [0]), because:
@@ -64,8 +64,8 @@ __docopt_converters__ = [
         inf if (max_read_length is None) else int(max_read_length),
     lambda min_map_overlap:
         1 if (min_map_overlap is None) else int(min_map_overlap),
-    lambda min_candidate_overlap:
-        1 if (min_candidate_overlap is None) else int(min_candidate_overlap),
+    lambda min_subtelomere_overlap:
+        1 if (min_subtelomere_overlap is None) else int(min_subtelomere_overlap),
 ]
 
 __docopt_tests__ = {
@@ -200,7 +200,7 @@ def make_entry_dispatchers(entries, ecx):
     return entry_dispatcher, valid_qnames
 
 
-def get_unambiguous_entries(entries, ecx, min_candidate_overlap):
+def get_unambiguous_entries(entries, ecx, min_subtelomere_overlap):
     """Subset candidate entries to those that map unambiguously"""
     entry_dispatcher, valid_qnames = make_entry_dispatchers(entries, ecx)
     chromosomes = set(ecx["chromosome"].drop_duplicates())
@@ -224,11 +224,11 @@ def get_unambiguous_entries(entries, ecx, min_candidate_overlap):
             if len(entry_candidates) == 1:
                 entry = entry_candidates.iloc[0]
                 if entry.flag & 0x800 == 0: # non-supplementary
-                    if entry.reference_length >= min_candidate_overlap:
+                    if entry.reference_length >= min_subtelomere_overlap:
                         yield entry
 
 
-def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_map_overlap, min_candidate_overlap, target, file=stdout, **kwargs):
+def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_map_overlap, min_subtelomere_overlap, target, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
     ecx = load_index(index, as_filter_dict=False)
@@ -239,7 +239,7 @@ def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_map_o
     )
     print(bam_header_string, file=file)
     n_orphaned_entries = 0
-    for entry in get_unambiguous_entries(entries, ecx, min_candidate_overlap):
+    for entry in get_unambiguous_entries(entries, ecx, min_subtelomere_overlap):
         if entry.mapq >= min_quality: # enforce quality on second pass
             print(entry.to_string(), file=file)
             if entry.seq is None:

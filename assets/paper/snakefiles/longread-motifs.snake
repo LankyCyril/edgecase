@@ -16,14 +16,15 @@ rule tailpuller:
     params:
         max_read_length=MAX_READ_LENGTH,
         min_map_overlap=MIN_MAP_OVERLAP,
-        min_candidate_overlap=MIN_CANDIDATE_OVERLAP,
+        min_subtelomere_overlap=MIN_SUBTELOMERE_OVERLAP,
+        min_telomere_overlap=MIN_TELOMERE_OVERLAP,
         target=TARGET,
         samtools_flags="-f0x4000",
     shell: """
         ./edgecase tailpuller -x {HG38EXT_ECX} -t {params.target} \
             -M {params.max_read_length} \
             --min-map-overlap {params.min_map_overlap} \
-            -m {params.min_candidate_overlap} \
+            -m {params.min_subtelomere_overlap} \
             {input.bam} \
         | samtools view -bh {params.samtools_flags} > {output.bam}
     """
