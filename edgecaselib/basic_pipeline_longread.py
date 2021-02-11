@@ -9,6 +9,7 @@ __doc__ = """edgeCase basic pipeline: select reads, find enriched motifs, plot
 
 Usage: {0} basic-pipeline-longread -x filename -o dirname [--force] [-j integer]
        {1}       [-M integer] [--min-map-overlap integer] [-m integer]
+       {1}       [--min-telomere-overlap integer]
        {1}       [--target targetspec] [-q integer]
        {1}       [-n integer] [--min-k integer] [--max-k integer]
        {1}       [--jellyfish filename] [--jellyfish-hash-size string]
@@ -39,6 +40,7 @@ Options:
     -M, --max-read-length [integer]          maximum read length to consider when selecting lookup regions *
     --min-map-overlap [integer]              minimum overlap of reference to consider read as mapped [default: 1] **
     -m, --min-subtelomere-overlap [integer]  minimum overlap of subtelomere to consider read as candidate [default: 1] ***
+    --min-telomere-overlap [integer]         minimum overlap of telomere to consider read as candidate [default: 1] ***
     --target [targetspec]                    an ECX flag for heads/tails [default: tract_anchor]
     -n, --max-motifs [integer]               maximum number of motifs to report [default: 4]
     --min-k [integer]                        smallest target repeat length [default: 4]
@@ -58,11 +60,9 @@ Notes:
    * Suggested value of --max-read-length for PacBio HiFi: 30000;
      if not specified, will assume +infinity (will be slow).
   ** Suggested value of --min-map-overlap for PacBio HiFi: 500;
-     if not specified, will assume 1.
- *** Suggested value of --min-subtelomere-overlap for PacBio HiFi: 3000;
-     if not specified, will assume 1.
-**** Depending on the aligner used, MAPQ of secondary reads may have been set to
-     zero regardless of real mapping quality; use this filtering option with
+ *** Suggested value of --min-(sub)telomere-overlap for PacBio HiFi: 3000;
+**** Depending on the aligner used, MAPQ of secondary reads may have been set
+     to zero regardless of real mapping quality; use this filtering option with
      caution.
 """
 
@@ -74,6 +74,8 @@ __docopt_converters__ = [
         1 if (min_map_overlap is None) else int(min_map_overlap),
     lambda min_subtelomere_overlap:
         1 if (min_subtelomere_overlap is None) else int(min_subtelomere_overlap),
+    lambda min_telomere_overlap:
+        None if (min_telomere_overlap is None) else int(min_telomere_overlap),
     lambda max_motifs: int(max_motifs),
     lambda min_k: int(min_k),
     lambda max_k: int(max_k),
@@ -101,10 +103,10 @@ __docopt_tests__ = {
 }
 
 
-get_tailpuller_kws = lambda min_quality, max_read_length, min_map_overlap, min_subtelomere_overlap, target, file: dict(
+get_tailpuller_kws = lambda min_quality, max_read_length, min_map_overlap, min_subtelomere_overlap, min_telomere_overlap, target, file: dict(
     max_read_length=max_read_length, target={target},
-    min_map_overlap=min_map_overlap,
     min_subtelomere_overlap=min_subtelomere_overlap,
+    min_telomere_overlap=min_telomere_overlap, min_map_overlap=min_map_overlap,
     flags=[0], flag_filter=[0], min_quality=min_quality,
     file=file,
 )
@@ -142,14 +144,14 @@ get_densityplot_kws = lambda f, F, q, bin_size, n_boot, palette, title, arm, fil
 )
 
 
-def main(bam, index, output_dir, jobs, max_read_length, min_map_overlap, min_subtelomere_overlap, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, bin_size, n_boot, palette, title, min_quality, **kwargs):
+def main(bam, index, output_dir, jobs, max_read_length, min_map_overlap, min_subtelomere_overlap, min_telomere_overlap, max_motifs, target, min_k, max_k, max_p_adjusted, jellyfish, jellyfish_hash_size, bin_size, n_boot, palette, title, min_quality, **kwargs):
     """basic pipeline: select reads, find enriched motifs, plot"""
     get_filename = lambda fn: path.join(output_dir, fn)
     tailpuller_sam = get_filename("tailpuller.sam")
     with open(tailpuller_sam, mode="wt") as sam:
         ret = tailpuller.main(bam, index, **get_tailpuller_kws(
             min_quality, max_read_length, min_map_overlap,
-            min_subtelomere_overlap, target, sam,
+            min_subtelomere_overlap, min_telomere_overlap, target, sam,
         ))
         if ret != 0: return ret
     tailchopper_sam = get_filename("tailchopper.sam")

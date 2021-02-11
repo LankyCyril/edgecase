@@ -24,7 +24,8 @@ rule tailpuller:
         ./edgecase tailpuller -x {HG38EXT_ECX} -t {params.target} \
             -M {params.max_read_length} \
             --min-map-overlap {params.min_map_overlap} \
-            -m {params.min_subtelomere_overlap} \
+            --min-subtelomere-overlap {params.min_subtelomere_overlap} \
+            --min-telomere-overlap {params.min_telomere_overlap} \
             {input.bam} \
         | samtools view -bh {params.samtools_flags} > {output.bam}
     """
