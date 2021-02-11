@@ -1,7 +1,7 @@
 from sys import stdout
 from edgecaselib.formats import load_index, load_kmerscan
 from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
-from edgecaselib.formats import DEFAULT_MOTIF_COLORS, PAPER_PALETTE, BGCOLOR
+from edgecaselib.formats import TOL_COLORSCHEME, PAPER_PALETTE, BGCOLOR
 from collections import OrderedDict
 from edgecaselib.util import natsorted_chromosomes, progressbar, motif_revcomp
 from matplotlib.pyplot import subplots, rc_context, switch_backend
@@ -319,13 +319,13 @@ def generate_updated_palette(palette, motif_order):
     """Given user palette and motifs in density file, generate palette that satisfies both"""
     updated_palette = OrderedDict()
     if palette is None:
-        if len(motif_order) > len(DEFAULT_MOTIF_COLORS):
+        if len(motif_order) > len(TOL_COLORSCHEME):
             error_msk = "Cannot plot over {} motifs with default palette; {}"
             raise ValueError(error_msk.format(
-                len(DEFAULT_MOTIF_COLORS), "please provide a custom --palette",
+                len(TOL_COLORSCHEME), "please provide a custom --palette",
             ))
         else:
-            for motif, color in zip(motif_order, DEFAULT_MOTIF_COLORS):
+            for motif, color in zip(motif_order, TOL_COLORSCHEME.values()):
                 updated_palette[motif] = color
         updated_motif_order = motif_order
     else:
