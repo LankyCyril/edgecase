@@ -82,7 +82,7 @@ __docopt_tests__ = {
         set(target) <= {"mask_anchor", "fork", "tract_anchor"}:
             "unknown value of --target",
     lambda output_ambiguous_reads:
-        set(output_ambiguous_reads) <= {"none", "all", "longest-overlap"}:
+        output_ambiguous_reads in {"none", "all", "longest-overlap"}:
             "unknown value of --output-ambiguous-reads",
 }
 
