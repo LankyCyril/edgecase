@@ -1,0 +1,80 @@
+from pandas import read_fwf
+from io import StringIO
+
+
+HG38EXT_ECX = "data/references/hg38/hg38ext.fa.ecx"
+DATA_DIR = "data/datasets/2021"
+MIN_MAP_OVERLAP = 500
+MIN_CANDIDATE_OVERLAP = 3000
+MAX_READ_LENGTH = 100000
+TARGET = "tract_anchor"
+MIN_PLOT_COVERAGE = 10
+SMALLEST_P_VALUE = 5e-324
+
+DATASETS = read_fwf(StringIO(str.strip("""
+group           subject  dataset      priority
+NA12878         HG001    11kb         1
+AshkenazimTrio  HG002    10kb         1
+AshkenazimTrio  HG002    15kb         1
+AshkenazimTrio  HG002    15kb_20kb    1
+AshkenazimTrio  HG003    15kb         1
+AshkenazimTrio  HG003    15kb_20kb    2
+AshkenazimTrio  HG004    15kb         1
+AshkenazimTrio  HG004    15kb_21kb    1
+ChineseTrio     HG005    11kb         1
+ChineseTrio     HG006    15kb_20kb    1
+ChineseTrio     HG006    hifi_google  1
+ChineseTrio     HG007    15kb_20kb    1
+ChineseTrio     HG007    hifi_google  1
+""")))
+
+"""Fully cannibalized datasets:
+AshkenazimTrio  HG004    15kb_20kb
+"""
+
+DATASETS["subject_pacbio_path"] = DATASETS.apply(
+    lambda row: "{}/PacBio/{}/{}".format(DATA_DIR, *row[:2]), axis=1,
+)
+DATASETS["dataset_pacbio_path"] = DATASETS.apply(
+    lambda row: "{}/PacBio/{}/{}/{}".format(DATA_DIR, *row[:3]), axis=1,
+)
+
+wildcard_constraints:
+    group="[^/]+", subject="[^/]+", dataset="[^/]+", name="[^/]+", kind="[^/]+",
+    arm="[pq]_arm",
+
+
+def get_sam_flags(arm, target=None):
+    if target:
+        if arm == "p_arm":
+            return "-f '{}' -F is_q".format(target)
+        elif arm == "q_arm":
+            return "-f is_q -f '{}'".format(target)
+        else:
+            raise ValueError("arm", arm)
+    else:
+        if arm == "p_arm":
+            return "-F is_q"
+        elif arm == "q_arm":
+            return "-f is_q"
+        else:
+            raise ValueError("arm", arm)
+
+
+include: "assets/paper/snakefiles/longread-motifs.snake"
+include: "assets/paper/snakefiles/shortread-support.snake"
+include: "assets/paper/snakefiles/shortread-motifs.snake"
+include: "assets/paper/snakefiles/bonferroni.snake"
+include: "assets/paper/snakefiles/densityplots.snake"
+include: "assets/paper/snakefiles/kmerscanner-all.snake"
+include: "assets/paper/snakefiles/levenshtein.snake"
+
+
+rule all:
+    input:
+        rules.densityplot_all.input,
+        rules.telbam_support_all.input,
+        rules.kmerscanner_all_motifs_all_subjects.input,
+        rules.kmerscanner_for_haploplots.input,
+        rules.levenshtein_all.input,
+        rules.repeatfinder_all_shortread.input,
