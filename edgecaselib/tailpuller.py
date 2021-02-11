@@ -9,6 +9,7 @@ from edgecaselib.util import progressbar
 from itertools import chain
 from numpy import isnan, inf
 from pandas import DataFrame, merge
+from collections import defaultdict
 
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
@@ -16,6 +17,7 @@ __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 Usage: {0} tailpuller -x filename [-t targetspec]...
        {1}            [-M integer] [--min-map-overlap integer]
        {1}            [-m integer] [--min-telomere-overlap integer]
+       {1}            [--output-ambiguous-reads string]
        {1}            [-f flagspec]... [-F flagspec]... [-q integer] <bam>
 
 Output:
@@ -33,6 +35,7 @@ Options:
     --min-map-overlap [integer]              minimum overlap of reference to consider read as mapped [default: 1] **
     -m, --min-subtelomere-overlap [integer]  minimum overlap of subtelomere to consider read as candidate [default: 1] ***
     --min-telomere-overlap [integer]         minimum overlap of telomere to consider read as candidate [default: 1] ***
+    --output-ambiguous-reads [string]        which ambiguously mapping reads to retain (none, all, longest-overlap) [default: none]
 
 Input filtering options:
     -f, --flags [flagspec]                   process only entries with all these sam flags present [default: 0]
@@ -78,6 +81,9 @@ __docopt_tests__ = {
     lambda target:
         set(target) <= {"mask_anchor", "fork", "tract_anchor"}:
             "unknown value of --target",
+    lambda output_ambiguous_reads:
+        set(output_ambiguous_reads) <= {"none", "all", "longest-overlap"}:
+            "unknown value of --output-ambiguous-reads",
 }
 
 
@@ -229,7 +235,16 @@ def get_unambiguous_entries(entries, ecx):
                     yield entry
 
 
-def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_map_overlap, min_subtelomere_overlap, min_telomere_overlap, target, file=stdout, **kwargs):
+def get_entries_once_with_ambiguity(entries, maxattr):
+    """Resolve ambiguously mapping entries in favor of biggest value of `maxattr`"""
+    entry_dispatcher = defaultdict(list)
+    for entry in entries:
+        entry_dispatcher[entry.qname].append((getattr(entry, maxattr), entry))
+    for entrylist in entry_dispatcher.values():
+        yield sorted(entrylist, reverse=True)[0][1]
+
+
+def main(bam, index, target, flags, flag_filter, min_quality, max_read_length, min_map_overlap, min_subtelomere_overlap, min_telomere_overlap, output_ambiguous_reads, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
     ecx = load_index(index, as_filter_dict=False)
@@ -240,7 +255,15 @@ def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_map_o
     )
     print(bam_header_string, file=file)
     n_orphaned_entries = 0
-    for entry in get_unambiguous_entries(entries, ecx):
+    if output_ambiguous_reads == "none":
+        entry_iterator = get_unambiguous_entries(entries, ecx)
+    elif output_ambiguous_reads == "all":
+        entry_iterator = entries
+    elif output_ambiguous_reads == "longest-overlap":
+        entry_iterator = get_entries_once_with_ambiguity(
+            entries, maxattr="reference_length",
+        )
+    for entry in entry_iterator:
         if entry.query_length - entry.reference_length >= min_telomere_overlap:
             if entry.reference_length >= min_subtelomere_overlap:
                 if entry.mapq >= min_quality: # enforce quality on second pass
