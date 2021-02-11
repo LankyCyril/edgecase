@@ -124,7 +124,7 @@ def calculate_chromosome_lds(chrom, entries, jobs):
         for i, j in list(zip(*triu_indices(len(names), 1)))
     ]
     with ThreadPoolExecutor(max_workers=jobs) as pool:
-        jobs = [
+        workers = [
             pool.submit(
                 get_relative_read_ld,
                 aname, bname, entries[aname], entries[bname],
@@ -132,10 +132,10 @@ def calculate_chromosome_lds(chrom, entries, jobs):
             for aname, bname in name_pairs
         ]
         iterator = progressbar(
-            as_completed(jobs), desc=chrom, unit="pair", total=len(jobs),
+            as_completed(workers), desc=chrom, unit="pair", total=len(workers),
         )
-        for job in iterator:
-            aname, bname, distance = job.result()
+        for worker in iterator:
+            aname, bname, distance = worker.result()
             lds.loc[aname, bname] = distance
             lds.loc[bname, aname] = distance
     for aname in names:
