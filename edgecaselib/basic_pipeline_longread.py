@@ -107,6 +107,7 @@ get_tailpuller_kws = lambda min_quality, max_read_length, min_map_overlap, min_s
     max_read_length=max_read_length, target={target},
     min_subtelomere_overlap=min_subtelomere_overlap,
     min_telomere_overlap=min_telomere_overlap, min_map_overlap=min_map_overlap,
+    output_ambiguous_reads="none",
     flags=[0], flag_filter=[0], min_quality=min_quality,
     file=file,
 )
