@@ -58,7 +58,7 @@
 55	chr18	10615	10616	chr18	chr18	16384	5	riethman_match	hg38	-	-
 56	chr20	79359	79360	chr20	chr20	16384	5	riethman_match	hg38	-	riethman_inexact
 57	chr3	198235558	198235559	chr3	chr3	16384	3	riethman_match	hg38	-	riethman_inexact
-58	chr4	190122583	190122584	chr4	chr4	16384	3	riethman_match	hg38	-	-
+58	chr4	190122583	190122584	chr4	chr4	16384	3	riethman_match	hg38	-	dup?
 59	chr7	159335873	159335874	chr7	chr7	16384	3	riethman_match	hg38	-	-
 60	chr8	145073354	145073355	chr8	chr8	16384	3	riethman_match	hg38	-	-
 61	chr11	135076569	135076570	chr11	chr11	16384	3	riethman_match	hg38	-	-
