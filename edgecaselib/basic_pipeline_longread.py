@@ -96,8 +96,8 @@ __docopt_tests__ = {
     lambda max_read_length:
         max_read_length > 0: "--max-read-length below 0",
     lambda target:
-        target in {"mask_anchor", "fork", "tract_anchor"}:
-            "unsupported value of --target",
+        target in {"tract_anchor"}:
+            "currently basic pipeline only supports --target=tract_anchor",
     lambda min_k, max_k:
         0 < min_k < max_k: "not satisfied: 0 < m < M",
 }
@@ -114,7 +114,7 @@ get_tailpuller_kws = lambda min_quality, max_read_length, min_map_overlap, min_s
 
 
 get_tailchopper_kws = lambda target, min_quality, file: dict(
-    target=target, flags=[target], flag_filter=[0],
+    target="cigar", flags=[target], flag_filter=[0],
     min_quality=min_quality, file=file,
 )
 
