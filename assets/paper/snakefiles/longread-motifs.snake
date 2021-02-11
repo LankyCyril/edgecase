@@ -39,7 +39,7 @@ rule tailchopper:
         target=TARGET,
     shell: """
         ./edgecase tailchopper -x {HG38EXT_ECX} \
-            -f {params.target} -t {params.target} {input.bam} \
+            -f {params.target} -t cigar {input.bam} \
         | samtools view -bh > {output.bam}
     """
 
