@@ -1,4 +1,6 @@
 from pandas import read_csv
+from io import StringIO
+from subprocess import check_output
 from gzip import open as gzopen
 from matplotlib.pyplot import subplots, switch_backend
 
@@ -27,6 +29,33 @@ rule plottable_repeats:
             )
 
 
+rule read_counts:
+    input: bam=f"{DATA_DIR}/PacBio/tailpuller.bam",
+    output: tsv=DATA_DIR+"/PacBio/counts-{arm}.tsv",
+    run:
+        if wildcards.arm == "p_arm":
+            flags = "-f0x4000 -F0x8000"
+        elif wildcards.arm == "q_arm":
+            flags = "-f0x4000 -f0x8000"
+        else:
+            raise ValueError(f"arm=='{wildcards.arm}'")
+        cmd = " | ".join([
+            f"samtools view {flags} {input.bam}", r"tr ':' '\t'",
+            "cut -f2,6", "sort", "uniq -c",
+            r"sed -E 's/^\s*//g; s/\s+/\t/g'"
+        ])
+        counts_narrow = read_csv(
+            StringIO(check_output(cmd, shell=True, universal_newlines=True)),
+            sep="\t", names=["count", "subject", "rname"],
+        )
+        counts = counts_narrow.pivot(
+            index="rname", columns="subject", values="count",
+        )
+        counts.columns.name = None
+        counts["total"] = counts.sum(axis=1)
+        counts.fillna(0).astype(int).to_csv(output.tsv, sep="\t")
+
+
 rule kmerscanner_unfiltered:
     input:
         bam=DATA_DIR+"/PacBio/{group}/{subject}/tailpuller.bam",
@@ -42,15 +71,20 @@ rule kmerscanner_unfiltered:
 
 
 rule kmerscanner_filtered:
-    input: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}-unfiltered.dat.gz",
-    output: dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}.dat.gz",
-    params: min_reads=MIN_PLOT_COVERAGE,
+    input:
+        dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}-unfiltered.dat.gz",
+        tsv=DATA_DIR+"/PacBio/counts-{arm}.tsv",
+    output:
+        dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}.dat.gz",
+    params:
+        min_reads=MIN_CHROM_COVERAGE,
     run:
+        counts = read_csv(input.tsv, sep="\t", index_col=0)
         raw_densities = read_csv(input.dat, sep="\t")
-        chromosome_counter = raw_densities[["#name", "chrom"]].drop_duplicates()
-        chromosome_counts = chromosome_counter["chrom"].value_counts()
-        indexer = (chromosome_counts>=params.min_reads)
-        chromosomes_to_keep = chromosome_counts[indexer].index
+        chromosomes_to_keep = (
+            set(raw_densities["chrom"].drop_duplicates()) &
+            set(counts[counts["total"]>=params.min_reads].index)
+        )
         filtered_densities = raw_densities[
             raw_densities["chrom"].isin(chromosomes_to_keep)
         ]
