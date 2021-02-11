@@ -237,11 +237,11 @@ def get_unambiguous_entries(entries, ecx):
 
 def get_entries_once_with_ambiguity(entries, maxattr):
     """Resolve ambiguously mapping entries in favor of biggest value of `maxattr`"""
-    entry_dispatcher = defaultdict(list)
+    entry_dispatcher = defaultdict(dict)
     for entry in entries:
-        entry_dispatcher[entry.qname].append((getattr(entry, maxattr), entry))
-    for entrylist in entry_dispatcher.values():
-        yield sorted(entrylist, reverse=True)[0][1]
+        entry_dispatcher[entry.qname][getattr(entry, maxattr)] = entry
+    for entrydict in entry_dispatcher.values():
+        yield entrydict[max(entrydict.keys())]
 
 
 def main(bam, index, target, flags, flag_filter, min_quality, max_read_length, min_map_overlap, min_subtelomere_overlap, min_telomere_overlap, output_ambiguous_reads, file=stdout, **kwargs):
