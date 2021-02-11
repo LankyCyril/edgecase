@@ -82,7 +82,7 @@ rule combined_bam:
 rule repeatfinder_pacbio:
     input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailchopper.bam",
     output: tsv=DATA_DIR+"/PacBio/{group}/{subject}/repeatfinder-{arm}.tsv",
-    params: s="24G", min_k=4, max_k=16, max_p_adjusted=1.1,
+    params: s="8G", min_k=4, max_k=16, max_p_adjusted=1.1,
     threads: 24,
     run:
         flags = get_sam_flags(wildcards.arm)
