@@ -122,8 +122,8 @@ rule densityplot:
             shell("""
                 ./edgecase densityplot \
                     -x {HG38EXT_ECX} --palette paper --title ' ' {flags} \
-                    --chroms-to-plot={chroms_to_plot} \
-                    -z {input} > {output}
+                    --chroms-to-plot '{chroms_to_plot}' \
+                    -z {input.dat} > {output.pdf}
             """)
 
 

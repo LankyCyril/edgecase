@@ -22,7 +22,7 @@ __doc__ = """edgeCase densityplot: visualization of motif densities
 
 Usage: {0} densityplot -x filename [-b integer] [-e] [--zoomed-in]
        {1}             [--palette palettespec] [--title string]
-       {1}             [--n-boot integer]
+       {1}             [--n-boot integer] [--chroms-to-plot string]
        {1}             [-f flagspec]... [-F flagspec]... [-q integer]
        {1}             [-z] <dat>
 
@@ -43,6 +43,7 @@ Options:
     --zoomed-in                   plot taller traces, cut off pre-anchor regions
     --palette [palettespec]       custom palette for plotting motifs
     --title [string]              figure title (defaults to input filename)
+    --chroms-to-plot [string]     if set, plot chromosomes from this comma-separated list unconditionally
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
@@ -182,22 +183,30 @@ def chromosome_exploded_motif_plot(binned_density_dataframe, ecx, chrom, max_map
     return page
 
 
-def make_decorated_densities_iterator(densities):
+def make_decorated_densities_iterator(densities, chroms_to_plot=None):
     """Order chromosomes and wrap with progress bar"""
-    sorted_chromosomes = natsorted_chromosomes(densities.keys())
+    if chroms_to_plot:
+        sorted_chromosomes = natsorted_chromosomes(
+            set(densities.keys()) | set(chroms_to_plot.split(","))
+        )
+    else:
+        sorted_chromosomes = natsorted_chromosomes(densities.keys())
     sorted_densities_iterator = (
-        (chrom, densities[chrom]) for chrom in sorted_chromosomes
+        (chrom, densities.get(chrom)) for chrom in sorted_chromosomes
     )
-    return progressbar(
-        sorted_densities_iterator, total=len(densities),
+    decorated_densities_iterator = progressbar(
+        sorted_densities_iterator, total=len(sorted_chromosomes),
         desc="Plotting", unit="chromosome",
     )
+    return decorated_densities_iterator, len(sorted_chromosomes)
 
 
 def plot_exploded_densities(densities, ecx, title, samfilters, file=buffer):
     """Plot binned densities as line plots, one read at a time"""
     max_mapq = max(d["mapq"].max() for d in densities.values())
-    decorated_densities_iterator = make_decorated_densities_iterator(densities)
+    decorated_densities_iterator, _ = make_decorated_densities_iterator(
+        densities,
+    )
     with rc_context({"figure.max_open_warning": len(densities)+2}):
         with PdfPages(file) as pdf:
             for chrom, binned_density_dataframe in decorated_densities_iterator:
@@ -339,6 +348,18 @@ def generate_updated_palette(palette, motif_order):
     return updated_palette, updated_motif_order
 
 
+def plot_anchors(ecx_chrom_name, ecx, target_anchor, is_q, ymax, ax):
+    """Plot anchor positions over densities"""
+    indexer = (
+        (ecx["rname"]==ecx_chrom_name) & (ecx["prime"]==(3 if is_q else 5)) &
+        (ecx["flag"]==interpret_flags(target_anchor))
+    )
+    plottable_flags = ecx.loc[indexer, ["pos", "flag"]]
+    for _, pos, flag in plottable_flags.itertuples():
+        ax.axvline(pos, 0, 1/ymax, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4)
+    return ecx.loc[indexer, "pos"].min(), ecx.loc[indexer, "pos"].max()
+
+
 def plot_combined_density(binned_density_dataframe, n_boot, ecx, title, palette, target_anchor, is_q, display_chrom_name, ecx_chrom_name, zoomed_in, ax):
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df, motif_order = stack_motif_densities(binned_density_dataframe)
@@ -360,17 +381,10 @@ def plot_combined_density(binned_density_dataframe, n_boot, ecx, title, palette,
         ymax = coverage_plot(plottable_df, len(motif_order), is_q, ax)
     else:
         ymax = 1
-    indexer = (
-        (ecx["rname"]==ecx_chrom_name) & (ecx["prime"]==(3 if is_q else 5)) &
-        (ecx["flag"]==interpret_flags(target_anchor))
-    )
-    plottable_flags = ecx.loc[indexer, ["pos", "flag"]]
-    for _, pos, flag in plottable_flags.itertuples():
-        ax.axvline(pos, 0, 1/ymax, ls=":", lw=4, c=FLAG_COLORS[flag], alpha=.4)
     position_values = plottable_df["position"].values
     ax.set(xlim=(position_values.min(), position_values.max()))
     ax.set(xlabel="", ylim=(0, ymax), ylabel=display_chrom_name, yticks=[])
-    return updated_palette
+    return updated_palette, ymax
 
 
 def align_subplots(ax2chrom, ecx, target_anchor, is_q, unit_adjustment=None, unit_fmt=",.0f"):
@@ -451,27 +465,43 @@ def plot_density_scale(ax):
     )
 
 
-def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, file=buffer, unit="Kbp"):
+def format_chrom(chrom, zoomed_in):
+    """Get printable options based on value of `chrom`"""
+    ecx_chrom_name, comment, *_ = chrom.split(":", 1) + [None]
+    if zoomed_in:
+        short_chrom_name = ecx_chrom_name
+    else:
+        short_chrom_name = shorten_chrom_name(ecx_chrom_name)
+    if comment:
+        display_chrom_name = short_chrom_name + "\n" + comment
+    else:
+        display_chrom_name = short_chrom_name
+    return ecx_chrom_name, short_chrom_name, display_chrom_name
+
+
+def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, chroms_to_plot, file=buffer, unit="Kbp"):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
-    decorated_densities_iterator = make_decorated_densities_iterator(densities)
+    decorated_densities_iterator, n_axes = make_decorated_densities_iterator(
+        densities, chroms_to_plot,
+    )
     switch_backend("Agg")
-    figure, axs = chromosome_subplots(len(densities), zoomed_in)
+    figure, axs = chromosome_subplots(n_axes, zoomed_in)
     ax2chrom = {}
     for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:, 0]):
-        ecx_chrom_name, comment, *_ = chrom.split(":", 1) + [None]
-        if zoomed_in:
-            short_chrom_name = ecx_chrom_name
-        else:
-            short_chrom_name = shorten_chrom_name(ecx_chrom_name)
-        if comment:
-            display_chrom_name = short_chrom_name + "\n" + comment
-        else:
-            display_chrom_name = short_chrom_name
-        updated_palette = plot_combined_density(
-            bdf, n_boot, ecx, title, palette, target_anchor, is_q, ax=ax,
-            zoomed_in=zoomed_in, display_chrom_name=display_chrom_name,
-            ecx_chrom_name=ecx_chrom_name,
+        ecx_chrom_name, short_chrom_name, display_chrom_name = format_chrom(
+            chrom, zoomed_in,
         )
+        if bdf is None:
+            ax.set(xlabel="", ylim=(0, 1), ylabel=display_chrom_name, yticks=[])
+        else:
+            updated_palette, ymax = plot_combined_density(
+                bdf, n_boot, ecx, title, palette, target_anchor, is_q, ax=ax,
+                zoomed_in=zoomed_in, display_chrom_name=display_chrom_name,
+                ecx_chrom_name=ecx_chrom_name,
+            )
+        xlim = plot_anchors(ecx_chrom_name, ecx, target_anchor, is_q, ymax, ax)
+        if bdf is None:
+            ax.set(xlim=(xlim[0]-1, xlim[1]+1))
         ax2chrom[ax] = ecx_chrom_name
     try:
         unit_adjustment = {"Kbp": 1e3, "Mbp": 1e6, "bp": None}[unit]
@@ -526,11 +556,13 @@ def generate_paper_palette(paper_palette, is_q):
         raise NotImplementedError("--palette 'paper' for unknown arm")
 
 
-def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
+def interpret_arguments(palette, exploded, chroms_to_plot, zoomed_in, samfilters, title, dat):
     """Parse and check arguments"""
     if exploded:
         if zoomed_in:
             raise NotImplementedError("--exploded with --zoomed-in")
+        if chroms_to_plot:
+            raise NotImplementedError("--chroms-to-plot with --zoomed-in")
         target_anchor, is_q = None, None
     else:
         is_q, target_anchor = interpret_target(samfilters)
@@ -564,11 +596,11 @@ def interpret_arguments(palette, exploded, zoomed_in, samfilters, title, dat):
     return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
-def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, file=buffer, **kwargs):
+def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, chroms_to_plot, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
     target_anchor, is_q, palette, legend, title = interpret_arguments(
-        palette, exploded, zoomed_in, samfilters, title, dat,
+        palette, exploded, chroms_to_plot, zoomed_in, samfilters, title, dat,
     )
     ecx = load_index(index)
     densities = load_kmerscan(dat, gzipped, samfilters, bin_size)
@@ -579,6 +611,6 @@ def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot,
     else:
         plot_densities(
             densities, n_boot, ecx, title, palette, legend, target_anchor,
-            is_q, zoomed_in, file,
+            is_q, zoomed_in, chroms_to_plot, file,
         )
     return 0
