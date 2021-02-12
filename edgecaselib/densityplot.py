@@ -13,9 +13,14 @@ from itertools import count
 from os import path
 from pandas import concat
 from re import search
-
+from pickle import dump
 
 buffer = getattr(stdout, "buffer", stdout)
+
+
+# TODO: disable --exploded and refactor / slim down code
+# TODO: more straightforward --outfmt handling
+# TODO: __docopt_tests__ instead of interpret_arguments()
 
 
 __doc__ = """edgeCase densityplot: visualization of motif densities
@@ -24,7 +29,7 @@ Usage: {0} densityplot -x filename [-b integer] [-e] [--zoomed-in]
        {1}             [--palette palettespec] [--title string]
        {1}             [--n-boot integer] [--chroms-to-plot string]
        {1}             [-f flagspec]... [-F flagspec]... [-q integer]
-       {1}             [-z] <dat>
+       {1}             [--outfmt string] [-z] <dat>
 
 Output:
     PDF file with motif densities visualized along chromosomal ends
@@ -44,6 +49,7 @@ Options:
     --palette [palettespec]       custom palette for plotting motifs
     --title [string]              figure title (defaults to input filename)
     --chroms-to-plot [string]     if set, plot chromosomes from this comma-separated list unconditionally
+    --outfmt [string]             output format (pdf, pkl) [default: pdf]
 
 Input filtering options:
     -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
@@ -479,7 +485,7 @@ def format_chrom(chrom, zoomed_in):
     return ecx_chrom_name, short_chrom_name, display_chrom_name
 
 
-def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, chroms_to_plot, file=buffer, unit="Kbp"):
+def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, zoomed_in, chroms_to_plot, outfmt, file=buffer, unit="Kbp"):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator, n_axes = make_decorated_densities_iterator(
         densities, chroms_to_plot,
@@ -517,7 +523,10 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
         plot_density_scale(axs[0, 0])
     axs[0, 0].set(title=title)
     axs[-1, 0].set(xlabel=unit)
-    figure.savefig(file, bbox_inches="tight", format="pdf")
+    if outfmt == "pdf":
+        figure.savefig(file, bbox_inches="tight", format="pdf")
+    elif outfmt == "pkl":
+        dump(figure, file)
 
 
 def interpret_target(samfilters):
@@ -556,7 +565,7 @@ def generate_paper_palette(paper_palette, is_q):
         raise NotImplementedError("--palette 'paper' for unknown arm")
 
 
-def interpret_arguments(palette, exploded, chroms_to_plot, zoomed_in, samfilters, title, dat):
+def interpret_arguments(palette, exploded, chroms_to_plot, zoomed_in, samfilters, title, outfmt, dat):
     """Parse and check arguments"""
     if exploded:
         if zoomed_in:
@@ -566,6 +575,11 @@ def interpret_arguments(palette, exploded, chroms_to_plot, zoomed_in, samfilters
         target_anchor, is_q = None, None
     else:
         is_q, target_anchor = interpret_target(samfilters)
+    if outfmt == "pkl":
+        if exploded:
+            raise NotImplementedError("--outfmt=pkl with --zoomed-in")
+    elif outfmt != "pdf":
+        raise ValueError(f"--outfmt={outfmt}")
     if palette is None:
         legend = not zoomed_in
     elif palette in {"paper|legend=False", "paper|legend=True", "paper"}:
@@ -596,11 +610,12 @@ def interpret_arguments(palette, exploded, chroms_to_plot, zoomed_in, samfilters
     return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
-def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, chroms_to_plot, file=buffer, **kwargs):
+def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, exploded, zoomed_in, palette, title, chroms_to_plot, outfmt, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
     target_anchor, is_q, palette, legend, title = interpret_arguments(
-        palette, exploded, chroms_to_plot, zoomed_in, samfilters, title, dat,
+        palette, exploded, chroms_to_plot, zoomed_in, samfilters,
+        title, outfmt, dat,
     )
     ecx = load_index(index)
     densities = load_kmerscan(dat, gzipped, samfilters, bin_size)
@@ -611,6 +626,6 @@ def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot,
     else:
         plot_densities(
             densities, n_boot, ecx, title, palette, legend, target_anchor,
-            is_q, zoomed_in, chroms_to_plot, file,
+            is_q, zoomed_in, chroms_to_plot, outfmt, file,
         )
     return 0
