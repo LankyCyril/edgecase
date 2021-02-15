@@ -12,7 +12,8 @@ rule plottable_repeats:
     output:
         p_arm=DATA_DIR+"/PacBio/repeatfinder-p_arm-plottable.tsv",
         q_arm=DATA_DIR+"/PacBio/repeatfinder-q_arm-plottable.tsv",
-    params: n=4
+    params:
+        n=N_MOTIFS_TO_PLOT,
     run:
         for arm in "p_arm", "q_arm":
             rf = read_csv(
