@@ -99,7 +99,7 @@ rule densityplot:
         dat=DATA_DIR+"/PacBio/{group}/{subject}/kmerscanner-{arm}.dat.gz",
         tsv=DATA_DIR+"/PacBio/counts-{arm}.tsv",
     output:
-        pdf=DATA_DIR+"/PacBio/{group}/{subject}/densityplot-{arm}.pdf",
+        pdf=DATA_DIR+"/PacBio/{group}/{subject}/densityplot-{arm}.{outfmt}",
     params:
         min_reads=MIN_CHROM_COVERAGE,
     run:
@@ -124,19 +124,30 @@ rule densityplot:
                 ./edgecase densityplot \
                     -x {HG38EXT_ECX} --palette paper --title ' ' {flags} \
                     --chroms-to-plot '{chroms_to_plot}' \
-                    -z {input.dat} > {output.pdf}
+                    --plot-coverage -b 100 \
+                    -z {input.dat} --outfmt {wildcards.outfmt} > {output.pdf}
             """)
 
 
 rule densityplot_all:
     input:
-        p_arm=[
+        p_arm_pdf=[
             DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-p_arm.pdf"
             for _, (group, subject)
             in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
         ],
-        q_arm=[
+        q_arm_pdf=[
             DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-q_arm.pdf"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        p_arm_pkl=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-p_arm.pkl"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm_pkl=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/densityplot-q_arm.pkl"
             for _, (group, subject)
             in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
         ],
