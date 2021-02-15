@@ -22,23 +22,40 @@ ALL_SAM_FLAGS = [
 
 FLAG_COLORS = {0x1000: "gray", 0x2000: "blueviolet", 0x4000: "red"}
 
-DEFAULT_MOTIF_COLORS = [
-    "#117733", "#88CCEE", "#AA4499", "#DDCC77", "#332288", "#882255",
-    "#44AA99", "#CC6677", "#EEEEEE",
-]
+TOL_COLORSCHEME = OrderedDict([
+    ("green",   "#117733"),
+    ("yellow",  "#DDCC77"),
+    ("magenta", "#AA4499"),
+    ("cyan",    "#88CCEE"),
+    ("blue",    "#332288"),
+    ("red",     "#882255"),
+    ("teal",    "#44AA99"),
+    ("pink",    "#CC6677"),
+    ("gray",    "#EEEEEE"),
+])
 
 BGCOLOR = "#BBBBCA"
 
 PAPER_PALETTE = OrderedDict([
-    ("TTAGGG", "#117733"), ("TTGGGG", "#AA4499"), ("TTAGGGG", "#88CCEE"),
-    ("TGAGGG", "#DDCC77"), ("TCAGGG", "#44AA99"), ("TTAGGGTTAGGGG", "#EEEEEE"),
-    ("CGCGG", "#332288"),
+    ("TTAGGG", TOL_COLORSCHEME["green"]),
+    ("TGAGGG", TOL_COLORSCHEME["yellow"]),
+    ("TTAGGGG", TOL_COLORSCHEME["magenta"]),
+    ("TTAGG", TOL_COLORSCHEME["cyan"]),
+    ("TTAGGGTTAGGGG", TOL_COLORSCHEME["blue"]),
+    ("TTGGGG", TOL_COLORSCHEME["red"]),
+    ("TCAGGG", TOL_COLORSCHEME["teal"]),
+    ("CGCGG", TOL_COLORSCHEME["pink"]),
 ])
 
 PAPER_PALETTE_RC = OrderedDict([
-    ("CCCTAA", "#117733"), ("CCCCAA", "#AA4499"), ("CCCCTAA", "#88CCEE"),
-    ("CCCTCA", "#DDCC77"), ("CCCTGA", "#44AA99"), ("CCCCTAACCCTAA", "#EEEEEE"),
-    ("CCGCG", "#332288"),
+    ("CCCTAA", TOL_COLORSCHEME["green"]),
+    ("CCCTCA", TOL_COLORSCHEME["yellow"]),
+    ("CCCCTAA", TOL_COLORSCHEME["magenta"]),
+    ("CCTAA", TOL_COLORSCHEME["cyan"]),
+    ("CCCCTAACCCTAA", TOL_COLORSCHEME["blue"]),
+    ("CCCCAA", TOL_COLORSCHEME["red"]),
+    ("CCCTGA", TOL_COLORSCHEME["teal"]),
+    ("CCGCG", TOL_COLORSCHEME["pink"]),
 ])
 
 KMERSCANNER_INCONSISTENT_NUMBER_OF_MOTIFS = (

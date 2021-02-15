@@ -9,41 +9,44 @@ from edgecaselib.util import progressbar
 from itertools import chain
 from numpy import isnan, inf
 from pandas import DataFrame, merge
+from collections import defaultdict
 
 
 __doc__ = """edgeCase tailpuller: selection of candidate telomeric long reads
 
 Usage: {0} tailpuller -x filename [-t targetspec]...
-       {1}            [-M integer] [--min-map-overlap integer] [-m integer]
+       {1}            [-M integer] [--min-map-overlap integer]
+       {1}            [-m integer] [--min-telomere-overlap integer]
+       {1}            [--output-ambiguous-reads string]
        {1}            [-f flagspec]... [-F flagspec]... [-q integer] <bam>
 
 Output:
     SAM-formatted file with reads overhanging anchors defined in index
 
 Positional arguments:
-    <bam>                                  name of input BAM/SAM file; must have a .bai index
+    <bam>                                    name of input BAM/SAM file; must have a .bai index
 
 Required options:
-    -x, --index [filename]                 location of the reference .ecx index
+    -x, --index [filename]                   location of the reference .ecx index
 
 Options:
-    -M, --max-read-length [integer]        maximum read length to consider when selecting lookup regions *
-    --min-map-overlap [integer]            minimum overlap of reference to consider read as mapped [default: 1] **
-    -m, --min-candidate-overlap [integer]  minimum overlap of subtelomere to consider read as candidate [default: 1] ***
-    -t, --target [targetspec]              target reads overlapping these features (ECX flags) [default: tract_anchor]
+    -t, --target [targetspec]                target reads overlapping these features (ECX flags) [default: tract_anchor]
+    -M, --max-read-length [integer]          maximum read length to consider when selecting lookup regions *
+    --min-map-overlap [integer]              minimum overlap of reference to consider read as mapped [default: 1] **
+    -m, --min-subtelomere-overlap [integer]  minimum overlap of subtelomere to consider read as candidate [default: 1] ***
+    --min-telomere-overlap [integer]         minimum overlap of telomere to consider read as candidate [default: 1] ***
+    --output-ambiguous-reads [string]        which ambiguously mapping reads to retain (none, all, longest-overlap) [default: none]
 
 Input filtering options:
-    -f, --flags [flagspec]                 process only entries with all these sam flags present [default: 0]
-    -F, --flag-filter [flagspec]           process only entries with none of these sam flags present [default: 0] ****
-    -q, --min-quality [integer]            process only entries with this MAPQ or higher [default: 0] *****
+    -f, --flags [flagspec]                   process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]             process only entries with none of these sam flags present [default: 0] ****
+    -q, --min-quality [integer]              process only entries with this MAPQ or higher [default: 0] *****
 
 Notes:
-    * Suggested value of --max-read-length for PacBio: 200000;
+    * Suggested value of --max-read-length for PacBio HiFi: 30000;
       if not specified, will assume +infinity (will be slow).
-   ** Suggested value of --min-map-overlap for PacBio: 500;
-      if not specified, will assume 1.
-  *** Suggested value of --min-candidate-overlap for PacBio: 3000;
-      if not specified, will assume 1.
+   ** Suggested value of --min-map-overlap for PacBio HiFi: 500;
+  *** Suggested value of --min-(sub)telomere-overlap for PacBio HiFi: 3000;
  **** It is recommended to include secondary and supplementary reads (i.e.,
       leave the -F flag as default [0]), because:
         **** edgeCase determines unambiguously mapped reads on its own; aligners
@@ -52,8 +55,8 @@ Notes:
              information in telomeric regions;
         **** edgeCase will discard chimeric reads in terminal regions if
              information about supplementary alignments is present.
-***** Depending on the aligner used, MAPQ of secondary reads may have been set to
-      zero regardless of real mapping quality; use this filtering option with
+***** Depending on the aligner used, MAPQ of secondary reads may have been set
+      to zero regardless of real mapping quality; use this filtering option with
       caution.
 """
 
@@ -64,8 +67,10 @@ __docopt_converters__ = [
         inf if (max_read_length is None) else int(max_read_length),
     lambda min_map_overlap:
         1 if (min_map_overlap is None) else int(min_map_overlap),
-    lambda min_candidate_overlap:
-        1 if (min_candidate_overlap is None) else int(min_candidate_overlap),
+    lambda min_subtelomere_overlap:
+        1 if (min_subtelomere_overlap is None) else int(min_subtelomere_overlap),
+    lambda min_telomere_overlap:
+        None if (min_telomere_overlap is None) else int(min_telomere_overlap),
 ]
 
 __docopt_tests__ = {
@@ -76,6 +81,9 @@ __docopt_tests__ = {
     lambda target:
         set(target) <= {"mask_anchor", "fork", "tract_anchor"}:
             "unknown value of --target",
+    lambda output_ambiguous_reads:
+        output_ambiguous_reads in {"none", "all", "longest-overlap"}:
+            "unknown value of --output-ambiguous-reads",
 }
 
 
@@ -200,7 +208,7 @@ def make_entry_dispatchers(entries, ecx):
     return entry_dispatcher, valid_qnames
 
 
-def get_unambiguous_entries(entries, ecx, min_candidate_overlap):
+def get_unambiguous_entries(entries, ecx):
     """Subset candidate entries to those that map unambiguously"""
     entry_dispatcher, valid_qnames = make_entry_dispatchers(entries, ecx)
     chromosomes = set(ecx["chromosome"].drop_duplicates())
@@ -224,11 +232,19 @@ def get_unambiguous_entries(entries, ecx, min_candidate_overlap):
             if len(entry_candidates) == 1:
                 entry = entry_candidates.iloc[0]
                 if entry.flag & 0x800 == 0: # non-supplementary
-                    if entry.reference_length >= min_candidate_overlap:
-                        yield entry
+                    yield entry
 
 
-def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_map_overlap, min_candidate_overlap, target, file=stdout, **kwargs):
+def get_entries_once_with_ambiguity(entries, maxattr):
+    """Resolve ambiguously mapping entries in favor of biggest value of `maxattr`"""
+    entry_dispatcher = defaultdict(dict)
+    for entry in entries:
+        entry_dispatcher[entry.qname][getattr(entry, maxattr)] = entry
+    for entrydict in entry_dispatcher.values():
+        yield entrydict[max(entrydict.keys())]
+
+
+def main(bam, index, target, flags, flag_filter, min_quality, max_read_length, min_map_overlap, min_subtelomere_overlap, min_telomere_overlap, output_ambiguous_reads, file=stdout, **kwargs):
     # dispatch data to subroutines:
     ecxfd = load_index(index, as_filter_dict=True)
     ecx = load_index(index, as_filter_dict=False)
@@ -239,11 +255,21 @@ def main(bam, index, flags, flag_filter, min_quality, max_read_length, min_map_o
     )
     print(bam_header_string, file=file)
     n_orphaned_entries = 0
-    for entry in get_unambiguous_entries(entries, ecx, min_candidate_overlap):
-        if entry.mapq >= min_quality: # enforce quality on second pass
-            print(entry.to_string(), file=file)
-            if entry.seq is None:
-                n_orphaned_entries += 1
+    if output_ambiguous_reads == "none":
+        entry_iterator = get_unambiguous_entries(entries, ecx)
+    elif output_ambiguous_reads == "all":
+        entry_iterator = entries
+    elif output_ambiguous_reads == "longest-overlap":
+        entry_iterator = get_entries_once_with_ambiguity(
+            entries, maxattr="reference_length",
+        )
+    for entry in entry_iterator:
+        if entry.query_length - entry.reference_length >= min_telomere_overlap:
+            if entry.reference_length >= min_subtelomere_overlap:
+                if entry.mapq >= min_quality: # enforce quality on second pass
+                    print(entry.to_string(), file=file)
+                    if entry.seq is None:
+                        n_orphaned_entries += 1
     if n_orphaned_entries == 0:
         return 0
     else:

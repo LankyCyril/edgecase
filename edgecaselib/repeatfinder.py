@@ -4,6 +4,7 @@ from pysam import AlignmentFile, FastxFile
 from os import path
 from edgecaselib.util import get_executable, progressbar, revcomp
 from edgecaselib.util import get_circular_pattern
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from edgecaselib.formats import filter_bam
 from functools import lru_cache
 from subprocess import check_output
@@ -257,28 +258,43 @@ def coerce_and_filter_report(analysis, max_p_adjusted):
     ].copy()
 
 
-def explain_report(filtered_analysis, sequencefile, min_repeats):
+def explain_report(filtered_analysis, sequencefile, min_repeats, jobs=1):
     """Calculate fraction of reads explainable by each motif"""
     explained_analysis = filtered_analysis.copy()
     explained_analysis["bases_explained"], total_bases = 0.0, 0
     with FastxFile(sequencefile) as fastx:
-        iterator = progressbar(fastx, desc="Calculating fractions", unit="read")
-        for entry in iterator:
-            for motif in filtered_analysis["motif"]:
+        def get_number_of_masked_positions(sequence, motifs):
+            n_masked_positions_per_motif = {}
+            for motif in motifs:
                 positions_to_mask = set()
                 motifs_pattern = get_circular_pattern(
                     motif, repeats=min_repeats,
                 )
-                matcher = motifs_pattern.finditer(
-                    entry.sequence, overlapped=True,
-                )
+                matcher = motifs_pattern.finditer(sequence, overlapped=True)
                 for match in matcher:
                     positions_to_mask |= set(range(match.start(), match.end()))
-                indexer = (
-                    explained_analysis["motif"]==motif, "bases_explained",
+                n_masked_positions_per_motif[motif] = len(positions_to_mask)
+            return n_masked_positions_per_motif, len(sequence)
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            workers = [
+                pool.submit(
+                    get_number_of_masked_positions, entry.sequence,
+                    set(filtered_analysis["motif"]),
                 )
-                explained_analysis.loc[indexer] += len(positions_to_mask)
-            total_bases += len(entry.sequence)
+                for entry in fastx
+            ]
+            iterator = progressbar(
+                as_completed(workers), total=len(workers),
+                desc="Calculating fractions", unit="read",
+            )
+            for worker in iterator:
+                n_masked_positions_per_motif, total_seq_bases = worker.result()
+                for motif, n_pos in n_masked_positions_per_motif.items():
+                    indexer = (
+                        explained_analysis["motif"]==motif, "bases_explained",
+                    )
+                    explained_analysis.loc[indexer] += n_pos
+                total_bases += total_seq_bases
     return explained_analysis, total_bases
 
 
@@ -338,7 +354,7 @@ def main(sequencefile, fmt, flags, flag_filter, min_quality, min_k, max_k, min_r
                 analysis, max_p_adjusted,
             )
             explained_analysis, total_bases = explain_report(
-                filtered_analysis, sequencefile, min_repeats,
+                filtered_analysis, sequencefile, min_repeats, jobs=jobs,
             )
             formatted_analysis = format_analysis(
                 explained_analysis, min_k, max_motifs, total_bases,
