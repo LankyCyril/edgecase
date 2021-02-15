@@ -1,0 +1,19 @@
+# Significantly enriched repeating motifs in telomeric candidate reads in short-read sequencing experiments,				
+# subset to motifs also observed in PacBio telomeric reads, with respect to reverse-complemented equivalence.				
+Motif	Illumina datasets	 	10X datasets	
+ 	Median score	Adjusted p-value	Median score	Adjusted p-value
+TTAGGG	0.299068	<1e-300	0.461711	<1e-300
+TGAGGG	0.007484	<1e-300	0.018524	<1e-300
+TTGGGG	0.002495	<1e-300	0.007190	<1e-300
+TTAGGGG	0.003007	<1e-300	0.005024	<1e-300
+TTAAGGG	0.000664	1.39e-55	0.001124	1.58e-59
+TTAGGGTTAGGGG	0.000533	1.04e-51	0.001020	<1e-300
+TAGGG	0.000619	<1e-300	0.001020	<1e-300
+TTGGG	0.000500	<1e-300	0.000989	<1e-300
+TTTAGGG	0.000622	6.40e-55	0.000884	1.02e-57
+TAGGGTTAGGG	0.000312	4.24e-40	0.000503	<1e-300
+TTAGGGTTTAGGG	0.000176	4.41e-38	0.000284	6.22e-59
+TTAGGGTTAAGGG	0.000145	6.63e-36	0.000264	4.15e-57
+TTAGG	0.000241	8.13e-35	0.000213	1.10e-55
+TTGGGTTAGGG	0.000127	4.47e-28	0.000178	3.34e-56
+TTAGGTTAGGG	0.000066	1.99e-18	0.000092	7.82e-48

@@ -30,6 +30,40 @@ $ pip install pandas matplotlib seaborn tqdm regex pysam
 $ ./edgecase
 ```
 
+## Version history
+
+#### 2020-08-25
+
+* Interface updates:
+    * all subroutines:
+        * removed flawed option `--flags-any` (`-g`)
+    * tailchopper:
+        * fixed the error that led to CIGAR strings being dropped
+    * kmerscanner:
+        * can now accept both BAM and Fastx input (option `--fmt`)
+    * repeatfinder:
+        * accepts option `--collapse-reverse-complement` (`-C`), which works
+          similarly to option `-C` of jellyfish (count reverse complement motifs
+          together)
+        * better coerces motifs in the output into human-friendly inversions
+    * densityplot:
+        * accepts option `--n-boot` to specify number of bootstrap rounds
+          for plotting confidence intervals
+    * basic-pipeline-longread:
+        * a new subroutine that runs all invididual subroutines in order
+* Refactoring and internal updates:
+    * all subroutines:
+        * switched from `argparse` to `docopt`
+        * improved code style
+    * kmerscanner:
+        * function `get_circular_pattern()` accepts parameter `repeats`
+          (currently it is always set to 2)
+* Other updates:
+    * paper drafts
+* TODO:
+    * update README
+    * kmerscanner: remove obsolete options (`--head-test`, `--tail-test`,
+      `--cutoff`) and associated warning messages
 
 ## Input data and formats
 
@@ -55,7 +89,7 @@ Specifically, as described in the bioRxiv preprint, the human reference can be
 constructed from the hg38/GRCh38 reference genome and subtelomeric assemblies
 published by [Stong et al., 2014](https://dx.doi.org/10.1101%2Fgr.166983.113).
 To generate this reference, which we call "extended", or *hg38ext*, run
-`tools/generate-hg38ext.py --remote > hg38ext.fa`.
+`assets/generate-hg38ext.py --remote > hg38ext.fa`.
 
 
 ### Custom SAM flags
@@ -78,14 +112,14 @@ secondary          | 256   | 0x0100    | SAM specification flag
 qcfail             | 512   | 0x0200    | SAM specification flag
 pcrdup             | 1024  | 0x0400    | SAM specification flag
 supp               | 2048  | 0x0800    | SAM specification flag
-ucsc_mask_anchor   | 4096  | 0x1000    | edgeCase-specific flag; added during pipeline
+mask_anchor        | 4096  | 0x1000    | edgeCase-specific flag; added during pipeline
 fork               | 8192  | 0x2000    | edgeCase-specific flag; added during pipeline
 tract_anchor       | 16384 | 0x4000    | edgeCase-specific flag; added during pipeline
 is_q               | 32768 | 0x8000    | edgeCase-specific flag; added during pipeline
 
 *Note:* All edgeCase routines that allow flag filtering recognize both the
-numeric flag format (such as 3844) and the "human-readable" format such as "rev"
-or "is_q|paired". Combinations are also understood, for example, "3844|is_q".
+numeric flag format (such as 3844) and the "human-readable" format such as "rev".
+Combinations are also understood, for example, "-F 3844 -F is_q".
 
 
 ## The edgeCase pipeline
@@ -114,10 +148,9 @@ positional arguments:
 optional arguments:
   -x X, --index X            location of the reference .ecx index (REQUIRED)
   -f f, --flags f            process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g        process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F      process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q      process only entries with MAPQ >= Q (default: 0)
-  -m M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
+  -M M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
 ```
 
 Outputs a subset SAM file that contains only the reads that overhang anchors
@@ -147,7 +180,6 @@ positional arguments:
 optional arguments:
   -x X, --index X        location of the reference .ecx index (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -t ?, --target ?       an ECX flag (cut relative to reference) or 'cigar' (default: tract_anchor)
@@ -155,7 +187,7 @@ optional arguments:
 
 Truncates reads in the tailpuller file either to soft/hard-clipped ends (when
 --target is "cigar"), or to sequences extending past given anchor (when
---target is "tract_anchor", "fork", or "ucsc_mask_anchor").
+--target is "tract_anchor", "fork", or "mask_anchor").
 
 **NB**: outputs a SAM file with unmapped reads (sets the 0x0004 bit in the
 flag), but *retains the original mapping position*; do *not* use this value for
@@ -172,15 +204,14 @@ positional arguments:
 
 optional arguments:
   -f f, --flags f             process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g         process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F       process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q       process only entries with MAPQ >= Q (default: 0)
   --fmt ?                     format of input file(s) (default: sam)
   -m ?, --min-k ?             smallest target repeat length (default: 4)
   -M ?, --max-k ?             largest target repeat length (default: 16)
+  -r R, --min-repeats R       minimum number of consecutive repeats (default: 2)
   -n ?, --max-motifs ?        maximum number of motifs to report (default: None)
   -P ?, --max-p-adjusted ?    cutoff adjusted p-value (default: 0.05)
-  --no-context                allow single interspersed instances of kmers (default: False)
   --jellyfish ?               jellyfish binary (unless in $PATH) (default: None)
   --jellyfish-hash-size ?     jellyfish initial hash size (default: 2G)
   -j J, --jobs J              number of jellyfish jobs (parallel threads) (default: 1)
@@ -193,10 +224,7 @@ Relies on [jellyfish](http://www.genome.umd.edu/jellyfish.html) to count
 *k*-mers. If *edgeCase* has been installed with the Conda method (by creating
 an environment from *environment.yaml*), *jellyfish* is already installed and no
 special action is needed. Otherwise, it needs to be installed manually and, if
-not in $PATH, supplied with the *--jellyfish* option.  
-By default, only finds motifs in repeating contexts (e.g., treats motifs ACGT
-and ACGTT as completely distinct). This can be overridden with *--no-context*
-(to make ACGTT count towards both itself and ACGT).
+not in $PATH, supplied with the *--jellyfish* option.
 
 
 ### kmerscanner
@@ -210,7 +238,6 @@ positional arguments:
 optional arguments:
   --motif-file M         file with repeated motif sequences (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -w W, --window-size W  size of the rolling window (default: 100)
@@ -246,7 +273,6 @@ positional arguments:
 
 optional arguments:
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   --kmerscanner-file ?   kmerscanner file (optional, for use with --output-dir)
@@ -284,11 +310,10 @@ positional arguments:
 optional arguments:
   -x X, --index X        location of the reference .ecx index (REQUIRED)
   -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -g g, --flags-any g    process only entries with any of these sam flags present (default: 65535)
   -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
   -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
   -z, --gzipped          input is gzipped (must specify if any of -qfF present) (default: False)
-  -b B, --bin-size B     size of each bin in bp for visualization speedup (default: 100)
+  -b B, --bin-size B     size of each bin in bp (default: 10)
   --zoomed-in            plot taller traces, cut off pre-anchor regions (default: False)
   --palette ?            custom palette for plotting motifs (default: None)
   -e, --exploded         plot each read separately (default: False)
@@ -306,12 +331,9 @@ key-value sequence of "motif=color" and "legend=boolean", for example:
 Options *--exploded* and *--title* are deprecated.
 
 Option *--zoomed-in* plots taller figures, discards non-telomeric regions, and
-visualizes read coverage above each plot. With this option, two custom "debug"
-environment variables can be passed to *densityplot* that specify how much
-of the surrounding reference coordinates should be included: *PAPER_LEFT_SPAN*
-and *PAPER_RIGHT_SPAN*.
+visualizes read coverage above each plot.
 
 Annotates the anchors from the ECX with dashed lines:
-* ucsc_mask_anchor == gray,
+* mask_anchor == gray,
 * fork == blueviolet,
 * tract_anchor == red.

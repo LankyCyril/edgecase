@@ -1,0 +1,18 @@
+\documentclass{article}
+\usepackage[paperheight=6.55in,paperwidth=10.4in,margin=0in]{geometry}
+\usepackage[sfdefault]{roboto}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage[absolute,overlay]{textpos}
+    \setlength{\TPHorizModule}{1in}
+    \setlength{\TPVertModule}{1in}
+
+\begin{document}
+
+\begin{textblock}{13}(-0.0,  0.20) \LARGE{(A)} \end{textblock}
+\begin{textblock}{13}(-0.2,  0.40) \includegraphics[width=.6\textwidth,keepaspectratio]{densityplots/HG001-densityplot-p_arm.pdf}   \end{textblock}
+
+\begin{textblock}{13}(-0.0,  1.60) \LARGE{(B)} \end{textblock}
+\begin{textblock}{13}(-0.2,  1.70) \includegraphics{densityplots/HG001-densityplot-q_arm.pdf}   \end{textblock}
+
+\end{document}
