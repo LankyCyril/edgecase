@@ -1,14 +1,11 @@
 rule levenshtein:
     input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailpuller.bam",
     output: tsv=DATA_DIR+"/PacBio/{group}/{subject}/haplotypes/levenshtein-{arm}.tsv",
-    params: directory=DATA_DIR+"/PacBio/{group}/{subject}/haplotypes/levenshtein-{arm}",
     threads: 48,
     run:
         flags = get_sam_flags(wildcards.arm, target="tract_anchor")
         shell("""
-            mkdir {params.directory} 2>/dev/null || :
             ./edgecase levenshtein -j {threads} {flags} \
-                --output-dir {params.directory} \
                 {input.bam} > {output.tsv}
         """)
 
@@ -71,14 +68,11 @@ rule kmerscanner_for_haploplots:
 rule levenshtein_across_populations:
     input: bam=DATA_DIR+"/PacBio/tailpuller.bam",
     output: tsv=DATA_DIR+"/PacBio/haplotypes/levenshtein-{arm}.tsv",
-    params: directory=DATA_DIR+"/PacBio/haplotypes/levenshtein-{arm}",
     threads: 96,
     run:
         flags = get_sam_flags(wildcards.arm, target="tract_anchor")
         shell("""
-            mkdir {params.directory} 2>/dev/null || :
             ./edgecase levenshtein -j {threads} {flags} \
-                --output-dir {params.directory} \
                 {input.bam} > {output.tsv}
         """)
 
