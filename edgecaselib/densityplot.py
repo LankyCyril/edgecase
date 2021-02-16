@@ -6,7 +6,7 @@ from collections import OrderedDict
 from edgecaselib.util import natsorted_chromosomes, progressbar, motif_revcomp
 from matplotlib.pyplot import subplots, switch_backend, cm
 from matplotlib.patches import Patch
-from numpy import clip, linspace, arange
+from numpy import clip, arange
 from seaborn import lineplot
 from os import path
 from pandas import concat
@@ -350,11 +350,11 @@ def plot_density_scale(ax, figwidth_inches):
     )
     ax.text(
         x=bar_position+tick_width, y=1/ymax, transform=ax.transAxes,
-        s=" 100%", ha="left", va="top",
+        s=" 100%", ha="left", va="center",
     )
     ax.text(
         x=bar_position+tick_width, y=0, transform=ax.transAxes,
-        s=" 0%", ha="left", va="bottom",
+        s=" 0%", ha="left", va="center",
     )
     ax.text(
         x=bar_position-tick_width, y=.5/ymax, transform=ax.transAxes,
