@@ -1,7 +1,50 @@
 from sys import stdout, stderr
 from pysam import AlignmentFile
+from numpy import array, where, errstate
 from re import search, split
 from edgecaselib.formats import load_index, filter_bam, interpret_flags
+from edgecaselib.util import progressbar
+
+
+__doc__ = """edgeCase tailchopper: selection of overhanging heads/tails of reads
+
+Usage: {0} tailchopper -x filename [-t targetspec]
+       {1}             [-f flagspec]... [-F flagspec]... [-q integer] <bam>
+
+Output:
+    SAM-formatted file with tails of candidate reads overhanging anchors defined
+    in index
+
+Positional arguments:
+    <bam>                         name of input BAM/SAM file
+
+Required options:
+    -x, --index [filename]        location of the reference .ecx index
+
+Options:
+    -t, --target [targetspec]     an ECX flag (cut relative to reference) or 'cigar' [default: tract_anchor]
+
+Input filtering options:
+    -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+
+Notes:
+  * Depending on the aligner used, MAPQ of secondary reads may have been set to
+    zero regardless of real mapping quality; use this filtering option with
+    caution.
+"""
+
+__docopt_converters__ = [
+    lambda min_quality:
+        None if (min_quality is None) else int(min_quality),
+]
+
+__docopt_tests__ = {
+    lambda target:
+        target in {"mask_anchor", "fork", "tract_anchor", "cigar"}:
+            "unknown value of --target",
+}
 
 
 def get_cigar_clip_length(entry, prime):
@@ -21,8 +64,9 @@ def get_cigar_clip_length(entry, prime):
         )
 
 
-def update_aligned_segment(entry, map_pos, start=None, end=None):
+def update_aligned_segment(entry, ref_map_pos, bounds):
     """Update sequence, cigar, quality string in-place"""
+    start, end = bounds
     if (end is not None) and (start is not None) and (end < start):
         start, end = end, start
     qualities_substring = entry.query_qualities[start:end]
@@ -31,8 +75,8 @@ def update_aligned_segment(entry, map_pos, start=None, end=None):
         entry.cigarstring = str(len(entry.query_sequence)) + "S"
     else:
         entry.cigarstring = None
-    if map_pos is not None:
-        entry.reference_start += map_pos
+    if ref_map_pos is not None:
+        entry.reference_start = ref_map_pos
     entry.query_qualities = qualities_substring
 
 
@@ -45,7 +89,7 @@ def cigar_chopper(entry, ecx, integer_target):
     else:
         cigar_clip = search(r'^(\d+[SH])+', entry.cigarstring)
     if not cigar_clip:
-        update_aligned_segment(entry, None, 0, 0)
+        update_aligned_segment(entry, None, (0, 0))
         error = "No clipped sequence"
     else:
         clip_length = sum(
@@ -54,55 +98,35 @@ def cigar_chopper(entry, ecx, integer_target):
         )
         if clip_length > 0:
             if is_q:
-                map_pos = entry.reference_end - 1
-                update_aligned_segment(entry, map_pos, -clip_length, None)
+                update_aligned_segment(
+                    entry, entry.reference_end-1, (-clip_length, None),
+                )
             else:
-                map_pos = entry.reference_start
-                update_aligned_segment(entry, map_pos, None, clip_length)
+                update_aligned_segment(
+                    entry, entry.reference_start, (None, clip_length),
+                )
         else:
-            update_aligned_segment(entry, None, 0, 0)
+            update_aligned_segment(entry, None, (0, 0))
             error = "No clipped sequence"
     return entry, error
 
 
 def find_map_and_cut_positions(entry, anchor_pos, is_q):
-    """Find closest mapping position within `relax_radius` of anchor"""
-    positions = entry.get_reference_positions(full_length=True)
+    """Find closest mapping position to anchor"""
+    ref_positions = array(
+        entry.get_reference_positions(full_length=True), # [read_pos->ref_pos]
+        dtype=float,
+    )
     try:
-        cut_pos = positions.index(anchor_pos)
         if is_q:
-            return cut_pos, cut_pos
+            read_cut_pos = where(ref_positions>=anchor_pos)[0][0]
         else:
-            return entry.reference_start, cut_pos
-    except ValueError:
-        if entry.reference_start <= anchor_pos < entry.reference_end:
-            ref_map_length = entry.reference_end - 1 - entry.reference_start
-            try:
-                read_map_length = (
-                    positions.index(entry.reference_end-1) -
-                    positions.index(entry.reference_start)
-                )
-            except ValueError:
-                raise IndexError("SAM error? Last mapped position not on read")
-            ref_anchor_distance = anchor_pos - entry.reference_start
-            cut_pos = int(round(
-                ref_anchor_distance * read_map_length / ref_map_length
-            ))
-            if is_q:
-                return cut_pos, cut_pos
-            else:
-                return entry.reference_start, cut_pos
-        elif is_q:
-            if entry.reference_start >= anchor_pos:
-                return entry.reference_start, entry.reference_start
-            elif entry.reference_end < anchor_pos:
-                raise ValueError("Anchor position beyond mapped portion")
-        else:
-            if entry.reference_end < anchor_pos:
-                return entry.reference_start, entry.reference_end - 1
-            elif entry.reference_start > anchor_pos:
-                raise ValueError("Anchor position beyond mapped portion")
-    raise ValueError("Satisfactory cutting position not found")
+            read_cut_pos = where(ref_positions<=anchor_pos)[0][-1]
+    except IndexError:
+        ref_map_pos, read_cut_pos = None, None
+    else:
+        ref_map_pos = ref_positions[read_cut_pos].astype(int)
+    return ref_map_pos, read_cut_pos
 
 
 def relative_chopper(entry, ecx, integer_target):
@@ -118,26 +142,20 @@ def relative_chopper(entry, ecx, integer_target):
     if len(anchor_positions) > 1:
         raise ValueError("Ambiguous index entry: {}".format(anchor_positions))
     elif len(anchor_positions) == 0:
-        update_aligned_segment(entry, 0, 0)
+        update_aligned_segment(entry, None, (0, 0))
         error = "No anchor data in index"
     else:
-        anchor_pos = anchor_positions.iloc[0]
-        try:
-            map_pos, cut_pos = find_map_and_cut_positions(
-                entry, anchor_pos, is_q
-            )
-        except ValueError as e:
-            update_aligned_segment(entry, None, 0, 0)
-            error = str(e)
+        ref_map_pos, read_cut_pos = find_map_and_cut_positions(
+            entry, anchor_positions.iloc[0], is_q,
+        )
+        if is_q:
+            update_aligned_segment(entry, ref_map_pos, (read_cut_pos, None))
         else:
-            if is_q:
-                update_aligned_segment(entry, map_pos, cut_pos, None)
-            else:
-                update_aligned_segment(entry, map_pos, None, -cut_pos)
+            update_aligned_segment(entry, ref_map_pos, (None, read_cut_pos))
     return entry, error
 
 
-def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1, file=stdout, **kwargs):
+def main(bam, index, flags, flag_filter, min_quality, target, file=stdout, **kwargs):
     """Interpret arguments and dispatch data to subroutines"""
     if target == "cigar":
         chopper, integer_target = cigar_chopper, None
@@ -146,16 +164,28 @@ def main(bam, index, flags, flags_any, flag_filter, min_quality, target, jobs=1,
     ecx = load_index(index)
     with AlignmentFile(bam) as alignment:
         print(str(alignment.header).rstrip("\n"), file=file)
-        samfilters = [flags, flags_any, flag_filter, min_quality]
-        for entry in filter_bam(alignment, samfilters):
-            if entry.query_sequence:
-                chopped_entry, error = chopper(
-                    entry, ecx, integer_target
-                )
-                if chopped_entry.query_sequence:
-                    print(chopped_entry.to_string(), file=file)
-                else:
-                    error_message = "Skipping {} ({})".format(
-                        entry.query_name, error or "Zero length chop"
+        n_skipped = 0
+        bam_iterator = progressbar(
+            filter_bam(alignment, [flags, flag_filter, min_quality]),
+            desc="Chopping", unit="read",
+        )
+        with errstate(invalid="ignore"):
+            for entry in bam_iterator:
+                if entry.query_sequence:
+                    chopped_entry, error = chopper(
+                        entry, ecx, integer_target,
                     )
-                    print(error_message, file=stderr)
+                    if chopped_entry.query_sequence:
+                        print(chopped_entry.to_string(), file=file)
+                    else:
+                        n_skipped += 1
+    if n_skipped:
+        msg_mask = "Skipped {} reads to be safe (unsure where to chop)"
+        print(msg_mask.format(n_skipped), file=stderr)
+    warning = [
+        "WARNING: Read mapping positions were adjusted and retained;",
+        "         this is needed to comply with the SAM spec.",
+        "         Do not use these positions for analyses outside of edgeCase!",
+    ]
+    print("\n".join(warning), file=stderr)
+    return 0
