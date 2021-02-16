@@ -4,9 +4,9 @@ from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
 from edgecaselib.formats import TOL_COLORSCHEME, PAPER_PALETTE, BGCOLOR
 from collections import OrderedDict
 from edgecaselib.util import natsorted_chromosomes, progressbar, motif_revcomp
-from matplotlib.pyplot import subplots, switch_backend
+from matplotlib.pyplot import subplots, switch_backend, cm
 from matplotlib.patches import Patch
-from numpy import clip, linspace
+from numpy import clip, linspace, arange
 from seaborn import lineplot
 from os import path
 from pandas import concat
@@ -60,9 +60,6 @@ __docopt_tests__ = {
         outfmt in {"pdf", "pkl"}:
             "--outfmt must be either 'pdf' or 'pkl'",
 }
-
-
-PLOT_SCHEMATIC_OTHER_READS = False
 
 
 def simplify_axes(ax, keep=(), keep_scientific=False):
@@ -182,7 +179,7 @@ def fill_area(plottable_df, i, updated_palette, ax):
     )
 
 
-def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.1):
+def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.025):
     """Plot read coverage under area chart"""
     covered_positions = plottable_df.loc[
         ~plottable_df["density"].isnull(), "position"
@@ -195,18 +192,22 @@ def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.1):
         coverage_df["coverage"], a_min=1, a_max=50,
     )
     max_viz_coverage = coverage_df["viz_coverage"].max()
-    if PLOT_SCHEMATIC_OTHER_READS:
-        peak_position_ix = (coverage_df["viz_coverage"] == max_viz_coverage)
-        peak_position = coverage_df.loc[peak_position_ix, "position"].max()
-        for y in linspace(1+y_offset, max_viz_coverage, 5):
-            ax.plot(
-                [coverage_df["position"].min(), peak_position], [y, y],
-                color="gray", alpha=.4,
-            )
-    ax.fill_between(
-        x=coverage_df["position"], y1=1+y_offset,
-        y2=coverage_df["viz_coverage"], step="pre", color="#BBBBBB", alpha=1,
+    poly, = ax.fill(
+        coverage_df["position"], coverage_df["viz_coverage"], color="none",
     )
+    gradient = arange(
+        coverage_df["coverage"].min(), coverage_df["coverage"].max(), .1,
+    )
+    img = ax.imshow(
+        gradient.reshape(gradient.size, 1), aspect="auto", origin="lower",
+        cmap=cm.bone, alpha=.6, vmin=-10, vmax=60, extent=[
+            coverage_df["position"].min(),
+            coverage_df["position"].max(),
+            coverage_df["viz_coverage"].min(),
+            coverage_df["viz_coverage"].max(),
+        ],
+    )
+    img.set_clip_path(poly)
     return max_viz_coverage
 
 
@@ -349,11 +350,11 @@ def plot_density_scale(ax, figwidth_inches):
     )
     ax.text(
         x=bar_position+tick_width, y=1/ymax, transform=ax.transAxes,
-        s=" 100%", ha="left", va="center",
+        s=" 100%", ha="left", va="top",
     )
     ax.text(
         x=bar_position+tick_width, y=0, transform=ax.transAxes,
-        s=" 0%", ha="left", va="center",
+        s=" 0%", ha="left", va="bottom",
     )
     ax.text(
         x=bar_position-tick_width, y=.5/ymax, transform=ax.transAxes,
@@ -394,8 +395,7 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
         xlim = plot_anchors(ecx_chrom_name, ecx, target_anchor, is_q, ax)
         if bdf is None:
             ax.set(xlim=(xlim[0]-1, xlim[1]+1))
-        ax2chrom[ax] = ecx_chrom_name
-        ax2ylabel[ax] = display_chrom_name
+        ax2chrom[ax], ax2ylabel[ax] = ecx_chrom_name, display_chrom_name
     try:
         unit_adjustment = {"Kbp": 1e3, "Mbp": 1e6, "bp": None}[unit]
         unit_fmt = {"Kbp": ",.0f", "Mbp": ",.3f", "bp": ",.0f"}[unit]
