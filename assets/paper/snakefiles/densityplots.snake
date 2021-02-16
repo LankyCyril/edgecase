@@ -115,9 +115,9 @@ rule densityplot:
             else:
                 kmerscan_empty = True
         if wildcards.outfmt == "pdf":
-            palette = "--palette paper"
+            options = "--palette paper --plot-coverage"
         elif wildcards.outfmt == "pkl":
-            palette = "--palette 'paper|legend=False'"
+            options = "--palette paper"
         else:
             raise ValueError(f"outfmt={wildcards.outfmt}")
         if kmerscan_empty:
@@ -128,9 +128,9 @@ rule densityplot:
             flags = get_sam_flags(wildcards.arm, target="tract_anchor")
             shell("""
                 ./edgecase densityplot \
-                    -x {HG38EXT_ECX} {palette} --title ' ' {flags} \
+                    -x {HG38EXT_ECX} --title ' ' {flags} \
                     --chroms-to-plot '{chroms_to_plot}' \
-                    --plot-coverage -b 100 \
+                    -b 100 {options} \
                     -z {input.dat} --outfmt {wildcards.outfmt} > {output.pdf}
             """)
 
