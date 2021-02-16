@@ -1,2 +1,2 @@
-from . import tailpuller, levenshtein, tailchopper, repeatfinder, kmerscanner
-from . import densityplot, entropy, basic_pipeline_longread
+from . import tailpuller, tailchopper, repeatfinder, kmerscanner, densityplot
+from . import entropy, levenshtein
