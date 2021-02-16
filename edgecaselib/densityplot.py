@@ -4,9 +4,9 @@ from edgecaselib.formats import FLAG_COLORS, explain_sam_flags, interpret_flags
 from edgecaselib.formats import TOL_COLORSCHEME, PAPER_PALETTE, BGCOLOR
 from collections import OrderedDict
 from edgecaselib.util import natsorted_chromosomes, progressbar, motif_revcomp
-from matplotlib.pyplot import subplots, switch_backend
+from matplotlib.pyplot import subplots, switch_backend, cm
 from matplotlib.patches import Patch
-from numpy import clip, linspace
+from numpy import clip, arange
 from seaborn import lineplot
 from os import path
 from pandas import concat
@@ -21,7 +21,7 @@ Usage: {0} densityplot -x filename [-b integer] [--plot-coverage]
        {1}             [--palette palettespec] [--title string]
        {1}             [--n-boot integer] [--chroms-to-plot string]
        {1}             [-f flagspec]... [-F flagspec]... [-q integer]
-       {1}             [--outfmt string] [-z] <dat>
+       {1}             [--figwidth-inches float] [--outfmt string] [-z] <dat>
 
 Output:
     PDF file with motif densities visualized along chromosomal ends
@@ -40,6 +40,7 @@ Options:
     --title [string]              figure title (defaults to input filename)
     --chroms-to-plot [string]     if set, plot chromosomes from this comma-separated list unconditionally
     --plot-coverage               plot coverage by telomeric reads on each arm
+    --figwidth-inches [float]     width of figure in inches [default: 13]
     --outfmt [string]             output format (pdf, pkl) [default: pdf]
 
 Input filtering options:
@@ -51,6 +52,7 @@ Input filtering options:
 __docopt_converters__ = [
     lambda bin_size: None if bin_size is None else int(bin_size),
     lambda n_boot: int(n_boot),
+    lambda figwidth_inches: float(figwidth_inches),
 ]
 
 __docopt_tests__ = {
@@ -58,10 +60,6 @@ __docopt_tests__ = {
         outfmt in {"pdf", "pkl"}:
             "--outfmt must be either 'pdf' or 'pkl'",
 }
-
-
-DENSITYPLOT_FIGWIDTH = 17
-PLOT_SCHEMATIC_OTHER_READS = False
 
 
 def simplify_axes(ax, keep=(), keep_scientific=False):
@@ -73,13 +71,13 @@ def simplify_axes(ax, keep=(), keep_scientific=False):
         ax.ticklabel_format(useOffset=False, style="plain")
 
 
-def chromosome_subplots(nrows, plot_coverage=False):
+def chromosome_subplots(nrows, figwidth_inches, plot_coverage=False):
     """Prepare figure with subplots for each chromosome end"""
     if plot_coverage:
-        figsize = (DENSITYPLOT_FIGWIDTH*.7, nrows*2.2*.7)
+        figsize = (figwidth_inches*.7, nrows*2.2*.7*figwidth_inches/15)
         hspace = .3
     else:
-        figsize = (DENSITYPLOT_FIGWIDTH*.7, nrows*1.5*.7)
+        figsize = (figwidth_inches*.7, nrows*1.5*.7*figwidth_inches/15)
         hspace = .7
     figure, axs = subplots(
         figsize=figsize, gridspec_kw={"hspace": hspace},
@@ -181,7 +179,7 @@ def fill_area(plottable_df, i, updated_palette, ax):
     )
 
 
-def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.1):
+def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.025):
     """Plot read coverage under area chart"""
     covered_positions = plottable_df.loc[
         ~plottable_df["density"].isnull(), "position"
@@ -194,18 +192,22 @@ def coverage_plot(plottable_df, motif_count, is_q, ax, y_offset=.1):
         coverage_df["coverage"], a_min=1, a_max=50,
     )
     max_viz_coverage = coverage_df["viz_coverage"].max()
-    if PLOT_SCHEMATIC_OTHER_READS:
-        peak_position_ix = (coverage_df["viz_coverage"] == max_viz_coverage)
-        peak_position = coverage_df.loc[peak_position_ix, "position"].max()
-        for y in linspace(1+y_offset, max_viz_coverage, 5):
-            ax.plot(
-                [coverage_df["position"].min(), peak_position], [y, y],
-                color="gray", alpha=.4,
-            )
-    ax.fill_between(
-        x=coverage_df["position"], y1=1+y_offset,
-        y2=coverage_df["viz_coverage"], step="pre", color="#BBBBBB", alpha=1,
+    poly, = ax.fill(
+        coverage_df["position"], coverage_df["viz_coverage"], color="none",
     )
+    gradient = arange(
+        coverage_df["coverage"].min(), coverage_df["coverage"].max(), .1,
+    )
+    img = ax.imshow(
+        gradient.reshape(gradient.size, 1), aspect="auto", origin="lower",
+        cmap=cm.bone, alpha=.6, vmin=-10, vmax=60, extent=[
+            coverage_df["position"].min(),
+            coverage_df["position"].max(),
+            coverage_df["viz_coverage"].min(),
+            coverage_df["viz_coverage"].max(),
+        ],
+    )
+    img.set_clip_path(poly)
     return max_viz_coverage
 
 
@@ -334,9 +336,9 @@ def add_legend(updated_palette, ax, is_q):
     ax.set(zorder=float("inf"))
 
 
-def plot_density_scale(ax):
-    bar_position = 1 + .002 * DENSITYPLOT_FIGWIDTH
-    tick_width = .0003 * DENSITYPLOT_FIGWIDTH
+def plot_density_scale(ax, figwidth_inches):
+    bar_position = 1 + .002 * figwidth_inches
+    tick_width = .0004 * figwidth_inches
     ymax = ax.get_ylim()[1]
     xtrace = [
         bar_position+tick_width, bar_position,
@@ -356,7 +358,8 @@ def plot_density_scale(ax):
     )
     ax.text(
         x=bar_position-tick_width, y=.5/ymax, transform=ax.transAxes,
-        s="density", ha="right", va="center", rotation=90,
+        s="density", ha="right", va="center",
+        rotation=90, size=figwidth_inches*2/3,
     )
 
 
@@ -371,12 +374,12 @@ def format_chrom(chrom):
     return ecx_chrom_name, short_chrom_name, display_chrom_name
 
 
-def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, chroms_to_plot, plot_coverage, unit="Kbp"):
+def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage, unit="Kbp"):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator, n_axes = make_decorated_densities_iterator(
         densities, chroms_to_plot,
     )
-    figure, axs = chromosome_subplots(n_axes, plot_coverage)
+    figure, axs = chromosome_subplots(n_axes, figwidth_inches, plot_coverage)
     ax2chrom, ax2ylabel = {}, {}
     for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:, 0]):
         ecx_chrom_name, short_chrom_name, display_chrom_name = format_chrom(
@@ -392,8 +395,7 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
         xlim = plot_anchors(ecx_chrom_name, ecx, target_anchor, is_q, ax)
         if bdf is None:
             ax.set(xlim=(xlim[0]-1, xlim[1]+1))
-        ax2chrom[ax] = ecx_chrom_name
-        ax2ylabel[ax] = display_chrom_name
+        ax2chrom[ax], ax2ylabel[ax] = ecx_chrom_name, display_chrom_name
     try:
         unit_adjustment = {"Kbp": 1e3, "Mbp": 1e6, "bp": None}[unit]
         unit_fmt = {"Kbp": ",.0f", "Mbp": ",.3f", "bp": ",.0f"}[unit]
@@ -405,7 +407,7 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
     )
     if legend:
         add_legend(updated_palette, axs[0, 0], is_q=is_q)
-        plot_density_scale(axs[0, 0])
+        plot_density_scale(axs[0, 0], figwidth_inches)
     axs[0, 0].set(title=title)
     axs[-1, 0].set(xlabel=unit)
     return figure
@@ -477,7 +479,7 @@ def interpret_arguments(palette, chroms_to_plot, samfilters, title, outfmt, dat)
     return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
 
 
-def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, palette, title, chroms_to_plot, plot_coverage, outfmt, file=buffer, **kwargs):
+def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, palette, title, chroms_to_plot, plot_coverage, outfmt, figwidth_inches, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
     target_anchor, is_q, palette, legend, title = interpret_arguments(
@@ -488,7 +490,7 @@ def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot,
     switch_backend("Agg")
     figure = plot_densities(
         densities, n_boot, ecx, title, palette, legend, target_anchor,
-        is_q, chroms_to_plot, plot_coverage,
+        is_q, chroms_to_plot, figwidth_inches, plot_coverage,
     )
     if outfmt == "pdf":
         figure.savefig(file, bbox_inches="tight", format="pdf")
