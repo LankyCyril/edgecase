@@ -19,8 +19,8 @@ Commmands (<command>):
     densityplot              visualize densities of candidate motifs
 
 Development area:
-    entropy                  calculate motif entropy among reads
-    levenshtein              cluster long reads by edit distance
+    entropy                  calculate motif entropy among long reads
+    levenshtein              calculate pairwise edit distance among long reads
 """
 
 
