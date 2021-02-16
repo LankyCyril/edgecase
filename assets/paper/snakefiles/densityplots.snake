@@ -114,6 +114,12 @@ rule densityplot:
                     break
             else:
                 kmerscan_empty = True
+        if wildcards.outfmt == "pdf":
+            palette = "--palette paper"
+        elif wildcards.outfmt == "pkl":
+            palette = "--palette 'paper|legend=False'"
+        else:
+            raise ValueError(f"outfmt={wildcards.outfmt}")
         if kmerscan_empty:
             switch_backend("Agg")
             figure, ax = subplots()
@@ -122,7 +128,7 @@ rule densityplot:
             flags = get_sam_flags(wildcards.arm, target="tract_anchor")
             shell("""
                 ./edgecase densityplot \
-                    -x {HG38EXT_ECX} --palette paper --title ' ' {flags} \
+                    -x {HG38EXT_ECX} {palette} --title ' ' {flags} \
                     --chroms-to-plot '{chroms_to_plot}' \
                     --plot-coverage -b 100 \
                     -z {input.dat} --outfmt {wildcards.outfmt} > {output.pdf}
