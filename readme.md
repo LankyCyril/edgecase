@@ -323,11 +323,12 @@ optional arguments:
 Visualizes the density of motifs on each chromosomal arm in the regions covered
 by candidate reads, binning the values by windows of *--bin-size*.  
 The value of *--palette* can be either none (in which case the maximum of nine
-motifs can be plotted with default colors), "paper" or "paper|legend=False" (in
-which case motifs known from research can be plotted with custom colors,
-matching the colors in the figures in the bioRxiv preprint), or a chained
-key-value sequence of "motif=color" and "legend=boolean", for example:
-"TTAGGG=green|TGAGGG=#D01000|legend=True".  
+motifs can be plotted with default colors), "paper", "paper|legend=full",
+"paper|legend=density", or "paper|legend=motifs" (in which case motifs known
+from research can be plotted with custom colors, matching the colors in the
+figures in the paper), or a chained key-value sequence of "motif=color" and
+"legend=spec", where "spec" is one of "none", "full", "density", "motifs".
+For example: "TTAGGG=green|TGAGGG=#D01000|legend=full".  
 Options *--exploded* and *--title* are deprecated.
 
 Option *--zoomed-in* plots taller figures, discards non-telomeric regions, and

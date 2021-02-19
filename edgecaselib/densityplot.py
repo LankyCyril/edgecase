@@ -319,7 +319,7 @@ def align_subplots(ax2chrom, ax2ylabel, ecx, target_anchor, is_q, unit_adjustmen
             )
 
 
-def add_legend(updated_palette, ax, is_q):
+def add_motifs_legend(updated_palette, ax, is_q):
     """Add custom legend"""
     handles = [
         Patch(label=motif, fc=color, ec="black", hatch=None, alpha=.7)
@@ -374,7 +374,7 @@ def format_chrom(chrom):
     return ecx_chrom_name, short_chrom_name, display_chrom_name
 
 
-def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage, unit="Kbp"):
+def plot_densities(densities, n_boot, ecx, title, palette, motifs_legend, density_legend, target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage, unit="Kbp"):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator, n_axes = make_decorated_densities_iterator(
         densities, chroms_to_plot,
@@ -405,8 +405,9 @@ def plot_densities(densities, n_boot, ecx, title, palette, legend, target_anchor
         ax2chrom, ax2ylabel, ecx, target_anchor, is_q,
         unit_adjustment=unit_adjustment, unit_fmt=unit_fmt,
     )
-    if legend:
-        add_legend(updated_palette, axs[0, 0], is_q=is_q)
+    if motifs_legend:
+        add_motifs_legend(updated_palette, axs[0, 0], is_q=is_q)
+    if density_legend:
         plot_density_scale(axs[0, 0], figwidth_inches)
     axs[0, 0].set(title=title)
     axs[-1, 0].set(xlabel=unit)
@@ -451,20 +452,26 @@ def generate_paper_palette(paper_palette, is_q):
 def interpret_arguments(palette, chroms_to_plot, samfilters, title, outfmt, dat):
     """Parse and check arguments"""
     is_q, target_anchor = interpret_target(samfilters)
+    PAPER_PALETTE_AS_PASSED_ARGS = {
+        "paper", "paper|legend=none", "paper|legend=full",
+        "paper|legend=density", "paper|legend=motifs",
+    }
     if palette is None:
-        legend = True
-    elif palette in {"paper|legend=False", "paper|legend=True", "paper"}:
-        legend = "False" not in palette
+        motifs_legend, density_legend = True, True
+    elif palette in PAPER_PALETTE_AS_PASSED_ARGS:
+        full_legend = "legend=full" in palette
+        motifs_legend = ("legend=motifs" in palette) or full_legend
+        density_legend = ("legend=density" in palette) or full_legend
         palette = generate_paper_palette(PAPER_PALETTE, is_q)
     else:
         interpreted_palette = OrderedDict()
-        legend = True
+        motifs_legend, density_legend = True, True
         for palette_field in palette.split("|"):
             if palette_field.startswith("legend="):
-                if palette_field[7:].lower() == "true":
-                    legend = True
-                elif palette_field[7:].lower() == "false":
-                    legend = False
+                spec = palette_field[7:]
+                if spec in {"full", "motifs", "density", "none"}:
+                    motifs_legend = spec in {"full", "motifs"}
+                    density_legend = spec in {"full", "density"}
                 else:
                     raise ValueError("Uknown syntax: " + palette_field)
             elif "=" in palette_field:
@@ -472,25 +479,26 @@ def interpret_arguments(palette, chroms_to_plot, samfilters, title, outfmt, dat)
                 interpreted_palette[motif] = color
             else:
                 raise ValueError("Uknown syntax: " + palette_field)
-        if interpreted_palette:
-            palette = interpreted_palette
-        else:
-            palette = None
-    return target_anchor, is_q, palette, legend, (title or path.split(dat)[-1])
+        palette = interpreted_palette or None
+    return (
+        target_anchor, is_q, palette, motifs_legend, density_legend,
+        (title or path.split(dat)[-1]),
+    )
 
 
 def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, palette, title, chroms_to_plot, plot_coverage, outfmt, figwidth_inches, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
-    target_anchor, is_q, palette, legend, title = interpret_arguments(
+    _intrg = interpret_arguments(
         palette, chroms_to_plot, samfilters, title, outfmt, dat,
     )
+    target_anchor, is_q, palette, motifs_legend, density_legend, title = _intrg
     ecx = load_index(index)
     densities = load_kmerscan(dat, gzipped, samfilters, bin_size)
     switch_backend("Agg")
     figure = plot_densities(
-        densities, n_boot, ecx, title, palette, legend, target_anchor,
-        is_q, chroms_to_plot, figwidth_inches, plot_coverage,
+        densities, n_boot, ecx, title, palette, motifs_legend, density_legend,
+        target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage,
     )
     if outfmt == "pdf":
         figure.savefig(file, bbox_inches="tight", format="pdf")

@@ -115,22 +115,23 @@ rule densityplot:
             else:
                 kmerscan_empty = True
         if wildcards.outfmt == "pdf":
-            options = "--palette paper --plot-coverage"
+            if wildcards.arm == "p_arm":
+                options = "--palette 'paper|legend=density'"
+            else:
+                options = "--palette paper"
         elif wildcards.outfmt == "pkl":
-            options = "--palette paper"
+            options = "--palette 'paper|legend=full' --plot-coverage"
         else:
             raise ValueError(f"outfmt={wildcards.outfmt}")
         if kmerscan_empty:
             switch_backend("Agg")
-            figure, ax = subplots()
-            figure.savefig(output.pdf, bbox_inches="tight")
+            subplots()[0].savefig(output.pdf, bbox_inches="tight")
         else:
             flags = get_sam_flags(wildcards.arm, target="tract_anchor")
             shell("""
                 ./edgecase densityplot \
-                    -x {HG38EXT_ECX} --title ' ' {flags} \
+                    -x {HG38EXT_ECX} --title ' ' {flags} -b 100 {options} \
                     --chroms-to-plot '{chroms_to_plot}' \
-                    -b 100 {options} \
                     -z {input.dat} --outfmt {wildcards.outfmt} > {output.pdf}
             """)
 
