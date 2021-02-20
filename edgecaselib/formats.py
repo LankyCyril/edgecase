@@ -25,8 +25,8 @@ FLAG_COLORS = {0x1000: "gray", 0x2000: "blueviolet", 0x4000: "red"}
 TOL_COLORSCHEME = OrderedDict([
     ("green",   "#117733"),
     ("yellow",  "#DDCC77"),
+    ("cyan",    "#88DDFF"),
     ("magenta", "#AA4499"),
-    ("cyan",    "#88CCEE"),
     ("blue",    "#332288"),
     ("red",     "#882255"),
     ("teal",    "#44AA99"),
@@ -39,8 +39,8 @@ BGCOLOR = "#BBBBCA"
 PAPER_PALETTE = OrderedDict([
     ("TTAGGG", TOL_COLORSCHEME["green"]),
     ("TGAGGG", TOL_COLORSCHEME["yellow"]),
-    ("TTAGGGG", TOL_COLORSCHEME["magenta"]),
-    ("TTAGG", TOL_COLORSCHEME["cyan"]),
+    ("TTAGGGG", TOL_COLORSCHEME["cyan"]),
+    ("TTAGG", TOL_COLORSCHEME["magenta"]),
     ("TTAGGGTTAGGGG", TOL_COLORSCHEME["blue"]),
     ("TTGGGG", TOL_COLORSCHEME["red"]),
     ("TCAGGG", TOL_COLORSCHEME["teal"]),
@@ -50,8 +50,8 @@ PAPER_PALETTE = OrderedDict([
 PAPER_PALETTE_RC = OrderedDict([
     ("CCCTAA", TOL_COLORSCHEME["green"]),
     ("CCCTCA", TOL_COLORSCHEME["yellow"]),
-    ("CCCCTAA", TOL_COLORSCHEME["magenta"]),
-    ("CCTAA", TOL_COLORSCHEME["cyan"]),
+    ("CCCCTAA", TOL_COLORSCHEME["cyan"]),
+    ("CCTAA", TOL_COLORSCHEME["magenta"]),
     ("CCCCTAACCCTAA", TOL_COLORSCHEME["blue"]),
     ("CCCCAA", TOL_COLORSCHEME["red"]),
     ("CCCTGA", TOL_COLORSCHEME["teal"]),
