@@ -8,6 +8,9 @@
 \usepackage[absolute,overlay]{textpos}
     \setlength{\TPHorizModule}{1in}
     \setlength{\TPVertModule}{1in}
+\makeatletter
+    \newcommand*{\textoverline}[1]{$\overline{\hbox{#1\vphantom{\"A}}}\m@th$}
+    \makeatother
 \begin{document}
 \begin{textblock}{13}(0,0.050)\includegraphics{./Figure_S4/chr2-HG002.pdf}\end{textblock}
 \begin{textblock}{13}(0,1.112)\includegraphics{./Figure_S4/chr2-HG003.pdf}\end{textblock}
@@ -51,13 +54,13 @@
 \begin{textblock}{13}(0,13.454)\includegraphics{./Figure_S4/17ptel_1_500K_1_12_12-HG005.pdf}\end{textblock}
 \begin{textblock}{13}(0,13.696)\includegraphics{./Figure_S4/17ptel_1_500K_1_12_12-HG006.pdf}\end{textblock}
 \begin{textblock}{13}(-0.11,14.063)\includegraphics{./Figure_S4/17ptel_1_500K_1_12_12-HG007.pdf}\end{textblock}
-\begin{textblock}{13}(6.465148181818182,0.47)\rotatebox{270}{\Large{\uline{\hspace*{7.8pt}2p (chr2)\hspace*{7.8pt}}}}\end{textblock}
-\begin{textblock}{13}(6.4024209090909095,1.8211146)\rotatebox{270}{\Large{\uline{\hspace*{7.8pt}3p (3ptel\_1...)\hspace*{7.8pt}}}}\end{textblock}
-\begin{textblock}{13}(8.531310909090909,3.4733371999999996)\rotatebox{270}{\Large{\uline{\hspace*{117.0pt}4p (4ptel\_1...)\hspace*{117.0pt}}}}\end{textblock}
-\begin{textblock}{13}(6.365148181818182,8.1733342)\rotatebox{270}{\Large{\uline{\hspace*{3.9pt}5p (chr5)\hspace*{3.9pt}}}}\end{textblock}
-\begin{textblock}{13}(6.037378181818182,9.375001199999998)\rotatebox{270}{\Large{\uline{\hspace*{0.0pt}9p (chr9)\hspace*{0.0pt}}}}\end{textblock}
-\begin{textblock}{13}(5.9,10.437778599999998)\rotatebox{270}{\Large{\uline{\hspace*{0.0pt}12p (chr12)\hspace*{0.0pt}}}}\end{textblock}
-\begin{textblock}{13}(6.8,11.679445399999999)\rotatebox{270}{\Large{\uline{\hspace*{50.699999999999996pt}17p (17ptel\_1...)\hspace*{50.699999999999996pt}}}}\end{textblock}
+\begin{textblock}{13}(6.465148181818182,0.47)\rotatebox{90}{\Large{\textoverline{\hspace*{7.8pt}2p (chr2)\hspace*{7.8pt}}}}\end{textblock}
+\begin{textblock}{13}(6.4024209090909095,1.8211146)\rotatebox{90}{\Large{\textoverline{\hspace*{7.8pt}3p (3ptel\_1...)\hspace*{7.8pt}}}}\end{textblock}
+\begin{textblock}{13}(8.531310909090909,3.4733371999999996)\rotatebox{90}{\Large{\textoverline{\hspace*{117.0pt}4p (4ptel\_1...)\hspace*{117.0pt}}}}\end{textblock}
+\begin{textblock}{13}(6.365148181818182,8.1733342)\rotatebox{90}{\Large{\textoverline{\hspace*{3.9pt}5p (chr5)\hspace*{3.9pt}}}}\end{textblock}
+\begin{textblock}{13}(6.037378181818182,9.375001199999998)\rotatebox{90}{\Large{\textoverline{\hspace*{0.0pt}9p (chr9)\hspace*{0.0pt}}}}\end{textblock}
+\begin{textblock}{13}(5.9,10.437778599999998)\rotatebox{90}{\Large{\textoverline{\hspace*{0.0pt}12p (chr12)\hspace*{0.0pt}}}}\end{textblock}
+\begin{textblock}{13}(6.8,11.679445399999999)\rotatebox{90}{\Large{\textoverline{\hspace*{50.699999999999996pt}17p (17ptel\_1...)\hspace*{50.699999999999996pt}}}}\end{textblock}
 \begin{textblock}{13}(7.070,.4)
 \includegraphics[width=4.100in,keepaspectratio]{Figure_4/legend.pdf}
 \end{textblock}

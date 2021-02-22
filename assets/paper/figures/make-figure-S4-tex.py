@@ -49,10 +49,13 @@ TEX_HEADER = r'''\documentclass{article}
 \usepackage[absolute,overlay]{textpos}
     \setlength{\TPHorizModule}{1in}
     \setlength{\TPVertModule}{1in}
+\makeatletter
+    \newcommand*{\textoverline}[1]{$\overline{\hbox{#1\vphantom{\"A}}}\m@th$}
+    \makeatother
 \begin{document}'''
 
 TEX_IMAGE = r'\begin{textblock}{13}($X,$Y)\includegraphics{$PDF}\end{textblock}'
-TEX_YLABEL = r'\begin{textblock}{13}($X,$Y)\rotatebox{270}{\Large{\uline{$T}}}\end{textblock}'
+TEX_YLABEL = r'\begin{textblock}{13}($X,$Y)\rotatebox{90}{\Large{\textoverline{$T}}}\end{textblock}'
 
 TEX_FOOTER = r'\end{document}'
 
