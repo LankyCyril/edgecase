@@ -2,6 +2,7 @@
 from sys import argv
 from pandas import read_csv
 from subprocess import Popen, PIPE
+from itertools import cycle, tee
 
 
 def get_header_height(filename):
@@ -46,7 +47,7 @@ def preformat_header(tsv, level):
             yield r'\multicolumn{'+str(count)+r'}{l}{\textbf{'+realname+"}}"
 
 
-def preformat_row(row):
+def preformat_row(row, factors_tee, fmts_tee):
     for label, value in row.items():
         is_p = False
         if isinstance(label, (tuple, list)):
@@ -72,7 +73,7 @@ def preformat_row(row):
             except ValueError:
                 yield value.replace("_", r'\_')
             else:
-                yield format(float_value, ".6f")
+                yield format(float_value*next(factors_tee), next(fmts_tee))
 
 
 def columnize(list_of_iterables):
@@ -96,7 +97,7 @@ def finish_table():
     ])
 
 
-def main(filename):
+def main(filename, factors, fmts):
     header_height = get_header_height(filename)
     tsv = read_csv(
         filename, sep="\t", escapechar="#",
@@ -106,13 +107,28 @@ def main(filename):
     print(init_table(ncols=tsv.shape[1]))
     print(columnize((
         [preformat_header(tsv, n) for n in range(header_height)] +
-        [r'\hline'] +
-        [preformat_row(row) for _, row in tsv.iterrows()]
+        [r'\hline'] + [
+            preformat_row(row, tee(factors)[0], tee(fmts)[0])
+            for _, row in tsv.iterrows()
+        ]
     )))
     print(finish_table())
     return 0
 
 
 if __name__ == "__main__":
-    returncode = main(filename=argv[1])
+    if len(argv) > 3:
+        factors = list(float(f) for f in argv[2].split(";"))
+        fmts = argv[3].split(";")
+    elif len(argv) > 2:
+        if argv[2] == "Table_1":
+            factors = [100]*7 + [1]*7
+            fmts = [".1f"]*7 + [".4f"]*7
+        else:
+            factors = list(float(f) for f in argv[2].split(";"))
+            fmts = cycle([".6f"])
+    else:
+        factors = cycle([1])
+        fmts = cycle([".6f"])
+    returncode = main(argv[1], factors, fmts)
     exit(returncode)
