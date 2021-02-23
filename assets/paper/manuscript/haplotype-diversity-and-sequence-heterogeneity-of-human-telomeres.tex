@@ -104,7 +104,7 @@
       \addspace\bibstring{and}\space}
 
 %\usepackage[natbib=true,backend=bibtex,style=authoryear]{biblatex}
-    \addbibresource{latex/references.bib}
+    \addbibresource{references.bib}
 
 \newcommand{\beginsupplement}{
 % bytesizebio.net/2013/03/11/adding-supplementary-tables-and-figures-in-latex
@@ -212,7 +212,7 @@
     We have validated these methods using
         Genome in a Bottle \parencite{giab} single-molecule real-time (SMRT) sequencing datasets
             generated with Pacific Biosciences circular consensus sequencing (PacBio CCS) \parencite{pacbio,pacbioccs},
-        and short-read Illumina \parencite{illumina} and 10X Genomics [Chromium] \parencite{10x} datasets.
+        and short-read Illumina \parencite{illumina} and 10x Genomics [Chromium] (www.10xgenomics.com) datasets.
     These results provide evidence for
         multiple novel, non-canonical telomeric repeats,
         resolution of multiple chromosome-specific haplotypes with SMRT sequencing,
@@ -237,7 +237,7 @@
                     (\textbf{Supplemental Table S1}).
     Portions of reads contained in the telomeric regions were extracted for further analysis (\textbf{\autoref{fig:schematic_alignment}}).
         \begin{figure}[h!] \centering % \vspace{5mm}
-        \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-1.pdf}
+        \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_1.pdf}
         \caption{
              \small Mapping of candidate telomeric reads, illustrated with reads from the HG002 dataset aligning to \mbox{chromosome 5.}
              The chromosome is displayed schematically, centered around the centromere.
@@ -268,9 +268,9 @@
         as it provided the deepest coverage among the assessed datasets (\textbf{Supplemental Table S1}).
         Only the chromosomal arms covered by at least 25 reads were plotted.
             Plots for the other six datasets are available as \textbf{Supplemental Figs. S1\textendash{}S6}.
-        \input{latex/tables/Table-1-repeatfinder.tex} % tab:repeatfinder
+        \input{../tables/Table_1.tex} % tab:repeatfinder
         \begin{figure}[h!] \centering
-        \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-2.pdf}
+        \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_2.pdf}
         \caption{
              \small Densities of the top four enriched motifs at ends of chromosomal \textbf{(A)} \textit{p} arms
              and \textbf{(B)} \textit{q} arms of the HG002 dataset.
@@ -289,7 +289,7 @@
         \textbf{\autoref{fig:entropy}}),
         indicating that locations of the variations are consistent among reads.
         \begin{figure}[h!] \centering
-        \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-3.pdf}
+        \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_3.pdf}
         \caption{
             \small Distribution of motif entropies in 10 bp windows of of candidate PacBio CCS reads aligning to the same chromosomal arms
             in GIAB datasets HG001 through HG007,
@@ -325,7 +325,7 @@
             and in visible structure (\textbf{\autoref{fig:haplotypes}}).
             % \eject \pdfpageheight=40in \pdfpagewidth=22in %remall
                 \begin{figure}[h!] \centering % \vspace{5mm} %remall
-                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-4.png} %remall
+                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_4.pdf} %remall
                 \caption{ %remall
                     \small Clustering of reads by relative pairwise Levenshtein distances (unitless measure) %remall
                     on each chromosomal \mbox{\textit{q} arm} of datasets HG001 through HG007, %remall
@@ -337,7 +337,7 @@
                 \label{fig:haplotypes} %remall
                 \end{figure} %remall
             % \eject \pdfpageheight=11in \pdfpagewidth=8.5in
-            \input{latex/tables/Table-2-cophenetic.tex} % tab:cophenetic
+            \input{../tables/Table_2.tex} % tab:cophenetic
     ~\\~\\
     In this complex clustering, subject- and population-specific variation was evident and quantifiable via relative Levenshtein distances
         (\textbf{\autoref{tab:haptests}}; see \hyperref[sec:methods]{Materials and Methods}):
@@ -347,7 +347,7 @@
             and telomeric reads within a population were more similar than between populations
                 (\textit{p} = 3.1e-120).
         ~\\
-        \input{latex/tables/Table-3-haplotype-comparisons.tex}
+        \input{../tables/Table_3.tex}
         ~\\
         Importantly, however, this was true for most, but not all reads;
             4\% of all assessed reads (142 out of 3,686) contributed to interpopulation similarity;
@@ -442,7 +442,7 @@
         This opens up avenues of investigation into the haplotypic variation among not only immune cells,
             but also different cell types overall.
                 \begin{figure}[h!] \centering % \vspace{5mm} %remall
-                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{renders/figures/Figure-SH.png} %remall
+                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_5.pdf} %remall
                 \caption{ %remall
                     \small Clustering of reads by relative pairwise Levenshtein distances %remall
                     within each subject (HG001 through HG007) %remall
@@ -510,19 +510,19 @@
     \\~\\
     To evaluate sequence motifs in independent samples collected from human subjects (as opposed to reference cell lines),
         we generated four whole-genome Illumina datasets (mean coverage $\sim$104x)
-        and three linked-read 10X datasets (mean coverage $\sim$28x) for one individual at different timepoints,
-        and one additional linked-read 10X dataset (coverage $\sim$47x) for another individual.
+        and three linked-read 10x datasets (mean coverage $\sim$28x) for one individual at different timepoints,
+        and one additional linked-read 10x dataset (coverage $\sim$47x) for another individual.
     These data were originally obtained from astronaut subjects for an unrelated space biology experiment,
         and the blood samples were collected from the subjects as described in \parencite{twins_study}.
         For each sample, 1.2ng of sorted immune cell input was aliquoted for
-            TruSeq PCR-free WGS (short read) and standard Chromium 10X whole genome (linked-read) preparation respectively,
+            TruSeq PCR-free WGS (short read) and standard Chromium 10x whole genome (linked-read) preparation respectively,
             and sequenced across one S4 flow cell on an Illumina NovaSeq 6000.
     From these datasets, candidate telomeric short reads were selected using Telomerecat \parencite{telomerecat}.
 
 \subsection*{Identification of repeat content}
 \addcontentsline{toc}{subsection}{Identification of repeat content}
     Overrepresentation of motifs of lengths $k \subset [4 .. 16]$ was tested within the candidate telomeric regions of PacBio CCS reads,
-        as well as in the candidate reads from independently generated Illumina and 10X Chromium datasets.
+        as well as in the candidate reads from independently generated Illumina and 10x Chromium datasets.
     To target motifs in repeat contexts,
         doubled sequences (for example, \textit{k}-mer ACGTACGT for motif ACGT) were counted with \textit{jellyfish} \parencite{jellyfish},
         and counts of \textit{k}-mers synonymous with respect to circular shifts (for example, ACGTACGT and CGTACGTA) were summed together.
@@ -541,7 +541,7 @@
                 $ C_{1,0} = $ {\rmfamily median count of \textit{k}-mer},
                 $ C_{1,1} = $ {\rmfamily sum of counts of other non-classifiable \textit{k}-mers}.
     The resultant \textit{p}-values for each motif among the samples were combined using the Mudholkar-George method \parencite{george}
-        within each technology (PacBio CCS, Illumina, 10X Genomics),
+        within each technology (PacBio CCS, Illumina, 10x Genomics),
         and the Bonferroni multiple testing correction was applied.
     Motifs in the long-read datasets for which \textit{k}-mers yielded \textit{p}-values below the cutoff of 0.05 were reported.
     As even doubled sequences (such as ACGTACGT for motif ACGT) can partially overlap at the boundaries of repeat contexts,
@@ -556,7 +556,7 @@
             elucidates the extent of deviation from the background repeat context,
             and identifies motifs that most affect the sequence structure;
             it was calculated as well and reported as each motif's score.
-    Additionally, motifs that were significantly enriched in the datasets produced by all three technologies (PacBio, Illumina, 10X),
+    Additionally, motifs that were significantly enriched in the datasets produced by all three technologies (PacBio, Illumina, 10x),
         with respect to reverse-complemented equivalence, were reported.
 
 \subsection*{Evaluation of sequence concordance in telomeric long reads}
@@ -630,7 +630,7 @@
                 (such as the reads that contributed to interpopulation similarity).
 
 \section*{Data access} \addcontentsline{toc}{section}{Data access}
-The NASA Life Sciences Data Archive (LSDA) is the repository for all human and animal research data, including the whole genome Illumina and 10X Chromium sequencing datasets from subjects aboard the ISS that were used in this study.
+The NASA Life Sciences Data Archive (LSDA) is the repository for all human and animal research data, including the whole genome Illumina and 10x Chromium sequencing datasets from subjects aboard the ISS that were used in this study.
 These datasets are protected by the terms of the Weill Cornell Medicine Internal Review Board (IRB) and can be made available to be shared upon request.
 LSDA has a public facing portal where data requests can be initiated (\href{https://lsda.jsc.nasa.gov/Request/dataRequestFAQ}{lsda.jsc.nasa.gov/Request/dataRequestFAQ});
 the LSDA team provides the appropriate processes, tools, and secure infrastructure for archival of experimental data and dissemination while complying with applicable rules, regulations, policies, and procedures governing the management and archival of sensitive data and information.
