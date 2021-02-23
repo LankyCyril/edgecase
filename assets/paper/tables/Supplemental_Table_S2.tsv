@@ -1,3 +1,4 @@
+# The number of telomeric reads on each arm identified in GIAB PacBio CCS datasets
 Telomere	Reference contig	HG001	HG002	HG003	HG004	HG005	HG006	HG007	TOTAL
 2p	chr2	1	34	6	8	3	1	2	55
 3p	3ptel_1-500K_1_12_12	3	29	8	11	0	7	11	69
