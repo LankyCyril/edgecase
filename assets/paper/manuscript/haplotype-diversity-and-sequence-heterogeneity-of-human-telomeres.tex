@@ -167,21 +167,22 @@
 \section*{Abstract} \addcontentsline{toc}{section}{Abstract}
     Telomeres are regions of repetitive nucleotide sequences capping the ends of eukaryotic chromosomes that protect against deterioration,
         and whose lengths can be correlated with age and adverse health risk factors.
-    Given their length and repetitive nature,
+    Yet, given their length and repetitive nature,
         telomeric regions are not easily reconstructed from short-read sequencing,
-        making telomere sequence resolution a very costly and generally intractable problem.
+        making telomere sequencing, mapping, and variant resolution difficult problems.
     Recently, long-read sequencing, with read lengths measuring in hundreds of Kbp,
         has made it possible to routinely read into telomeric regions and inspect their sequence structure.
     Here, we describe a framework for
         extracting telomeric reads from whole genome single-molecule sequencing experiments,
-        prior-less \textit{de novo} identification of telomere repeat motifs,
-        and describing their sequence variation.
+        including \textit{de novo} identification of telomere repeat motifs and repeat types,
+        and also describe their sequence variation.
     We find that
-        long telomeric stretches can be accurately captured with long-read sequencing,
+        long, complex telomeric stretches can be accurately captured with long-read sequencing,
         observe extensive sequence heterogeneity of human telomeres,
         discover and localize non-canonical motifs (both previously reported as well as novel),
         confirm the presence of the non-canonical motifs in short read sequencing experiments,
-        and report the first motif composition maps of human telomeric haplotypes across populations on a multi-Kbp scale.
+        and report the first motif composition maps of human telomeric haplotypes across three distinct ancestries
+            (Ashkenazim, Chinese, and Utah) and two trios on a multi-Kbp scale.
 
 \section*{Keywords} \addcontentsline{toc}{section}{Keywords}
     Telomere, telomeric haplotypes, long-read sequencing, telomere sequence heterogeneity
@@ -192,7 +193,7 @@
 \doublespacing
 
 \section*{Introduction} \addcontentsline{toc}{section}{Introduction}
-    Telomeres are the functional ends of human chromosomes that naturally shorten with cell division and therefore with age \parencite{teloaging}.
+    Telomeres are the functional ends of human chromosomes that naturally shorten with cell division and with age \parencite{teloaging}.
     Telomere length can also be influenced by a variety of lifestyle factors and environmental exposures
         (e.g., stress, exercise, air pollution, radiation) \parencite{teloeffects}.
     While human telomeres are known to consist largely of a conserved six-nucleotide repeat (TTAGGG) \parencite{moyzis},
@@ -201,17 +202,19 @@
     However, such studies were performed with oligonucleotide hybridization, PCR, immunoprecipitation, and short-read sequencing,
         requiring prior assumptions about specific target motifs, custom sample preparation, and targeted sequencing,
         and therefore preventing \textit{de novo} identification of motif variants and their localization.
-    Thus, long-range maps of telomeric sequence variation in the human genome are still lacking.
-    Such maps can provide insight into telomere biology and enable novel approaches to analyze the effects of
-        health status, aging, and environment on telomere sequence and length.
+    Thus, long-range maps of telomeric sequence variation in the human genome are still incomplete, preliminary \parencite{shafin},
+        or have only been completed for a single genome \parencite{jain,t2t}.
+    Therefore, completing maps of telomeres and providing new tools for such research \parencite{nurk} can provide insight into
+        telomere biology and enable novel approaches to analyze the effects of aging, environment, and health status \parencite{telovars2018}
+        on telomere sequence and length.
     \\~\\
     To improve our understanding of telomere sequence structure and variation, we developed \textit{edgeCase},
-        a framework for alignment and \textit{de novo} telomeric motif discovery
-        which uses human whole genome long-read sequencing experiments,
-            making it easily scalable.
+        a scalable framework for alignment and \textit{de novo} telomeric motif discovery
+        from human whole genome long-read sequencing experiments.
     We have validated these methods using
         Genome in a Bottle \parencite{giab} single-molecule real-time (SMRT) sequencing datasets
-            generated with Pacific Biosciences circular consensus sequencing (PacBio CCS) \parencite{pacbio,pacbioccs},
+            generated from healthy donor peripheral blood mononuclear cells (PBMCs)
+            with Pacific Biosciences circular consensus sequencing (PacBio CCS) \parencite{pacbio,pacbioccs},
         and short-read Illumina \parencite{illumina} and 10x Genomics [Chromium] (www.10xgenomics.com) datasets.
     These results provide evidence for
         multiple novel, non-canonical telomeric repeats,
