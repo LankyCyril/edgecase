@@ -8,9 +8,9 @@ sandbox
 jupyter
 *.log
 *.aux
-assets/paper/figures/*-.png
-assets/paper/figures/*/*-.png
+assets/paper/figures/*.png
+assets/paper/figures/*/*.png
 assets/paper/figures/*.svg
 assets/paper/figures/*/*.svg
-assets/paper/renders/figures/Figure-*.svg
+*.odt
 Snakefile

@@ -16,8 +16,7 @@ submission: haplotype-diversity-and-sequence-heterogeneity-of-human-telomeres.od
 	convert -density 300 $< $@
 
 %.odt: %.tex
-	./tex2office -i references.bib ../figures ../tables --svg $<
-	mv latex/$(@F) $@
+	cd .. && ./tools/tex2office -i manuscript/references.bib figures tables --svg --rem-dot-dot manuscript/$<
 
 clean:
 	rm -f haplotype-diversity-and-sequence-heterogeneity-of-human-telomeres.aux

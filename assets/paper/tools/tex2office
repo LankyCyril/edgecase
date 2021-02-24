@@ -58,6 +58,10 @@ ARG_RULES = {
         help="lines to replace with {}".format(PXFONTS), nargs="+",
         metavar="P", default="\\usepackage[sfdefault]{roboto}"
     ),
+    ("--rem-dot-dot", "--rdd",) : dict(
+        help="remove all instances of '../' from the LaTeX source",
+        action="store_true",
+    ),
     ("-d", "--debug",): dict(help="debug mode", action="store_true"),
 }
 
@@ -97,19 +101,22 @@ def parse_and_validate_args(parser):
     return args, TempDir
 
 
-def prepare_source(tex, workdir, replace_fonts, debug, basename="source"):
+def prepare_source(tex, workdir, replace_fonts, rem_dot_dot, debug, basename="source"):
     """Creates a copy of the source LaTeX file and modifies it for improved compatibility"""
     with open(tex, mode="rt") as tex_in:
         with open(path.join(workdir, basename+".tex"), mode="wt") as tex_out:
             for line in map(str.strip, tex_in):
                 if line in replace_fonts:
                     line = PXFONTS
-                elif search(r'^\s*\\\\%rem\s*$', line):
-                    continue
-                elif search(r'%remall', line):
-                    continue
-                elif search(r'\\\\%rem', line):
-                    line = sub(r'\\\\%rem', " ", line)
+                else:
+                    if search(r'^\s*\\\\%rem\s*$', line):
+                        continue
+                    elif search(r'%remall', line):
+                        continue
+                    elif search(r'\\\\%rem', line):
+                        line = sub(r'\\\\%rem', " ", line)
+                    if rem_dot_dot and search(r'\.\.\/', line):
+                        line = sub(r'\.\.\/', "", line)
                 line = sub(r'\\textcolor{white}\S*', "", line)
                 print(line, file=tex_out)
     return basename
@@ -313,7 +320,7 @@ def main(args, TempDir, prefix="converted"):
     """Dispatches data and arguments to subroutines"""
     with TempDir() as workdir:
         basename = prepare_source(
-            args.tex, workdir, args.replace_fonts, args.debug
+            args.tex, workdir, args.replace_fonts, args.rem_dot_dot, args.debug,
         )
         if args.include:
             for filename in args.include:
