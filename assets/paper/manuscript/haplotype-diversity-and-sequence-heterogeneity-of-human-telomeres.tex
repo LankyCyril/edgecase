@@ -278,6 +278,15 @@
             these data also illustrated the positions of the repeat-rich portions of the genomes in relation to the
             known subtelomere-telomere boundaries, including deletions/insertions (4p, 8q)
             and an apparent extension of the 17p subtelomere (see \hyperref[sec:discussion]{Discussion}).
+    \\~\\ % \noindent
+    To discern if the sequence mapping, read length, or overall coverage had any effect on the discovery or enrichment of these motifs,
+            the motif entropies were examined as a function of their location within reads and coverage across the telomere tracks.
+        When the locations of different motifs were examined within any 10 bp window across the length of the long reads,
+            the entropy data showed consistency among reads and across samples (\textbf{\autoref{fig:entropy}}).
+        Indeed, the coverage-weighted median of normalized Shannon entropy was 0.00 for all datasets,
+            while most non-zero values were contained only in the top quartile,
+            i.e., between the 75th and the 100th percentile,
+            indicating that locations of the variations are colinear among reads.
         \input{../tables/Table_1.tex} % tab:repeatfinder
         \begin{figure}[h!] \centering
         \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_2.pdf}
@@ -290,15 +299,6 @@
         }
         \label{fig:hg002_densityplot}
         \end{figure}
-    \noindent % \\~\\
-    To discern if the sequence mapping, read length, or overall coverage had any effect on the discovery or enrichment of these motifs,
-            the motif entropies were examined as a function of their location within reads and coverage across the telomere tracks.
-        When the locations of different motifs were examined within any 10 bp window across the length of the long reads,
-            the entropy data showed consistency among reads and across samples (\textbf{\autoref{fig:entropy}}).
-        Indeed, the coverage-weighted median of normalized Shannon entropy was 0.00 for all datasets,
-            while most non-zero values were contained only in the top quartile,
-            i.e., between the 75th and the 100th percentile,
-            indicating that locations of the variations are colinear among reads.
         \begin{figure}[h!] \centering
         \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_3.pdf}
         \caption{
@@ -399,8 +399,10 @@
     This diversity of repeats includes previously reported variants,
         as well as novel motifs that are characterized not only by nucleotide substitutions,
         but also insertions, deletions, and even motif pairing.
+    Repeat patterns were chromosome-specific, with different non-canonical repeats being pronounced on different chromosomes,
+        such as TGAGGG on 12q and TTAGGGG on 15q, which may be correlated with biological pathways \parencite{telovars2019}.
     Apart from these variations,
-        CG-rich motifs were identified in telomeric regions of \textit{p} arms,
+        CG-rich motifs were identified in telomeric regions of \textit{q} arms,
         consistent with previously reported findings \parencite{cpg}.
     Moreover, while short read sequencing is able to identify such variants,
         it alone cannot reveal the relative locations of these motifs within telomeres,
@@ -414,68 +416,47 @@
         the method described here allows identification of multiple enriched motifs and their localization
             \textit{de novo}, without any bias introduced by prior knowledge about the sequence of target motifs.
     These results also highlight the need of better subtelomeric and telomeric annotations in the human genome:
-    Four of the 40 subtelomeric assemblies \parencite{riethman2014}
-        were homologous to regions in the reference genome far within the respective chromosomes (up to 586 Kbp into the reference sequence),
-        and the canonical motif was present on the \textit{q} arm of Chr8
-            only after 2\textendash{}3Kbp past the annotated boundary in all datasets,
-        suggesting that the existing assemblies do not provide a completely accurate telomeric annotation,
-        and that methods described herein could help to resolve these areas of reference genomes.
+        the canonical motif was present on the \textit{q} arm of Chromosome 8
+            only after 2\textendash{}3Kbp past the annotated boundary in all datasets;
+        the candidate reads on the \textit{p} arm of Chromosome 17 represented repeat-rich and non-repeat-rich haplotypes,
+            indicating that in multiple subjects and ancestries there exists an extension of the 17p subtelomere.
+            Strikingly, for example, the Ashkenazim son (HG002) provided only non-repeat-rich 17p reads, while both
+            the father (HG003) and the mother (HG004) had a mixture of apparently telomeric and non-telomeric 17p reads.
+    This supports previous findings \parencite{riethman2020}
+            that the existing assemblies do not provide a completely accurate subtelomeric annotation,
+        and suggests that methods described herein could help to resolve these areas of reference genomes.
     \\~\\
     We observed PacBio CCS reads reaching up to 16 Kbp beyond the known regions of the genome,
-        and resolving the underlying sequence with reasonable fidelity,
-        measured both by the entropy of motif assignment and by pairwise Levenshtein distances
+        and resolving the underlying sequence with fidelity,
+        as measured both by the entropy of motif assignment and by pairwise Levenshtein distances
             between the reads belonging to the same chromosomal arms.
     While short reads also provided support for non-canonical motifs,
         the overlap between the short and the long reads was substantial, but not complete,
         which can be explained by the necessary bias towards the canonical motif during the selection of short reads.
     Therefore, telomeric regions with higher content of non-canonical repeats are less likely to be identified through the use of short reads,
         and instead, long reads appear to be more suitable for this purpose as well.
-    Of note, the captured PacBio CCS reads that mapped to \textit{q} arm telomeres
-        agreed with short read sequences much better (median 98\% support, \textbf{Supplemental Fig. S7})
-        than the reads that mapped to \textit{p} arm telomeres (median 38\% support).
-        While, for this reason, we opted to choose only the \textit{q} arm reads for deeper analysis,
-            this discrepancy can lend itself to multiple potential explanations,
-                from artifacts of SMRT technology preventing faithful reproduction of the sequence,
-                to the inherent bias of short-read based methods \parencite{telomerecat} towards the canonical motif CCCTAA
-                    that in fact could be present at a lower percentage on \textit{p} arm telomeres.
-            Therefore, more research is required to determine the level of deviation of \textit{p} arm telomeric sequences
-                from those on \textit{q} arms, and into biases and limitations of different technologies
-                    for sequencing distal \textit{p} arm chromosomal regions.
     \\~\\
     The identified variations in long range contexts elucidate
-        subject-specific, trio- and population-specific similarities of \textit{q} arm telomeric sequences,
+        subject-specific, trio- and population-specific similarities of telomeric sequences,
             as well as a level of interpopulation similarity,
         and thus provide a new means of haplotype mapping and reveal the existence and motif composition of haplotype spectra
             on a multi-Kbp scale.
-    Interpopulation similarity, as well as familial inheritance of variation in the Ashkenazim trio,
+    Interpopulation similarity, as well as paternal inheritance of variation,
         evidenced that the observed haplotypes could not be attributed to per-dataset batch effects.
     Coverage of different chromosomes was uneven,
-        and as such, numbers of captured telomeric reads and levels of observed similarity varied from chromosome to chromosome;
-        in particular, familial inheritance of haplotypes was only registered in half the cases in the Chinese trio.
+        and as such, numbers of captured telomeric reads and levels of observed similarity varied from subject to subject;
+        in particular, maternal inheritance of haplotypes could not be determined, in contrast to statistically significant paternal inheritance.
         This calls for more sequencing experiments aimed to reconstruct the full picture of this variation.
     Clustering on a per-subject basis concealed interpopulation similarity,
-        but underscored intra-subject variation (\textbf{\autoref{fig:subject_haplotypes}}),
-            suggesting coexistence of multiple telomeric haplotypes per \textit{q} arm within each subject.
+        but underscored intra-subject variation (\textbf{Supplemental Figs. S4 and S5}),
+            suggesting coexistence of multiple telomeric haplotypes per chromosomal arm within each subject.
         Given that the reference DNA for the subjects HG001 through HG007
             was extracted from growths of B lymphoblastoid cell lines,
             this suggests that as B cells undergo maturation,
                 distinct clones may gain distinct variations in their telomeric sequence.
         This opens up avenues of investigation into the haplotypic variation among not only immune cells,
-            but also different cell types overall.
-                \begin{figure}[h!] \centering % \vspace{5mm} %remall
-                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_5.pdf} %remall
-                \caption{ %remall
-                    \small Clustering of reads by relative pairwise Levenshtein distances %remall
-                    within each subject (HG001 through HG007) %remall
-                    on each chromosomal \mbox{\textit{q} arm}, %remall
-                    and densities of top four enriched motifs along each read. %remall
-                    Each horizontal line represents an individual read; %remall
-                    genomic coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries. %remall
-                    Only the chromosomal arms cumulatively covered by at least 25 reads are displayed. %remall
-                } %remall
-                \label{fig:subject_haplotypes} %remall
-                \end{figure} %remall
-%TODO for reviewers: stress that the shift from diplotypes to spectra does not invalidate the previous findings: we were able to put these findings and the method into a broader context and see more structure.
+            but also different cell types overall,
+            and provides a new opportunity to map, quantify, and characterize a previously missed form of human genetic variation.
 
 \section*{Materials and Methods} \addcontentsline{toc}{section}{Materials and Methods} \label{sec:methods}
 
