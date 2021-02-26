@@ -179,7 +179,7 @@
     We find that
         long, complex telomeric stretches can be accurately captured with long-read sequencing,
         observe extensive sequence heterogeneity of human telomeres,
-        discover and localize non-canonical motifs (both previously reported as well as novel),
+        discover and localize non-canonical motifs (both previously reported, as well as novel),
         confirm the presence of the non-canonical motifs in short read sequencing experiments,
         and report the first motif composition maps of human telomeric haplotypes across three distinct ancestries
             (Ashkenazim, Chinese, and Utah) and two trios on a multi-Kbp scale.
@@ -193,8 +193,8 @@
 \doublespacing
 
 \section*{Introduction} \addcontentsline{toc}{section}{Introduction}
-    Telomeres are the functional ends of human chromosomes that naturally shorten with cell division and with age \parencite{teloaging}.
-    Telomere length can also be influenced by a variety of lifestyle factors and environmental exposures
+    Telomeres are the functional ends of human chromosomes that naturally shorten with cell division, and thus with age \parencite{teloaging}.
+    Telomere length is also influenced by a variety of lifestyle factors and environmental exposures
         (e.g., stress, exercise, air pollution, radiation) \parencite{teloeffects}.
     While human telomeres are known to consist largely of a conserved six-nucleotide repeat (TTAGGG) \parencite{moyzis},
         several studies have identified variations of this motif in proximal telomeric regions
@@ -204,7 +204,7 @@
         and therefore preventing \textit{de novo} identification of motif variants and their localization.
     Thus, long-range maps of telomeric sequence variation in the human genome are still incomplete, preliminary \parencite{shafin},
         or have only been completed for a single genome \parencite{jain,t2t}.
-    Therefore, completing maps of telomeres and providing new tools for such research \parencite{nurk} can provide insight into
+    Therefore, completing maps of telomeres and providing new tools for such research \parencite{nurk} can provide new insight into
         telomere biology and enable novel approaches to analyze the effects of aging, environment, and health status \parencite{telovars2018}
         on telomere sequence and length.
     \\~\\
@@ -215,7 +215,7 @@
         Genome in a Bottle \parencite{giab} single-molecule real-time (SMRT) sequencing datasets
             generated with Pacific Biosciences circular consensus sequencing (PacBio CCS) \parencite{pacbio,pacbioccs},
         and short-read Illumina \parencite{illumina} and 10x Genomics [Chromium] (www.10xgenomics.com) datasets,
-        as well as with healthly donor peripheral blood mononuclear cells (PBMCs).
+        as well as with healthy donor peripheral blood mononuclear cells (PBMCs).
     These results provide evidence for
         multiple novel, non-canonical telomeric repeats,
         resolution of multiple chromosome-specific haplotypes with SMRT sequencing,
@@ -291,7 +291,7 @@
         \begin{figure}[h!] \centering
         \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_2.pdf}
         \caption{
-             \small Densities of the top four enriched motifs at ends of chromosomal \textbf{(A)} \textit{p} arms
+             \small Densities of the top three enriched motifs at ends of chromosomal \textbf{(A)} \textit{p} arms
              and \textbf{(B)} \textit{q} arms of the HG002 dataset.
              \textit{Background} represents the remaining sequence content (non-repeating sequence and not significantly enriched motifs).
              Reads are shown aligned to the contigs in the \textit{hg38ext} reference set, and genomic coordinates are given in Kbp.
@@ -393,18 +393,18 @@
         has provided new opportunities to map the sequence composition of a previously "dark" area of the human genome,
         enabling research into the sequence composition and length dynamics \parencite{luxton2020} of telomeres.
     Our results reaffirm
-        that the canonical repeat (TTAGGG) is certainly the most dominant type of motif in telomeres,
+        that the canonical repeat (TTAGGG) is certainly the most dominant motif found within telomeres,
         but also reveal a surprising diversity of repeat variations,
             which are confirmed by both short and long-read sequencing technologies.
-    This diversity of repeats includes previously reported variants,
+    This diversity of repeat sequence includes previously reported variants,
         as well as novel motifs that are characterized not only by nucleotide substitutions,
         but also insertions, deletions, and even motif pairing.
-    Repeat patterns were chromosome-specific, with different non-canonical repeats being pronounced on different chromosomes,
-        such as TGAGGG on 12q and TTAGGGG on 15q, which may be correlated with biological pathways \parencite{telovars2019}.
+    Interestingly, repeat patterns were chromosome-specific, with different non-canonical repeats being pronounced on different chromosomes,
+        such as TGAGGG on 12q and TTAGGGG on 15q, which may be correlated with particular biological pathways \parencite{telovars2019}.
     Apart from these variations,
         CG-rich motifs were identified in telomeric regions of \textit{q} arms,
         consistent with previously reported findings \parencite{cpg}.
-    Moreover, while short read sequencing is able to identify such variants,
+    Moreover, while short read sequencing is capable of identifying such variants,
         it alone cannot reveal the relative locations of these motifs within telomeres,
         as repetitive short reads can
             neither be aligned outside of the reference genome
@@ -417,13 +417,13 @@
             \textit{de novo}, without any bias introduced by prior knowledge about the sequence of target motifs.
     These results also highlight the need of better subtelomeric and telomeric annotations in the human genome:
         the canonical motif was present on the \textit{q} arm of Chromosome 8
-            only after 2\textendash{}3Kbp past the annotated boundary in all datasets;
+            only 2\textendash{}3Kbp beyond the annotated boundary in all datasets;
         the candidate reads on the \textit{p} arm of Chromosome 17 represented repeat-rich and non-repeat-rich haplotypes,
             indicating that in multiple subjects and ancestries there exists an extension of the 17p subtelomere.
             Strikingly, for example, the Ashkenazim son (HG002) provided only non-repeat-rich 17p reads, while both
             the father (HG003) and the mother (HG004) had a mixture of apparently telomeric and non-telomeric 17p reads.
     This supports previous findings \parencite{riethman2020}
-            that the existing assemblies do not provide a completely accurate subtelomeric annotation,
+            that the existing assemblies do not provide completely accurate subtelomeric annotation,
         and suggests that methods described herein could help to resolve these areas of reference genomes.
     \\~\\
     We observed PacBio CCS reads reaching up to 16 Kbp beyond the known regions of the genome,
@@ -434,7 +434,7 @@
         the overlap between the short and the long reads was substantial, but not complete,
         which can be explained by the necessary bias towards the canonical motif during the selection of short reads.
     Therefore, telomeric regions with higher content of non-canonical repeats are less likely to be identified through the use of short reads,
-        and instead, long reads appear to be more suitable for this purpose as well.
+        and so, long reads appear to be more suitable for this purpose as well.
     \\~\\
     The identified variations in long range contexts elucidate
         subject-specific, trio- and population-specific similarities of telomeric sequences,
@@ -442,9 +442,9 @@
         and thus provide a new means of haplotype mapping and reveal the existence and motif composition of haplotype spectra
             on a multi-Kbp scale.
     Interpopulation similarity, as well as paternal inheritance of variation,
-        evidenced that the observed haplotypes could not be attributed to per-dataset batch effects.
+        provided evidence that the observed haplotypes could not be attributed to per-dataset batch effects.
     Coverage of different chromosomes was uneven,
-        and the lengths of PacBio CCS reads allowed to resolve uniquely mapping reads only on 37 chromosomal arms.
+        and the lengths of PacBio CCS reads allowed resolution of uniquely mapping reads only on 23 chromosomal arms.
         As such, numbers of captured telomeric reads and levels of observed similarity varied from subject to subject;
         in particular, maternal inheritance of haplotypes could not be determined, in contrast to statistically significant paternal inheritance.
         This calls for more sequencing experiments aimed to reconstruct the full picture of this variation.
@@ -457,7 +457,7 @@
                 distinct clones may gain distinct variations in their telomeric sequence.
         This opens up avenues of investigation into the haplotypic variation among not only immune cells,
             but also different cell types overall,
-            and provides a new opportunity to map, quantify, and characterize a previously missed form of human genetic variation.
+            and provides a new opportunity to map, quantify, and characterize a previously unrecognized form of human genetic variation.
 
 \section*{Materials and Methods} \addcontentsline{toc}{section}{Materials and Methods} \label{sec:methods}
 
