@@ -236,7 +236,7 @@
         from three different ancestries (Ashkenazim, Chinese, and Utah),
             which included two son/father/mother trios (\textbf{Supplemental Table S1}).
         In total, we observed reads uniquely mapping to the ends of chromosomes and extending into telomeric regions
-            on 11 \textit{p} arms and 26 \textit{q} arms,
+            on 9 \textit{p} arms and 14 \textit{q} arms,
                 with 43\textendash{}285 such reads on the \textit{p} arms
                 and 34\textendash{}250 on the \textit{q} arms
                     (\textbf{Supplemental Table S2}).
@@ -258,7 +258,7 @@
     We then performed \textit{de novo} repeat discovery in the telomeric sequences for motifs of lengths 4 through 16,
             and identified motifs in repeat contexts that are statistically enriched in the seven datasets.
         The majority of motifs were either the canonical TTAGGG / CCCTAA,
-            its variations (e.g., T\underline{G}AGGG / CCCT\underline{C}A),
+            its variations (e.g., T\underline{G}AGGG),
             or a duplet of variants, such as TTAGGGTTA\underline{G}GGG
             (\textbf{\autoref{tab:repeatfinder}}).
         CG-rich motifs were also observed on the \textit{q} arms.
@@ -270,7 +270,7 @@
     We next visualized the locations of the top three enriched motifs and their reverse complements
         on the chromosomal ends of the HG002 dataset (\textbf{\autoref{fig:hg002_densityplot}}),
         as it provided the deepest coverage among the assessed datasets (\textbf{Supplemental Table S2});
-            plots for the other six datasets are available as \textbf{Supplemental Figs. S2 and S3}.
+            plots for the other six datasets are available as \textbf{Supplemental Figs. S2} and \textbf{S3}.
         Only the chromosomal arms cumulatively covered by at least 25 reads across datasets were plotted.
     These data showed that the overwhelming majority of the telomeric regions were represented by the canonical repeats,
         but also novel, chromosome-specific repeat motif patterns could be observed,
@@ -283,7 +283,7 @@
             the motif entropies were examined as a function of their location within reads and coverage across the telomere tracks.
         When the locations of different motifs were examined within any 10 bp window across the length of the long reads,
             the entropy data showed consistency among reads and across samples (\textbf{\autoref{fig:entropy}}).
-        Indeed, the coverage-weighted median of normalized Shannon entropy was 0.00 for all datasets,
+        Indeed, the coverage-weighted median of normalized Shannon entropy was 0.07 for one dataset and 0.00 for the other six,
             while most non-zero values were contained only in the top quartile,
             i.e., between the 75th and the 100th percentile,
             indicating that locations of the variations are colinear among reads.
@@ -418,9 +418,9 @@
     These results also highlight the need of better subtelomeric and telomeric annotations in the human genome:
         the canonical motif was present on the \textit{q} arm of Chromosome 8
             only 2\textendash{}3Kbp beyond the annotated boundary in all datasets;
-        the candidate reads on the \textit{p} arm of Chromosome 17 represented repeat-rich and non-repeat-rich haplotypes,
+        the candidate reads on the \textit{p} arm of Chromosome 17 represented TTAGGG-rich and non-TTAGGG-rich haplotypes,
             indicating that in multiple subjects and ancestries there exists an extension of the 17p subtelomere.
-            Strikingly, for example, the Ashkenazim son (HG002) provided only non-repeat-rich 17p reads, while both
+            Strikingly, for example, the Ashkenazim son (HG002) provided only non-TTAGGG-rich 17p reads, while both
             the father (HG003) and the mother (HG004) had a mixture of apparently telomeric and non-telomeric 17p reads.
     This supports previous findings \parencite{riethman2020}
             that the existing assemblies do not provide completely accurate subtelomeric annotation,
@@ -449,8 +449,8 @@
         in particular, maternal inheritance of haplotypes could not be determined, in contrast to statistically significant paternal inheritance.
         This calls for more sequencing experiments aimed to reconstruct the full picture of this variation.
     Clustering on a per-subject basis concealed interpopulation similarity,
-        but underscored intra-subject variation (\textbf{Supplemental Figs. S4 and S5}),
-            suggesting coexistence of multiple telomeric haplotypes per chromosomal arm within each subject.
+        but underscored intra-subject variation (\textbf{Supplemental Figs. S4} and \textbf{S5}),
+            suggesting coexistence of two or more telomeric haplotypes per chromosomal arm within each subject.
         Given that the reference DNA for the subjects HG001 through HG007
             was extracted from growths of B lymphoblastoid cell lines,
             this suggests that as B cells undergo maturation,
@@ -638,7 +638,8 @@ The LSDA team enables data and information dissemination to the public or to aut
 \\~\\
 %\section*{Availability and implementation} \addcontentsline{toc}{section}{Availability and implementation}
 The software for identification of telomeric reads, \textit{de novo} discovery of repeat motifs, haplotype inference and motif density visualization was implemented in Python and is freely available at \\%rem
-\href{https://github.com/lankycyril/edgecase}{github.com/lankycyril/edgecase}.
+\href{https://github.com/lankycyril/edgecase}{github.com/lankycyril/edgecase},
+as well as \textbf{Supplemental File S3}.
 
 \section*{Acknowledgements} \addcontentsline{toc}{section}{Acknowledgements}
 We would like to thank
