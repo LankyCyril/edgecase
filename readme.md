@@ -5,79 +5,49 @@ edgeCase
 from long-read single-molecule whole genome sequencing datasets. Associated
 preprint: https://www.biorxiv.org/content/10.1101/2020.01.31.929307v1
 
-![densityplot_sample](assets/densityplot-haplotypes.png?raw=true "densityplot example")
+![haplotypes_example](assets/haplotypes-example.png?raw=true "haplotypes example")
 
 
 ## Installation
 
-#### With Conda (preferred):
+### Obtaining code
+
+The code can either be downloaded from the
+[releases](https://github.com/LankyCyril/edgecase/releases) page,  
+or cloned with git: `git clone https://github.com/LankyCyril/edgecase`
+
+### Environment setup
+
+#### With Conda (preferred)
 
 ```{sh}
-$ git clone https://github.com/LankyCyril/edgecase
 $ cd edgecase
 $ conda env create --name edgecase --file environment.yaml
 $ conda activate edgecase
 $ ./edgecase
 ```
 
-#### By manually installing dependencies:
+#### By manually installing dependencies
 
 ```{sh}
-$ git clone https://github.com/LankyCyril/edgecase
 $ cd edgecase
 $ pip install numpy scipy scikit-learn statsmodels numba
 $ pip install pandas matplotlib seaborn tqdm regex pysam
 $ ./edgecase
 ```
 
-## Version history
-
-#### 2020-08-25
-
-* Interface updates:
-    * all subroutines:
-        * removed flawed option `--flags-any` (`-g`)
-    * tailchopper:
-        * fixed the error that led to CIGAR strings being dropped
-    * kmerscanner:
-        * can now accept both BAM and Fastx input (option `--fmt`)
-    * repeatfinder:
-        * accepts option `--collapse-reverse-complement` (`-C`), which works
-          similarly to option `-C` of jellyfish (count reverse complement motifs
-          together)
-        * better coerces motifs in the output into human-friendly inversions
-    * densityplot:
-        * accepts option `--n-boot` to specify number of bootstrap rounds
-          for plotting confidence intervals
-    * basic-pipeline-longread:
-        * a new subroutine that runs all invididual subroutines in order
-* Refactoring and internal updates:
-    * all subroutines:
-        * switched from `argparse` to `docopt`
-        * improved code style
-    * kmerscanner:
-        * function `get_circular_pattern()` accepts parameter `repeats`
-          (currently it is always set to 2)
-* Other updates:
-    * paper drafts
-* TODO:
-    * update README
-    * kmerscanner: remove obsolete options (`--head-test`, `--tail-test`,
-      `--cutoff`) and associated warning messages
 
 ## Input data and formats
 
-### The extended reference genome and BAM files
+### The extended reference genome
 
 *edgeCase* works with SAM/BAM files aligned to a reference that is annotated
 with known subtelomeric regions and uses reads anchored to the outermost ends
-of subtelomeres (5' on the *p* arm, 3' on the *q* arm). For a BAM file
-*dataset.bam* aligned to *ref.fa*, it needs several files:
+of subtelomeres (5' on the *p* arm, 3' on the *q* arm).
 
 ```
-dataset.bam.bai: a BAI index; create with "samtools index dataset.bam"
-ref.fa.fai:      a FAI index; create with "samtools faidx ref.fa"
-ref.fa.ecx:      an index containing annotations of subtelomere-telomere boundareis
+ref.fa.fai:  a FAI index; create with "samtools faidx ref.fa"
+ref.fa.ecx:  an index containing annotations of subtelomere-telomere boundaries
 ```
 
 *ref.fa.ecx*, a.k.a. the edgeCase indeX, describes anchors of interest in the
@@ -91,8 +61,21 @@ published by [Stong et al., 2014](https://dx.doi.org/10.1101%2Fgr.166983.113).
 To generate this reference, which we call "extended", or *hg38ext*, run
 `assets/generate-hg38ext.py --remote > hg38ext.fa`.
 
+### Alignment files
 
-### Custom SAM flags
+We recommend using *minimap2* to generate BAM files for edgeCase. Another option
+is *winnowmap*, but it has not been sufficiently tested yet.
+
+**NB**: currently, it is imperative to supply a BAM file where secondary
+alignment entries have read sequences. For example, *minimap2* creates BAMs in
+this format with the use of the `-Y` switch.  
+We plan to implement a workaround for this requirement in the future.
+
+BAM files must also be indexed (i.e., have a `.bai` file created with
+`samtools index`).
+
+
+## Custom SAM flags
 
 *edgeCase* extends the zoo of SAM flags with four of its own. The full table of
 flag names:  
@@ -117,41 +100,47 @@ fork               | 8192  | 0x2000    | edgeCase-specific flag; added during pi
 tract_anchor       | 16384 | 0x4000    | edgeCase-specific flag; added during pipeline
 is_q               | 32768 | 0x8000    | edgeCase-specific flag; added during pipeline
 
+**NB**: these flags are unused in the SAM specification and should not clash with
+anything. `samtools view` can correctly subset using these flags.
+
 *Note:* All edgeCase routines that allow flag filtering recognize both the
 numeric flag format (such as 3844) and the "human-readable" format such as "rev".
 Combinations are also understood, for example, "-F 3844 -F is_q".
+
+*Note:* In the future, custom SAM flags may be superseded with tags.  
+A backwards compatibility layer will be provided (i.e., arguments like "-f fork"
+or "-F 16384" will still work but interpret and produce appropriate tags).
 
 
 ## The edgeCase pipeline
 
 ```
-usage: ./edgecase [-h] {tailpuller,tailchopper,repeatfinder,kmerscanner,levenshtein,densityplot} ...
+Usage: ./edgecase [-h | --help]
+       ./edgecase <command> [<args>...]
 
-positional arguments:
-    tailpuller                select overhanging reads
-    tailchopper               get overhanging heads/tails of reads
-    repeatfinder              discover enriched repeats in candidate sequences
-    kmerscanner               perform scan of known kmers/motifs
-    levenshtein               cluster reads by edit distance
-    densityplot               visualize densities of candidate reads
+Commmands (<command>):
+    tailpuller               select overhanging long reads
+    tailchopper              get overhanging heads/tails of long reads
+    repeatfinder             discover enriched repeats in candidate sequences
+    kmerscanner              perform scan of known kmers/motifs
+    densityplot              visualize densities of candidate motifs
+
+Development area:
+    entropy                  calculate motif entropy among long reads
+    levenshtein              calculate pairwise edit distance among long reads
 ```
+
+All commands output their results to stdout; you must pipe them into other
+commands or into the destination file. This applies even to outputs in PDF and
+PKL formats.
+
+**NB**: Depending on the aligner used upstream, MAPQ of secondary reads may have
+been set to zero regardless of real mapping quality; use this filtering option
+with caution. **This warning applies to all edgeCase subroutines that accept
+the `-q` filtering flag.**
 
 
 ### tailpuller
-
-```
-usage: ./edgecase tailpuller --index X [options] bam > sam
-
-positional arguments:
-  bam                        name of input BAM/SAM file
-
-optional arguments:
-  -x X, --index X            location of the reference .ecx index (REQUIRED)
-  -f f, --flags f            process only entries with all these sam flags present (default: 0)
-  -F F, --flag-filter F      process only entries with none of these sam flags present (default: 0)
-  -q Q, --min-quality Q      process only entries with MAPQ >= Q (default: 0)
-  -M M, --max-read-length M  max read length to consider when selecting lookup regions (default: None)
-```
 
 Outputs a subset SAM file that contains only the reads that overhang anchors
 defined in the ECX. If the read overhangs the mask anchor, the 4096 SAM flag is
@@ -159,182 +148,262 @@ added; for forks, 8192 is added; for telomeric tracts, 16384.
 For reads on the *q* arm (i.e., on the 3' end), the 32768 flag is added (see
 above for the full list and the explanation of flags).
 
-**NB**: these flags are unused in the SAM specification and should not clash with
-anything. `samtools view` can correctly subset using these flags.
+```
+Usage: ./edgecase tailpuller -x filename [-t targetspec]...
+                            [-M integer] [--min-map-overlap integer]
+                            [-m integer] [--min-telomere-overlap integer]
+                            [--output-ambiguous-reads string]
+                            [-f flagspec]... [-F flagspec]... [-q integer] <bam>
+
+Required options:
+    -x, --index [filename]                   location of the reference .ecx index
+
+Options:
+    -t, --target [targetspec]                target reads overlapping these features (ECX flags) [default: tract_anchor]
+    -M, --max-read-length [integer]          maximum read length to consider when selecting lookup regions
+    --min-map-overlap [integer]              minimum overlap of reference to consider read as mapped [default: 1]
+    -m, --min-subtelomere-overlap [integer]  minimum overlap of subtelomere to consider read as candidate [default: 1]
+    --min-telomere-overlap [integer]         minimum overlap of telomere to consider read as candidate [default: 1]
+    --output-ambiguous-reads [string]        which ambiguously mapping reads to retain (none, all, longest-overlap) [default: none]
+
+Input filtering options:
+    -f, --flags [flagspec]                   process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]             process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]              process only entries with this MAPQ or higher [default: 0]
+```
 
 Suggestions:
-* use `-F 3844` to skip secondary, supplementary and QC-fail alignments;
-* pipe the output through `samtools view -bh -` to compress on the fly;
-* supplying `--max-read-length` drastically improves wall time if reads are
-significantly shorter than chromosomes.
+* It is recommended to include secondary and supplementary reads (i.e., leave
+  the -F flag as default [0]), because:
+    * edgeCase determines unambiguously mapped reads on its own; aligners
+      assign the 'supplementary' flag to multi-mapping reads arbitrarily, and
+      removing such supplementary reads upstream may lead to loss of information
+      in telomeric regions;
+    * edgeCase will discard chimeric reads in terminal regions if information
+      about supplementary alignments is present.
+* Supplying `--max-read-length` drastically improves wall time if reads are
+  significantly shorter than chromosomes; for PacBio HiFi (CCS) it is suggested
+  to use the value of 30000. If the value is not specified, edgeCase will
+  assume *infinity*, and will have to go over the entire content of the BAM file.
+* Suggested value of --min-map-overlap for PacBio HiFi: 500.
+* Suggested value of --min-(sub)telomere-overlap for PacBio HiFi: 3000.
+* Pipe the output through `samtools view -bh -` to compress on the fly.
 
 
 ### tailchopper
-
-```
-usage: ./edgecase tailchopper --index X [options] bam > fasta
-
-positional arguments:
-  bam                    name of input BAM/SAM file
-
-optional arguments:
-  -x X, --index X        location of the reference .ecx index (REQUIRED)
-  -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
-  -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
-  -t ?, --target ?       an ECX flag (cut relative to reference) or 'cigar' (default: tract_anchor)
-```
 
 Truncates reads in the tailpuller file either to soft/hard-clipped ends (when
 --target is "cigar"), or to sequences extending past given anchor (when
 --target is "tract_anchor", "fork", or "mask_anchor").
 
-**NB**: outputs a SAM file with unmapped reads (sets the 0x0004 bit in the
-flag), but *retains the original mapping position*; do *not* use this value for
-downstream analyses unless you know exactly what you are after.
+Outputs a SAM file with overhanging tails of candidate reads.
+
+```
+Usage: ./edgecase tailchopper -x filename [-t targetspec]
+                            [-f flagspec]... [-F flagspec]... [-q integer] <bam>
+
+Required options:
+    -x, --index [filename]        location of the reference .ecx index
+
+Options:
+    -t, --target [targetspec]     an ECX flag (cut relative to reference) or 'cigar' [default: tract_anchor]
+
+Input filtering options:
+    -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+```
+
+**NB**: tailchopper outputs a SAM file with unmapped reads (sets the 0x0004 bit
+in the flag), but *retains the original mapping position*; do *not* use this
+value for downstream analyses unless you know exactly what you are after.
+
+*Suggestion*: pipe the output through `samtools view -bh -` to compress on the
+fly.
 
 
 ### repeatfinder
 
-```
-usage: ./edgecase repeatfinder [options] sequencefile > tsv
-
-positional arguments:
-  sequencefile                name of input SAM/BAM/FASTA/FASTQ file
-
-optional arguments:
-  -f f, --flags f             process only entries with all these sam flags present (default: 0)
-  -F F, --flag-filter F       process only entries with none of these sam flags present (default: 0)
-  -q Q, --min-quality Q       process only entries with MAPQ >= Q (default: 0)
-  --fmt ?                     format of input file(s) (default: sam)
-  -m ?, --min-k ?             smallest target repeat length (default: 4)
-  -M ?, --max-k ?             largest target repeat length (default: 16)
-  -r R, --min-repeats R       minimum number of consecutive repeats (default: 2)
-  -n ?, --max-motifs ?        maximum number of motifs to report (default: None)
-  -P ?, --max-p-adjusted ?    cutoff adjusted p-value (default: 0.05)
-  --jellyfish ?               jellyfish binary (unless in $PATH) (default: None)
-  --jellyfish-hash-size ?     jellyfish initial hash size (default: 2G)
-  -j J, --jobs J              number of jellyfish jobs (parallel threads) (default: 1)
-```
+Expects the SAM/BAM file from `tailchopper` as input; however, will also work
+on any SAM/BAM file as well as Fasta/Fastq files.
 
 Performs Fisher's exact tests on *k*-mer counts to identify significantly
-enriched repeating motifs of lengths from *--min-k* to *--max-k* in the input
+enriched repeating motifs of lengths from `--min-k` to `--max-k` in the input
 file.  
 Relies on [jellyfish](http://www.genome.umd.edu/jellyfish.html) to count
-*k*-mers. If *edgeCase* has been installed with the Conda method (by creating
-an environment from *environment.yaml*), *jellyfish* is already installed and no
+*k*-mers. If edgeCase has been installed with the Conda method (by creating
+an environment from `environment.yaml`), `jellyfish` is already installed and no
 special action is needed. Otherwise, it needs to be installed manually and, if
-not in $PATH, supplied with the *--jellyfish* option.
+not in `$PATH`, supplied with the `--jellyfish` option.
+
+Outputs a TSV file with columns:  
+`monomer motif length score fraction_explained p p_adjusted`
+
+```
+Usage: ./edgecase repeatfinder [-m integer] [-M integer] [-r integer] [-P float]
+                               [--jellyfish filename] [--jellyfish-hash-size string]
+                               [-n integer] [-j integer] [-q integer]
+                               [-f flagspec]... [-F flagspec]... [--fmt string]
+                               [--collapse-reverse-complement] <sequencefile>
+
+Options:
+    --fmt sam|fastx                     format of input file [default: sam]
+    -m, --min-k [integer]               smallest target repeat length [default: 4]
+    -M, --max-k [integer]               largest target repeat length [default: 16]
+    -r, --min-repeats [integer]         minimum number of consecutive repeats [default: 2]
+    -P, --max-p-adjusted [float]        cutoff adjusted p-value [default: .05]
+    --jellyfish [filename]              jellyfish binary (unless in $PATH)
+    -s, --jellyfish-hash-size [string]  jellyfish initial hash size [default: 2G]
+    -n, --max-motifs [integer]          maximum number of motifs to report
+    -j, --jobs [integer]                number of jellyfish jobs (parallel threads) [default: 1]
+    -C, --collapse-reverse-complement   collapse counts of reverse complement motifs
+
+Input filtering options:
+    -f, --flags [flagspec]              process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]        process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]         process only entries with this MAPQ or higher [default: 0]
+```
 
 
 ### kmerscanner
 
-```
-usage: ./edgecase kmerscanner --motif-file M [options] bam > dat
+Expects the SAM/BAM file from `tailpuller` as input; however, will also work
+on any SAM/BAM file as well as Fasta/Fastq files.
 
-positional arguments:
-  bam                    name of input SAM/BAM file
-
-optional arguments:
-  --motif-file M         file with repeated motif sequences (REQUIRED)
-  -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
-  -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
-  -w W, --window-size W  size of the rolling window (default: 100)
-  --head-test H          length of head to use for density filter (if specified) (default: None)
-  --tail-test T          length of tail to use for density filter (if specified) (default: None)
-  -c C, --cutoff C       use hard cutoff for density (default: None)
-  -j J, --jobs J         number of jobs to run in parallel (default: 1)
-```
+Expects the TSV file from `kmerscanner` provided as the `--motif-file` option;
+however, one may supply an arbitrary tab-separated file where the first field of
+each line is a motif (except for lines starting with "#" which are treated as
+comments).
 
 In a rolling window along each read in a BAM file, calculates densities of given
-motifs and outputs a DAT file.  
-Optionally filters input by terminal density (outputs data only for reads
-exceeding density cutoff). By default, outputs data for all input reads.  
-*--motif-file* is usually the output of *repeatfinder*, but can be an arbitrary
-tab-separated file where the first field of each line is a motif (except for
-lines starting with "#" which are treated as comments).
+motifs and outputs a tab-separated DAT file with columns:  
+`name flag chrom pos mapq motif score clip_5prime clip_3prime b=N`,  
+where the last column name contains the value of `--bin-size`, and the column
+itself lists all density values along rolling windows for a given motif.
 
-**NB**: it is possible to run *kmerscanner* on an entire WGS BAM and look for
-reads that pass tests encoded by *--head-test*, *--tail-test*, and *--cutoff*,
-but this use case is experimental and is discouraged.  Generally, *kmerscanner*
-is intended to be used downstream of *tailpuller/tailchopper* and *repeatfinder*
-to calculate densities of identified motifs in telomeric candidate reads. In
-this case, *--head-test*, *--tail-test*, and *--cutoff* should be omitted.
-
-
-### levenshtein
+*Note*: it is recommended to pipe the output through `gzip`, as these files
+are quite verbose and easily compressible. In the future, we plan to implement
+a more space-efficient (and backwards-compatible) format.
 
 ```
-usage: ./edgecase levenshtein [options] sequencedata > tsv
+Usage: ./edgecase kmerscanner [-j integer] --motif-file filename
+                              [-b integer] [-n integer]
+                              [-f flagspec]... [-F flagspec]... [-q integer]
+                              [--fmt string] <sequencefile>
 
-positional arguments:
-  sequencedata           name of input BAM/SAM file or directory with precomputed distances
+Required options:
+    --motif-file [filename]       file with repeated motif sequences (output of `repeatfinder`)
 
-optional arguments:
-  -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
-  -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
-  --kmerscanner-file ?   kmerscanner file (optional, for use with --output-dir)
-  --min-cluster-size ?   minimum cluster size to consider (default: 5)
-  -o ?, --output-dir ?   output directory for clustermaps and per-haplotype SAM files (default: None)
+Options:
+    --fmt sam|fastx               format of input file [default: sam]
+    -b, --bin-size [integer]      size of the rolling window [default: 10]
+    -n, --num-reads [integer]     expected number of reads in input (for progress display)
+    -j, --jobs [integer]          number of jobs to run in parallel [default: 1]
+
+Input filtering options:
+    -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
 ```
-
-For each chromosome arm in the BAM/SAM file, clusters the reads that align there
-by their relative pairwise edit distance (Levenshtein distance) and decides on
-the best number of clusters by maximizing the Bayesian information criterion.
-If more than one cluster is identified, performs a Mann-Whitney U one-tailed
-test on all intra-cluster distances vs. all inter-cluster distances.  
-If the input is a directory with precomputed matrices (files matching mask
-*${chromosome_name}-matrix.tsv*), uses these values to cluster and compute
-*p*-values (skips the actual step of distance computation).  
-If *--kmerscanner-file* is provided, generates kmerscanner files for read
-clusters (haplotypes) on each arm where more than one such cluster is
-detected.
-
-**NB**: this is an experimental module, and the maximum number of outliers is
-hard-coded as 1. This worked for the datasets analyzed in the bioRxiv preprint,
-but the number of outliers may have to be adjusted for other datasets.  
-**NB**: this algorithm scales quadratically with the number of input reads and
-is computationally infeasible for large datasets.
 
 
 ### densityplot
 
-```
-usage: ./edgecase densityplot --index X [options] dat > pdf
+Expects the DAT file from `kmerscanner` as input;  
+visualizes the density of motifs on each chromosomal arm in the regions covered
+by candidate reads.
 
-positional arguments:
-  dat                    input density file
-
-optional arguments:
-  -x X, --index X        location of the reference .ecx index (REQUIRED)
-  -f f, --flags f        process only entries with all these sam flags present (default: 0)
-  -F F, --flag-filter F  process only entries with none of these sam flags present (default: 0)
-  -q Q, --min-quality Q  process only entries with MAPQ >= Q (default: 0)
-  -z, --gzipped          input is gzipped (must specify if any of -qfF present) (default: False)
-  -b B, --bin-size B     size of each bin in bp (default: 10)
-  --zoomed-in            plot taller traces, cut off pre-anchor regions (default: False)
-  --palette ?            custom palette for plotting motifs (default: None)
-  -e, --exploded         plot each read separately (default: False)
-  --title T              figure title (defaults to input filename) (default: None)
-```
-
-Visualizes the density of motifs on each chromosomal arm in the regions covered
-by candidate reads, binning the values by windows of *--bin-size*.  
-The value of *--palette* can be either none (in which case the maximum of nine
+The value of `--palette` can be either none (in which case the maximum of nine
 motifs can be plotted with default colors), "paper", "paper|legend=full",
 "paper|legend=density", or "paper|legend=motifs" (in which case motifs known
 from research can be plotted with custom colors, matching the colors in the
 figures in the paper), or a chained key-value sequence of "motif=color" and
 "legend=spec", where "spec" is one of "none", "full", "density", "motifs".
-For example: "TTAGGG=green|TGAGGG=#D01000|legend=full".  
-Options *--exploded* and *--title* are deprecated.
-
-Option *--zoomed-in* plots taller figures, discards non-telomeric regions, and
-visualizes read coverage above each plot.
+For example: `"TTAGGG=green|TGAGGG=#D01000|legend=full"`.
 
 Annotates the anchors from the ECX with dashed lines:
 * mask_anchor == gray,
 * fork == blueviolet,
 * tract_anchor == red.
+
+Outputs a PDF file (writes it to stdout; you must pipe the output into a file).
+Alternatively, can output a Python pickle file (with `--outfmt=pkl`).
+
+```
+Usage: ./edgecase densityplot -x filename [-b integer] [--plot-coverage]
+                              [--palette palettespec] [--title string]
+                              [--n-boot integer] [--chroms-to-plot string]
+                              [-f flagspec]... [-F flagspec]... [-q integer]
+                              [--figwidth-inches float] [--outfmt string] [-z] <dat>
+
+Required options:
+    -x, --index [filename]        location of the reference .ecx index
+
+Options:
+    -z, --gzipped                 input is gzipped (must specify if any of -qfF present)
+    -b, --bin-size [integer]      size of each bin in bp (overrides bin size in <dat>)
+    --n-boot [integer]            number of bootstrap iterations for 95% confidence intervals [default: 1000]
+    --palette [palettespec]       custom palette for plotting motifs
+    --title [string]              figure title (defaults to input filename)
+    --chroms-to-plot [string]     if set, plot chromosomes from this comma-separated list unconditionally
+    --plot-coverage               plot coverage by telomeric reads on each arm
+    --figwidth-inches [float]     width of figure in inches [default: 13]
+    --outfmt [string]             output format (pdf, pkl) [default: pdf]
+
+Input filtering options:
+    -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+```
+
+
+### entropy
+
+Expects the DAT file from `kmerscanner` as input; can accept multiple DAT files
+at once.
+
+Calculates entropy values of motif assignments per window among reads,
+and outputs a TSV file with columns:  
+`entropy coverage`.
+
+```
+Usage: ./edgecase entropy [-b integer] [-f flagspec]... [-F flagspec]... [-q integer]
+                          [-z] <dat>...
+
+Options:
+    -z, --gzipped                 input is gzipped (must specify if any of -qfF present)
+    -b, --bin-size [integer]      size of each bin in bp (overrides bin size in <dat>)
+
+Input filtering options:
+    -f, --flags [flagspec]        process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]  process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]   process only entries with this MAPQ or higher [default: 0]
+```
+
+
+### levenshtein
+
+Expects the SAM/BAM file from `tailpuller` as input.
+
+Calculates pairwise relative edit distance (Levenshtein distance) for all pairs
+of reads mapping to each chromosomal arm in the input SAM/BAM file.  
+Outputs a TSV file with columns:  
+`rname qname1 qname2 relative_ld`,  
+where `rname` is the name of the chromosome, `qnameN` is the name of a read in
+the pair, and `relative_ld` is the distance.
+
+**NB**: this algorithm scales quadratically with the number of input reads and
+is computationally infeasible for large datasets.
+
+```
+Usage: ./edgecase levenshtein [-f flagspec]... [-F flagspec]... [-q integer]
+                              [-j integer] <sequencefile>
+
+Options:
+    -j, --jobs [integer]               number of jobs to run in parallel [default: 1]
+
+Input filtering options:
+    -f, --flags [flagspec]             process only entries with all these sam flags present [default: 0]
+    -F, --flag-filter [flagspec]       process only entries with none of these sam flags present [default: 0]
+    -q, --min-quality [integer]        process only entries with this MAPQ or higher [default: 0]
+```
