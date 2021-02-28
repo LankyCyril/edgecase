@@ -18,11 +18,9 @@ Commmands (<command>):
     kmerscanner              perform scan of known kmers/motifs
     densityplot              visualize densities of candidate motifs
 
-Combined "pipeline" commands:
-    basic-pipeline-longread  extract candidate long reads, discover motifs, plot
-
 Development area:
-    levenshtein              cluster long reads by edit distance
+    entropy                  calculate motif entropy among long reads
+    levenshtein              calculate pairwise edit distance among long reads
 """
 
 

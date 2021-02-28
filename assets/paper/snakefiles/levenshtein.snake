@@ -1,0 +1,83 @@
+rule levenshtein:
+    input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailpuller.bam",
+    output: tsv=DATA_DIR+"/PacBio/{group}/{subject}/haplotypes/levenshtein-{arm}.tsv",
+    threads: 48,
+    run:
+        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+        shell("""
+            ./edgecase levenshtein -j {threads} {flags} \
+                {input.bam} > {output.tsv}
+        """)
+
+
+def trio_bam_input(w):
+    return {
+        subject: f"{DATA_DIR}/PacBio/{w.group}/{subject}/tail{w.kind}.bam"
+        for subject in set(DATASETS.loc[DATASETS["group"]==w.group, "subject"])
+    }
+
+rule trio_bam:
+    input: unpack(trio_bam_input),
+    output: bam=DATA_DIR+"/PacBio/{group}/tail{kind}.bam",
+    params: sam=DATA_DIR+"/PacBio/{group}/tail{kind}.sam", flags="-f0x4000",
+    run:
+        first_bam = next(iter(input))
+        shell("samtools view -H {first_bam} > {params.sam}")
+        for subject, bam in input.items():
+            shell("""
+                samtools view {params.flags} {bam} \
+                    | sed -E 's/^/{subject}:/g' >> {params.sam}
+            """)
+        shell("samtools view -bh {params.sam} > {output.bam}")
+        shell("rm {params.sam}")
+
+
+def all_bam_input(w):
+    return {
+        group: f"{DATA_DIR}/PacBio/{group}/tail{w.kind}.bam"
+        for group in set(DATASETS["group"])
+    }
+rule all_bam:
+    input: unpack(all_bam_input),
+    output: bam=DATA_DIR+"/PacBio/tail{kind}.bam",
+    params: sam=DATA_DIR+"/PacBio/tail{kind}.sam", flags="-f0x4000",
+    run:
+        first_bam = next(iter(input))
+        shell("samtools view -H {first_bam} > {params.sam}")
+        for group, bam in input.items():
+            shell("""
+                samtools view {params.flags} {bam} \
+                    | sed -E 's/^/{group}:/g' >> {params.sam}
+            """)
+        shell("samtools view -bh {params.sam} > {output.bam}")
+        shell("rm {params.sam}")
+
+
+rule kmerscanner_for_haploplots:
+    input:
+        bam=f"{DATA_DIR}/PacBio/tailpuller.bam",
+        tsv=f"{DATA_DIR}/PacBio/repeatfinder-q_arm-plottable.tsv",
+    output:
+        dat=f"{DATA_DIR}/PacBio/kmerscanner-q_arm.dat.gz",
+    shell: """
+        ./edgecase kmerscanner --motif-file {input.tsv} -b 10 \
+            -f0x4000 -f0x8000 {input.bam} | gzip -2 > {output.dat}
+    """
+
+
+rule levenshtein_across_populations:
+    input: bam=DATA_DIR+"/PacBio/tailpuller.bam",
+    output: tsv=DATA_DIR+"/PacBio/haplotypes/levenshtein-{arm}.tsv",
+    threads: 96,
+    run:
+        flags = get_sam_flags(wildcards.arm, target="tract_anchor")
+        shell("""
+            ./edgecase levenshtein -j {threads} {flags} \
+                {input.bam} > {output.tsv}
+        """)
+
+
+rule levenshtein_all:
+    input:
+        p_arm=DATA_DIR+"/PacBio/haplotypes/levenshtein-p_arm.tsv",
+        q_arm=DATA_DIR+"/PacBio/haplotypes/levenshtein-q_arm.tsv",

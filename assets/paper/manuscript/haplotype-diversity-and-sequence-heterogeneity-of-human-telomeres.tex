@@ -1,0 +1,676 @@
+\documentclass{article}
+
+\usepackage[tmargin=.9in, bmargin=.9in, lmargin=1in, rmargin=1in]{geometry}
+\usepackage{bookmark, wrapfig, enumitem, pdflscape, hyphenat}
+\usepackage[labelfont=bf]{caption}
+\usepackage{lmodern}
+\usepackage[sfdefault]{roboto}
+\usepackage[T1]{fontenc}
+
+\usepackage{graphicx}
+    \makeatletter % tex.stackexchange.com/a/28565
+    \setlength{\@fptop}{0pt}
+    \setlength{\@fpbot}{0pt plus 1fil}
+    \makeatother
+
+\usepackage[absolute, overlay]{textpos}
+    \setlength{\TPHorizModule}{1mm}
+    \setlength{\TPVertModule}{1mm}
+
+\usepackage{xcolor}
+    \definecolor{WCM}{RGB}{172,31,44} % AC1E2C
+
+\usepackage{hyperref} \hypersetup{
+    colorlinks=true, linkcolor={blue!65!black},
+    citecolor={blue!65!black}, urlcolor={blue!50!black},
+    pdfpagelayout=OneColumn, pdfstartview={XYZ null null 1.25},
+    bookmarksnumbered=true, bookmarksopen=true, bookmarksopenlevel=3
+}
+
+% Genome Research citation style:
+% https://github.com/khyox/GR
+    \RequirePackage[
+        backend=bibtex,maxcitenames=2,maxbibnames=10,
+        style=authoryear,sorting=nyt,sortlocale=auto,
+        uniquename=init,maxitems=2,giveninits=true,terseinits=true,
+        dashed=false,doi=false,isbn=false,url=false,
+    %   uniquelist=false, % Avoid disambiguation adding a 2n surname
+    ]{biblatex}
+    \DeclareNameAlias{sortname}{family-given} % for the bibliography section
+    \renewcommand*{\revsdnamepunct}{} % No commas between last and first names
+    \DeclareFieldFormat*{title}{#1} % Do not quote the title
+    \renewbibmacro*{date+extradate}{ % Avoid year inside parenthesis
+        \iffieldundef{labelyear}
+        {}
+        {\printtext[]{\printlabeldateextra}
+            \newunit}
+    }%
+    \DeclareBibliographyDriver{book}{%
+        \printnames{author}%
+    \finentry}
+    \DeclareBibliographyDriver{article}{%
+        \printnames{author}%
+        \newunit%
+        \usebibmacro{date+extradate}%
+        \printfield{title}\printfield{titleaddon}%
+        \newunit%
+        \printfield{journaltitle}%
+        \space%?\newunit%
+        \printfield{volume}%
+        \printfield{pages}%
+        \usebibmacro{doi}
+    \usebibmacro{finentry}}
+    \DeclareFieldFormat[article]{journaltitle}{\mkbibemph{#1}} % italic title
+    \DeclareFieldFormat[article]{volume}{\mkbibbold{#1}\addcolon\addspace} % --
+    \DeclareFieldFormat[article]{pages}{#1}
+    \newbibmacro*{doi}{%
+        \iffieldequalstr{journaltitle}{BioRxiv}{ % DOI only for bioRxiv
+            \newunit
+            \printfield{doi}}{}
+    }
+    \DeclareBibliographyDriver{book}{%
+        \printnames{author}%
+        \newunit%
+        \usebibmacro{date+extradate}%
+        \usebibmacro{chaptertitle+booktitle}%
+        \newunit
+        \ifnameundef{editor}{}{\printtext[parens]{\usebibmacro{byeditor+others}}}  % Print (editors)
+        \newunit
+        \usebibmacro{chapter+pages}%
+        \newunit
+        \usebibmacro{publisher+location}%
+    \usebibmacro{finentry}}
+    \DeclareFieldFormat[book]{booktitle}{\mkbibemph{#1}} % italic journal title
+    \newbibmacro{chaptertitle+booktitle}{%
+        \iffieldundef{title}
+        {\printfield{booktitle}}
+        {\printfield{title}\newunit\bibstring{in}\addspace\printfield{booktitle}}
+    }
+    \newbibmacro*{publisher+location}{%
+        \printlist{publisher}
+        \iflistundef{location}
+        {}
+        {\addcomma\newunit\printlist{location}}
+        \newunit
+    }
+    \DeclareBibliographyAlias{inbook}{book}
+
+% https://tex.stackexchange.com/a/371909
+    \renewcommand*{\finalnamedelim}{\addcomma\addspace}%
+
+% https://tex.stackexchange.com/a/359430
+    \DeclareDelimFormat[parencite]{finalnamedelim}{%
+      \ifnumgreater{\value{liststop}}{2}{\finalandcomma}{}%
+      \addspace\bibstring{and}\space}
+
+%\usepackage[natbib=true,backend=bibtex,style=authoryear]{biblatex}
+    \addbibresource{references.bib}
+
+\newcommand{\beginsupplement}{
+% bytesizebio.net/2013/03/11/adding-supplementary-tables-and-figures-in-latex
+    \newpage
+    \setcounter{page}{1}
+    \renewcommand{\thepage}{S-\arabic{page}}
+    \setcounter{table}{0}
+    \renewcommand{\thetable}{S\arabic{table}}
+    \setcounter{figure}{0}
+    \renewcommand{\thefigure}{S\arabic{figure}}
+ }
+
+\usepackage{setspace}
+
+\begin{document}
+
+\begin{center}
+    \Large{\textbf{Haplotype Diversity and Sequence Heterogeneity of Human Telomeres}}
+    \\~\\
+    \small{
+        Kirill Grigorev\textsuperscript{1,2 \#},
+        Jonathan Foox\textsuperscript{1,2,3 \#},
+        Daniela Bezdan\textsuperscript{1,2,3},
+        Daniel Butler\textsuperscript{1},
+        Jared J. Luxton\textsuperscript{4,5},
+        Jake Reed\textsuperscript{1},
+        \\%rem
+        Miles J. McKenna\textsuperscript{4,5},
+        Lynn Taylor\textsuperscript{4,5},
+        Kerry A. George\textsuperscript{4,5},
+        Cem Meydan\textsuperscript{1,2,3},
+        Susan M. Bailey\textsuperscript{4,5 *},
+        Christopher E. Mason\textsuperscript{1,2,3,6 *}
+    }
+\end{center}
+
+\small{ \noindent
+    \textsuperscript{1} Department of Physiology and Biophysics, Weill Cornell Medicine, New York, New York, USA
+    \\
+    \textsuperscript{2} The HRH Prince Alwaleed Bin Talal Bin Abdulaziz Alsaud Institute for Computational Biomedicine, \\
+    \textcolor{white}{\textsuperscript{2}} Weill Cornell Medicine, New York, New York, USA
+    \\
+    \textsuperscript{3} The Feil Family Brain and Mind Research Institute, New York, New York, USA
+    \\
+    \textsuperscript{4} Department of Environmental and Radiological Health Sciences, Colorado State University, Fort Collins, CO
+    \\
+    \textsuperscript{5} Cell and Molecular Biology Program, Colorado State University, Fort Collins, CO
+    \\
+    \textsuperscript{6} The WorldQuant Initiative for Quantitative Prediction, Weill Cornell Medicine, New York, NY, USA
+    \\
+    \textsuperscript{\#} Co-first authors
+    \\
+    \textsuperscript{*} Corresponding authors. Send correspondence to S.M.B. (susan.bailey@colostate.edu) \\%rem
+    \textcolor{white}{\textsuperscript{*}} and C.E.M. (chm2042@med.cornell.edu)
+}
+
+\normalsize
+\doublespacing
+
+\section*{Abstract} \addcontentsline{toc}{section}{Abstract}
+    Telomeres are regions of repetitive nucleotide sequences capping the ends of eukaryotic chromosomes that protect against deterioration,
+        and whose lengths can be correlated with age and adverse health risk factors.
+    Yet, given their length and repetitive nature,
+        telomeric regions are not easily reconstructed from short-read sequencing,
+        making telomere sequencing, mapping, and variant resolution difficult problems.
+    Recently, long-read sequencing, with read lengths measuring in hundreds of Kbp,
+        has made it possible to routinely read into telomeric regions and inspect their sequence structure.
+    Here, we describe a framework for
+        extracting telomeric reads from whole genome single-molecule sequencing experiments,
+        including \textit{de novo} identification of telomere repeat motifs and repeat types,
+        and also describe their sequence variation.
+    We find that
+        long, complex telomeric stretches can be accurately captured with long-read sequencing,
+        observe extensive sequence heterogeneity of human telomeres,
+        discover and localize non-canonical motifs (both previously reported, as well as novel),
+        confirm the presence of the non-canonical motifs in short read sequencing experiments,
+        and report the first motif composition maps of human telomeric haplotypes across three distinct ancestries
+            (Ashkenazim, Chinese, and Utah) and two trios on a multi-Kbp scale.
+
+\section*{Keywords} \addcontentsline{toc}{section}{Keywords}
+    Telomere, telomeric haplotypes, long-read sequencing, telomere sequence heterogeneity
+
+\pagebreak
+%\singlespacing
+%\tableofcontents
+\doublespacing
+
+\section*{Introduction} \addcontentsline{toc}{section}{Introduction}
+    Telomeres are the functional ends of human chromosomes that naturally shorten with cell division, and thus with age \parencite{teloaging}.
+    Telomere length is also influenced by a variety of lifestyle factors and environmental exposures
+        (e.g., stress, exercise, air pollution, radiation) \parencite{teloeffects}.
+    While human telomeres are known to consist largely of a conserved six-nucleotide repeat (TTAGGG) \parencite{moyzis},
+        several studies have identified variations of this motif in proximal telomeric regions
+            \parencite{telovars1989,telovars1999,telovars2018,telovars2019}.
+    However, such studies were performed with oligonucleotide hybridization, PCR, immunoprecipitation, and short-read sequencing,
+        requiring prior assumptions about specific target motifs, custom sample preparation, and targeted sequencing,
+        and therefore preventing \textit{de novo} identification of motif variants and their localization.
+    Thus, long-range maps of telomeric sequence variation in the human genome are still incomplete, preliminary \parencite{shafin},
+        or have only been completed for a single genome \parencite{jain,t2t}.
+    Therefore, completing maps of telomeres and providing new tools for such research \parencite{nurk} can provide new insight into
+        telomere biology and enable novel approaches to analyze the effects of aging, environment, and health status \parencite{telovars2018}
+        on telomere sequence and length.
+    \\~\\
+    To improve our understanding of telomere sequence structure and variation, we developed \textit{edgeCase},
+        a scalable framework for alignment and \textit{de novo} telomeric motif discovery
+        from human whole genome long-read sequencing experiments.
+    We have validated these methods using
+        Genome in a Bottle \parencite{giab} single-molecule real-time (SMRT) sequencing datasets
+            generated with Pacific Biosciences circular consensus sequencing (PacBio CCS) \parencite{pacbio,pacbioccs},
+        and short-read Illumina \parencite{illumina} and 10x Genomics [Chromium] (www.10xgenomics.com) datasets,
+        as well as with healthy donor peripheral blood mononuclear cells (PBMCs).
+    These results provide evidence for
+        multiple novel, non-canonical telomeric repeats,
+        resolution of multiple chromosome-specific haplotypes with SMRT sequencing,
+        and a new method for long-range characterization of the structure of telomeric sequences.
+
+\section*{Results} \addcontentsline{toc}{section}{Results}
+
+\subsection*{A telomere-annotated reference genome enables recovery of telomeric reads from human long-read whole genome sequencing datasets}
+\addcontentsline{toc}{subsection}{A telomere-annotated reference genome enables recovery of telomeric reads from human long-read whole genome sequencing datasets}
+    We first constructed an extended reference genome, \textit{hg38ext},
+        that combines chromosome sequences of the \textit{hg38} reference genome \parencite{grch38,hg38}
+            and human subtelomeric assemblies \parencite{riethman2014},
+        resulting in a reference set annotated with boundaries of subtelomeric and telomeric tracts.
+            % (see \hyperref[sec:methods]{Materials and Methods}).
+        The layout of this reference set is available in \textbf{Supplemental File S1},
+            and the set itself can be reproduced with a script available as \textbf{Supplemental File S2}.
+    We then aligned to it PacBio CCS reads of seven Genome in a Bottle [GIAB] \parencite{giab} human subjects (HG001 through HG007)
+        from three different ancestries (Ashkenazim, Chinese, and Utah),
+            which included two son/father/mother trios (\textbf{Supplemental Table S1}).
+        In total, we observed reads uniquely mapping to the ends of chromosomes and extending into telomeric regions
+            on 9 \textit{p} arms and 14 \textit{q} arms,
+                with 43\textendash{}285 such reads on the \textit{p} arms
+                and 34\textendash{}250 on the \textit{q} arms
+                    (\textbf{Supplemental Table S2}).
+    Portions of reads contained in the telomeric regions were extracted for further analysis (\textbf{\autoref{fig:schematic_alignment}}).
+        \begin{figure}[h!] \centering % \vspace{5mm}
+        \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_1.pdf}
+        \caption{
+             \small Mapping of candidate telomeric reads, illustrated with reads from the HG002 dataset aligning to \mbox{Chromosome 12.}
+             The chromosome is displayed schematically, centered around the centromere.
+             Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
+             Coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries.
+             Statistics for all chromosomes of all seven datasets are provided in \textbf{Supplemental Table S2}.
+        }
+        \label{fig:schematic_alignment}
+        \end{figure}
+
+\subsection*{Telomeric long reads contain variations of the canonical motif}
+\addcontentsline{toc}{subsection}{Telomeric long reads contain variations of the canonical motif}
+    We then performed \textit{de novo} repeat discovery in the telomeric sequences for motifs of lengths 4 through 16,
+            and identified motifs in repeat contexts that are statistically enriched in the seven datasets.
+        The majority of motifs were either the canonical TTAGGG / CCCTAA,
+            its variations (e.g., T\underline{G}AGGG),
+            or a duplet of variants, such as TTAGGGTTA\underline{G}GGG
+            (\textbf{\autoref{tab:repeatfinder}}).
+        CG-rich motifs were also observed on the \textit{q} arms.
+        The top enriched motif (TTAGGG / CCCTAA) explained
+            27.0\%\textendash{}76.9\% of the telomeric repeat content on the \textit{p} arms
+            and 49.1\%\textendash{}80.1\% on the \textit{q} arms,
+            while motifs T\underline{G}AGGG and TTA\underline{G}GGG explained up to 8.0\% and 6.6\% of the repeat content overall, respectively.
+    \\~\\
+    We next visualized the locations of the top three enriched motifs and their reverse complements
+        on the chromosomal ends of the HG002 dataset (\textbf{\autoref{fig:hg002_densityplot}}),
+        as it provided the deepest coverage among the assessed datasets (\textbf{Supplemental Table S2});
+            plots for the other six datasets are available as \textbf{Supplemental Figs. S2} and \textbf{S3}.
+        Only the chromosomal arms cumulatively covered by at least 25 reads across datasets were plotted.
+    These data showed that the overwhelming majority of the telomeric regions were represented by the canonical repeats,
+        but also novel, chromosome-specific repeat motif patterns could be observed,
+            and they were enriched for the proximal end of the telomere;
+            these data also illustrated the positions of the repeat-rich portions of the genomes in relation to the
+            known subtelomere-telomere boundaries, including deletions/insertions (4p, 8q)
+            and an apparent extension of the 17p subtelomere (see \hyperref[sec:discussion]{Discussion}).
+    \\~\\ % \noindent
+    To discern if the sequence mapping, read length, or overall coverage had any effect on the discovery or enrichment of these motifs,
+            the motif entropies were examined as a function of their location within reads and coverage across the telomere tracks.
+        When the locations of different motifs were examined within any 10 bp window across the length of the long reads,
+            the entropy data showed consistency among reads and across samples (\textbf{\autoref{fig:entropy}}).
+        Indeed, the coverage-weighted median of normalized Shannon entropy was 0.07 for one dataset and 0.00 for the other six,
+            while most non-zero values were contained only in the top quartile,
+            i.e., between the 75th and the 100th percentile,
+            indicating that locations of the variations are colinear among reads.
+        \input{../tables/Table_1.tex} % tab:repeatfinder
+        \begin{figure}[h!] \centering
+        \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_2.pdf}
+        \caption{
+             \small Densities of the top three enriched motifs at ends of chromosomal \textbf{(A)} \textit{p} arms
+             and \textbf{(B)} \textit{q} arms of the HG002 dataset.
+             \textit{Background} represents the remaining sequence content (non-repeating sequence and not significantly enriched motifs).
+             Reads are shown aligned to the contigs in the \textit{hg38ext} reference set, and genomic coordinates are given in Kbp.
+             Vertical red dashed lines denote the position of the boundary of the annotated telomeric tract.
+        }
+        \label{fig:hg002_densityplot}
+        \end{figure}
+        \begin{figure}[h!] \centering
+        \includegraphics[height=.75\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_3.pdf}
+        \caption{
+            \small Distribution of motif entropies in 10 bp windows of of candidate PacBio CCS reads aligning to the same chromosomal arms
+            in GIAB datasets HG001 through HG007,
+            with respect to per-window coverage,
+            and the coverage-weighted percentiles of the entropy values.
+        }
+        \label{fig:entropy}
+        \end{figure}
+
+\subsection*{Short-read sequencing validates motif variations observed in long reads}
+\addcontentsline{toc}{subsection}{Short-read sequencing validates motif variations observed in long reads}
+    We next validated these findings using short-read sequencing in two ways.
+    First, we extracted telomeric candidate reads with \textit{Telomerecat} \parencite{telomerecat}
+        from respective GIAB Illumina datasets,
+        and found that they supported a definitive majority of the long-read telomeric candidates, with
+            a median 89\% of the \textit{p} arm sequence
+            and a median 95\% of the \textit{q} arm sequence supported
+            (\textbf{Supplemental Fig. S1}).
+    Second, we confirmed 13 of the enriched motifs in independently generated human short-read and linked-read genomic datasets
+        from donated PBMCs, with the same three motifs being the most enriched (\textbf{Supplemental Table S3}).
+
+\subsection*{Long-read sequencing uncovers a variety of human telomeric haplotypes}
+\addcontentsline{toc}{subsection}{Long-read sequencing uncovers a variety of human telomeric haplotypes}
+    While reads agreed on colinearity of motifs, evidenced by low entropy,
+        rarer non-zero entropy values could be attributable both to sequencing errors
+        and to structural variations within the same subject's dataset.
+    To investigate the latter possibility,
+        we clustered reads on each arm of each subject by relative pairwise Levenshtein distances \parencite{levenshtein}
+        and found that hierarchical clustering described read similarity well,
+            resulting in high cophenetic correlation between the dendrograms and the pairwise distance matrices
+                (\textbf{\autoref{tab:cophenetic}}),
+            and in visible structure (\textbf{\autoref{fig:haplotypes_p}}, \textbf{\autoref{fig:haplotypes_q}}).
+            % \eject \pdfpageheight=40in \pdfpagewidth=22in %remall
+                \begin{figure}[h!] \centering % \vspace{5mm} %remall
+                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_4.pdf} %remall
+                \caption{ %remall
+                    \small Clustering of reads by relative pairwise Levenshtein distances (unitless measure) %remall
+                    on each chromosomal \mbox{\textit{p} arm} of datasets HG001 through HG007, %remall
+                    and densities of the top enriched motifs along each read. %remall
+                    Each horizontal line represents an individual read; %remall
+                    genomic coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries. %remall
+                    Only the chromosomal arms cumulatively covered by at least 25 reads are displayed. %remall
+                } %remall
+                \label{fig:haplotypes_p} %remall
+                \end{figure} %remall
+            % \eject \pdfpageheight=11in \pdfpagewidth=8.5in
+            % \eject \pdfpageheight=40in \pdfpagewidth=22in %remall
+                \begin{figure}[h!] \centering % \vspace{5mm} %remall
+                \includegraphics[height=.88\textheight,width=\textwidth,keepaspectratio]{../figures/Figure_5.pdf} %remall
+                \caption{ %remall
+                    \small Clustering of reads by relative pairwise Levenshtein distances (unitless measure) %remall
+                    on each chromosomal \mbox{\textit{q} arm} of datasets HG001 through HG007, %remall
+                    and densities of the top enriched motifs along each read. %remall
+                    Each horizontal line represents an individual read; %remall
+                    genomic coordinates are given in Kbp, relative to the positions of the telomeric tract boundaries. %remall
+                    Only the chromosomal arms cumulatively covered by at least 25 reads are displayed. %remall
+                } %remall
+                \label{fig:haplotypes_q} %remall
+                \end{figure} %remall
+            % \eject \pdfpageheight=11in \pdfpagewidth=8.5in
+            \input{../tables/Table_2.tex} % tab:cophenetic
+    ~\\~\\
+    In this complex clustering, subject- and population-specific variation was evident and quantifiable via relative Levenshtein distances
+        (\textbf{\autoref{tab:haptests}}; see \hyperref[sec:methods]{Materials and Methods}):
+        overall,
+            telomeric reads within a subject were more similar than within a population
+                (adjusted Wilcoxon signed-rank test \textit{p} = 4.2e-56),
+            and telomeric reads within a population were more similar than between populations
+                (\textit{p} = 2.2e-40).
+        ~\\
+        \input{../tables/Table_3.tex}
+        ~\\
+        Importantly, however, this was true for most, but not all reads;
+            13.8\% of all assessed reads (165 out of 1,192) contributed to interpopulation similarity;
+                these reads were twice as close to reads from a different population than they were to any reads of their own subjects.
+            This trend is observable on \textbf{\autoref{fig:haplotypes_p}} and \textbf{\autoref{fig:haplotypes_q}},
+                with subjects' and populations' reads interspersed across multiple clusters.
+        Therefore, the captured reads reflected spectra of haplotypes,
+            generally describing subject- and population-specific similarities,
+            but including a sizable component that described interpopulation similarity.
+        Paternal inheritance of variation was also observed:
+            each father's telomeric reads were more similar to their son's than to the mother's reads
+                in both the Ashkenazim and the Chinese trios.
+
+\section*{Discussion} \addcontentsline{toc}{section}{Discussion} \label{sec:discussion}
+    Repeat-rich, low-complexity regions of the human genome such as telomeres
+        have been historically recalcitrant to full mapping and annotation \parencite{miga2015},
+        mainly due to the alignment challenge they pose and to the read lengths required to span such areas \parencite{ngslowcomplexity}.
+    The advent of long-read, single-molecule methods (third generation sequencing)
+        has provided new opportunities to map the sequence composition of a previously "dark" area of the human genome,
+        enabling research into the sequence composition and length dynamics \parencite{luxton2020} of telomeres.
+    Our results reaffirm
+        that the canonical repeat (TTAGGG) is certainly the most dominant motif found within telomeres,
+        but also reveal a surprising diversity of repeat variations,
+            which are confirmed by both short and long-read sequencing technologies.
+    This diversity of repeat sequence includes previously reported variants,
+        as well as novel motifs that are characterized not only by nucleotide substitutions,
+        but also insertions, deletions, and even motif pairing.
+    Interestingly, repeat patterns were chromosome-specific, with different non-canonical repeats being pronounced on different chromosomes,
+        such as TGAGGG on 12q and TTAGGGG on 15q, which may be correlated with particular biological pathways \parencite{telovars2019}.
+    Apart from these variations,
+        CG-rich motifs were identified in telomeric regions of \textit{q} arms,
+        consistent with previously reported findings \parencite{cpg}.
+    Moreover, while short read sequencing is capable of identifying such variants,
+        it alone cannot reveal the relative locations of these motifs within telomeres,
+        as repetitive short reads can
+            neither be aligned outside of the reference genome
+            nor provide enough overlap variability to be assembled \textit{de novo}.
+    Long SMRT reads, on the other hand,
+        can be anchored to known subtelomeric sequences of the human genome and extend into the previously unmapped telomeric area.
+    Furthermore, in contrast to previously published research that utilized targeted sequencing
+        \parencite{telovars1989,telovars1999,telovars2018,telovars2019},
+        the method described here allows identification of multiple enriched motifs and their localization
+            \textit{de novo}, without any bias introduced by prior knowledge about the sequence of target motifs.
+    These results also highlight the need of better subtelomeric and telomeric annotations in the human genome:
+        the canonical motif was present on the \textit{q} arm of Chromosome 8
+            only 2\textendash{}3Kbp beyond the annotated boundary in all datasets;
+        the candidate reads on the \textit{p} arm of Chromosome 17 represented TTAGGG-rich and non-TTAGGG-rich haplotypes,
+            indicating that in multiple subjects and ancestries there exists an extension of the 17p subtelomere.
+            Strikingly, for example, the Ashkenazim son (HG002) provided only non-TTAGGG-rich 17p reads, while both
+            the father (HG003) and the mother (HG004) had a mixture of apparently telomeric and non-telomeric 17p reads.
+    This supports previous findings \parencite{riethman2020}
+            that the existing assemblies do not provide completely accurate subtelomeric annotation,
+        and suggests that methods described herein could help to resolve these areas of reference genomes.
+    \\~\\
+    We observed PacBio CCS reads reaching up to 16 Kbp beyond the known regions of the genome,
+        and resolving the underlying sequence with fidelity,
+        as measured both by the entropy of motif assignment and by pairwise Levenshtein distances
+            between the reads belonging to the same chromosomal arms.
+    While short reads also provided support for non-canonical motifs,
+        the overlap between the short and the long reads was substantial, but not complete,
+        which can be explained by the necessary bias towards the canonical motif during the selection of short reads.
+    Therefore, telomeric regions with higher content of non-canonical repeats are less likely to be identified through the use of short reads,
+        and so, long reads appear to be more suitable for this purpose as well.
+    \\~\\
+    The identified variations in long range contexts elucidate
+        subject-specific, trio- and population-specific similarities of telomeric sequences,
+            as well as a level of interpopulation similarity,
+        and thus provide a new means of haplotype mapping and reveal the existence and motif composition of haplotype spectra
+            on a multi-Kbp scale.
+    Interpopulation similarity, as well as paternal inheritance of variation,
+        provided evidence that the observed haplotypes could not be attributed to per-dataset batch effects.
+    The lengths of PacBio CCS reads allowed resolution of uniquely mapping reads only on 23 chromosomal arms,
+        and coverage of different arms was uneven.
+        As such, numbers of captured telomeric reads and levels of observed similarity varied from subject to subject;
+        in particular, maternal inheritance of haplotypes could not be determined, in contrast to statistically significant paternal inheritance.
+        This calls for more sequencing experiments aimed to reconstruct the full picture of this variation.
+    Clustering on a per-subject basis concealed interpopulation similarity,
+        but underscored intra-subject variation (\textbf{Supplemental Figs. S4} and \textbf{S5}),
+            suggesting coexistence of two or more telomeric haplotypes per chromosomal arm within each subject.
+        Given that the reference DNA for the subjects HG001 through HG007
+            was extracted from growths of B lymphoblastoid cell lines,
+            this suggests that as B cells undergo maturation,
+                distinct clones may gain distinct variations in their telomeric sequence.
+        This opens up avenues of investigation into the haplotypic variation among not only immune cells,
+            but also different cell types overall,
+            and provides a new opportunity to map, quantify, and characterize a previously unrecognized form of human genetic variation.
+
+\section*{Materials and Methods} \addcontentsline{toc}{section}{Materials and Methods} \label{sec:methods}
+
+\subsection*{The extended reference genome}
+\addcontentsline{toc}{subsection}{The extended reference genome}
+    We constructed the extended reference genome by performing an all-to-all alignment
+        of all contigs in the \textit{hg38} reference genome \parencite{grch38,hg38}
+        and the subtelomeric assemblies \parencite{riethman2014}
+        with \textit{minimap2} \parencite{minimap} using three settings
+            for assembly-to-reference mapping (\textit{asm5}, \textit{asm10}, \textit{asm20}).
+    Forty subtelomeric contigs mapped to ends of \textit{hg38} chromosomes with a mapping quality of 60,
+        one (XpYptel) mapped with the quality of 0 and was discarded;
+        one (14qtel) mapped to the ALT version of Chromosome 14 (chr14\_KI270846v1\_alt) with the quality of 52,
+            which, in turn, mapped to the main contig of Chromosome 14 (chr14) with the quality of 60.
+    These data and the exact match and mismatch coordinates were used to create a combined reference (\textit{hg38ext})
+        in which subtelomeric contigs informed the locations of the boundaries of the telomeric tracts (\textit{tract\_anchor}).
+    Such contigs that mapped fully within \textit{hg38} chromosomes resulted in \textit{tract\_anchor} annotations
+            directly on those \textit{hg38} chromosomes;
+        partially mapping contigs were considered as forking from the \textit{hg38} sequence and were similarly annotated by themselves.
+    For the purposes of capturing candidate reads that uniquely align to subtelomere-telomere boundaries,
+        subtelomeric contigs which were not previously assembled as extending completely up to the start of the telomere,
+        and/or were not precisely localized in relation to the reference genome,
+        such as 1p, 6p, 7p, 8p, 11p, 20p, 3q, 4q, 20q, and Xq \parencite{riethman2014,riethman2020},
+        were masked prior to downstream analyses.
+
+\subsection*{Detection of telomeric sequences in long-read datasets}
+\addcontentsline{toc}{subsection}{Detection of telomeric sequences in long-read datasets}
+    Seven subjects were selected for the analysis.
+    The first individual (NA12878/HG001) came from the pilot genome of the HapMap project \parencite{HG001},
+    while the other six,
+        including
+            the Ashkenazim Jewish Trio (son: NA24385/HG002, father: NA24149/HG003, mother: NA24143/HG004)
+            and the Chinese Trio \\%rem
+            (\mbox{son: NA24631/HG005}, father: NA24694/HG006, mother: NA24695/HG007),
+        are members of the Personal Genome Project,
+            whose genomes are consented for commercial redistribution and reidentification \parencite{HG00X}.
+    These subjects are referred to throughout as HG001 through HG007, respectively.
+    \\~\\
+    Multiple Genome in a Bottle \parencite{giab} PacBio CCS \parencite{pacbio,pacbioccs} datasets were available and combined per each subject,
+        with mean coverages of individual datasets ranging from $\sim$21x to $\sim$69x (\textbf{Supplemental Table S1}).
+    We mapped these reads to \textit{hg38ext} with \textit{minimap2}, allowing secondary mappings,
+        and selected reads that mapped to either end of either chromosome,
+        having an at least 500 bp portion of their sequence mapped to the reference contig and a portion extending beyond the reference
+            (soft- or hard-clipped in the alignment file).
+    As each of such reads can map to multiple subtelomeres due to paralogy,
+        we considered such multiple mappings and only retained the reads that mapped to a unique subtelomere;
+        furthermore, out of these candidates, we only selected the ones overlapping the subtelomere and the telomere by at least 3Kbp.
+    Sequences past the \textit{tract\_anchor} marker were extracted from the reads that had this marker within their mapped portion
+        (from the 5' end to the marker on \textit{p} arms and from the marker to the 3' end on \textit{q} arms,
+        accounting for forward and reverse mappings; \textbf{\autoref{fig:schematic_alignment}}).
+
+\subsection*{Evaluation of telomeric content in short- and linked-read datasets}
+\addcontentsline{toc}{subsection}{Evaluation of telomeric content in short- and linked-read datasets}
+    To evaluate the concordance of telomeric reads captured by long- and short-read technologies,
+        we extracted candidate telomeric reads from GIAB Illumina datasets for each subject (\textbf{Supplemental Table S1})
+            with \textit{Telomerecat} \parencite{telomerecat},
+            and mapped the short reads back onto the candidate long reads from the same subject's dataset with \textit{minimap2},
+            again allowing all secondary mappings.
+        Then, we calculated the fractions of each long read that were supported by the short reads that aligned to them.
+    \\~\\
+    To evaluate sequence motifs in independent samples collected from human subjects (as opposed to reference cell lines),
+        we analyzed four whole-genome Illumina datasets (mean coverage $\sim$104x)
+        and three linked-read 10x datasets (mean coverage $\sim$28x) for one individual at different timepoints,
+        and one additional linked-read 10x dataset (coverage $\sim$47x) for another individual.
+    These data were originally obtained from astronaut subjects for an unrelated space biology experiment,
+        and the blood samples were collected from the subjects as described in the study \parencite{twins_study}.
+        For each sample, 1.2ng of sorted immune cell input was aliquoted for
+            TruSeq PCR-free WGS (short-read) and standard Chromium 10x whole genome (linked-read) preparation respectively,
+            and sequenced across one S4 flow cell on an Illumina NovaSeq 6000.
+    From these datasets, candidate telomeric short reads were selected using Telomerecat \parencite{telomerecat}.
+
+\subsection*{Identification of repeat content}
+\addcontentsline{toc}{subsection}{Identification of repeat content}
+    Overrepresentation of motifs of lengths $k \subset [4 .. 16]$ was tested within the candidate telomeric regions of PacBio CCS reads,
+        as well as in the candidate reads from independently generated Illumina and 10x Chromium datasets.
+    To target motifs in repeat contexts,
+        doubled sequences (for example, \textit{k}-mer ACGTACGT for motif ACGT) were counted with \textit{jellyfish} \parencite{jellyfish},
+        and counts of \textit{k}-mers synonymous with respect to circular shifts (for example, ACGTACGT and CGTACGTA) were summed together.
+    For each such \textit{k}-mer,
+        Fisher's exact test was performed to determine whether its count is significant
+            on the background of counts of other \textit{k}-mers of the same length.
+    Briefly, we considered \textit{k}-mers with counts higher than 1.5 interquartile range above the third quartile of the distribution
+        as potentially classifiable,
+        and a $ 2 \times{} 2 $ contingency matrix $ C $ for the test was constructed as follows:
+        row 0 contained counts of potentially classifiable \textit{k}-mers,
+        row 1 contained counts of remaining (non-classifiable) \textit{k}-mers,
+        columns 0 and 1 contained counts of single and remaining (background) \textit{k}-mers, respectively,
+            i.e.:
+                $ C_{0,0} = $ {\rmfamily count of target \textit{k}-mer},
+                $ C_{0,1} = $ {\rmfamily sum of counts of other potentially classifiable \textit{k}-mers},
+                $ C_{1,0} = $ {\rmfamily median count of \textit{k}-mer},
+                $ C_{1,1} = $ {\rmfamily sum of counts of other non-classifiable \textit{k}-mers}.
+    The resultant \textit{p}-values for each motif among the samples were combined using the Mudholkar-George method \parencite{george}
+        within each technology (PacBio CCS, Illumina, 10x Genomics),
+        and the Bonferroni multiple testing correction was applied.
+    Motifs in the long-read datasets for which \textit{k}-mers yielded \textit{p}-values below the cutoff of 0.05 were reported.
+    As even doubled sequences (such as ACGTACGT for motif ACGT) can partially overlap at the boundaries of repeat contexts,
+        we quantified their presence in the telomeric reads in two distinct ways.
+        Consider a sequence such as TTAGGG(\underline{TTAGTTAG})GGTTA:
+            the inner (TTAG)x2 repeat can be explained by the repeats of the canonical motif extending into it from either side;
+            the middle part of a similar sequence with a bigger number of the repeats of the 4-mer, TTAGGG\underline{TTAG(TTAGTTAG)TTAG}GGTTA,
+                can only be explained by the repeats of said 4-mer.
+        On the one hand, the maximum fraction of the sequence that can be explained by any one motif is a useful metric,
+            and it was calculated and reported.
+        On the other hand, the fraction of the \textit{k}-mers attributable to a specific motif \textendash{} and not to any others \textendash{}
+            elucidates the extent of deviation from the background repeat context,
+            and identifies motifs that most affect the sequence structure;
+            it was calculated as well and reported as each motif's score.
+    Additionally, motifs that were significantly enriched in the datasets produced by all three technologies (PacBio, Illumina, 10x),
+        with respect to reverse-complemented equivalence, were reported.
+
+\subsection*{Evaluation of sequence concordance in telomeric long reads}
+\addcontentsline{toc}{subsection}{Evaluation of sequence concordance in telomeric long reads}
+    As telomeric reads contain long low-complexity regions and present an alignment challenge,
+        we evaluated concordance of their sequences without realignment of their portions that extended past the reference sequence.
+    To that end, for all reads mapping to the same chromosomal arm,
+        we calculated densities of each identified motif in a rolling window starting from the innermost mapped position of each entire read.
+    To evaluate whether the reads on the same arm agree on the positions of different motifs,
+        for each read, we calculated motif densities in 10 bp windows with 10 bp smoothing to buffer insertions and deletions.
+    For each window in each read,
+        the motif with the highest density was selected to represent that window.
+    Then, normalized Shannon entropy among all reads was calculated in each window as $ S = \frac{ - \sum_{i} \; ( p_{i} ln p_{i} )}{ln N} $,
+        where $ p_{i} $ is the frequency of each motif in the window and $ N $ is the number of motifs \parencite{hepc_entropy}.
+    The value of normalized entropy was a metric bounded by $ [ 0, 1 ] $,
+        with $ 0 $ describing perfect agreement and $ 1 $ describing maximum randomness.
+    As coverage of windows drops off towards the distal end of the alignment,
+        lower covered windows have less chance to produce entropy;
+        we calculated percentiles of entropy as weighted by coverage minus one
+        (thus prioritizing higher covered windows, and removing windows with the coverage of one and no entropy from the calculation).
+    For motif visualization,
+        we performed 1000 rounds of bootstrap of the calculated density values,
+            this time in 100 bp rolling windows to accommodate the scale of multi-Kbp plots,
+            and selected the lower and the upper bounds of the 95\% confidence interval of bootstrap.
+
+\subsection*{Identification of telomeric haplotypic variation}
+\addcontentsline{toc}{subsection}{Identification of telomeric haplotypic variation}
+    Within groups of reads mapping to each chromosomal arm, all relative pairwise Levenshtein distances were calculated.
+    In short, Levenshtein distance is a string metric defined as the edit distance between two strings (sequences),
+        equal to the minimum number of single-character insertions, deletions, and substitutions
+            required to make these sequences identical \parencite{levenshtein}.
+    For each pair of reads, this metric was calculated and represented absolute edit distance;
+        the relative distance was then computed as the absolute distance divided by the length of the overlap,
+            to normalize for the variation of such lengths.
+    Pairwise relative distances were then clustered using Ward's method via the Euclidean metric,
+        resulting in hierarchical structure describing the extents of similarity among reads.
+    To quantify how accurately hierarchical clustering described this similarity,
+        cophenetic distances \parencite{cophenetic} between the hierarchies (dendrograms) and the distance matrices was calculated,
+        and their Pearson correlation coefficients and Bonferroni-corrected \textit{p}-values were reported.
+    \\~\\
+    We then traversed the distance matrices,
+        and for each read, tracked the closest reads by category:
+            closest reads from the same subject,
+            from the same trio (population),
+            and from the outgroup (other populations).
+        For the Ashkenazim and the Chinese trios, we also tracked the closest reads
+            between the parents
+            and between each parent and the child.
+        Thus, for each read, we determined whether it locally clustered
+            within its own category
+                (for example, with other reads of the same subject, or with other reads from the same population)
+            or in a different one
+                (for example, with other reads of a different population),
+            and the value of the distances that drove either clustering.
+        Performing the Wilcoxon signed-rank test on these values between either categories
+            provided us with \textit{p}-values that, after a Bonferroni correction,
+            described whether reads tended to cluster in their own category or in a different one.
+        Additionally, we also identified the minority of reads that did not follow the overall trend,
+            and quantified the extent to which they did so
+                (such as the reads that contributed to interpopulation similarity).
+
+\section*{Data access} \addcontentsline{toc}{section}{Data access}
+Healthy donor DNA came from a previous study [The NASA Twins Study] \parencite{twins_study}.
+The NASA Life Sciences Data Archive (LSDA) is the repository for all human and animal research data, including the whole genome Illumina and 10x Chromium sequencing datasets from subjects aboard the ISS that were used in this study.
+These datasets are protected by the terms of the Weill Cornell Medicine Internal Review Board (IRB) and can be made available to be shared upon request.
+LSDA has a public facing portal where data requests can be initiated (\href{https://lsda.jsc.nasa.gov/Request/dataRequestFAQ}{lsda.jsc.nasa.gov/Request/dataRequestFAQ});
+the LSDA team provides the appropriate processes, tools, and secure infrastructure for archival of experimental data and dissemination while complying with applicable rules, regulations, policies, and procedures governing the management and archival of sensitive data and information.
+The LSDA team enables data and information dissemination to the public or to authorized personnel either by providing public access to information or via an approved request process for information and data from the LSDA in accordance with NASA Human Research Program and JSC Institutional Review Board direction.
+\\~\\
+%\section*{Availability and implementation} \addcontentsline{toc}{section}{Availability and implementation}
+The software for identification of telomeric reads, \textit{de novo} discovery of repeat motifs, haplotype inference and motif density visualization was implemented in Python and is freely available at \\%rem
+\href{https://github.com/lankycyril/edgecase}{github.com/lankycyril/edgecase},
+as well as \textbf{Supplemental File S3}.
+
+\section*{Acknowledgements} \addcontentsline{toc}{section}{Acknowledgements}
+We would like to thank
+the Epigenomics Core Facility at Weill Cornell Medicine,
+the Scientific Computing Unit (SCU),
+XSEDE Supercomputing Resources,
+as well as
+the STARR grants I9-A9-071, I13-0052,
+The Vallee Foundation,
+The WorldQuant Foundation,
+The Pershing Square Sohn Cancer Research Alliance,
+NASA (NNX14AH51G, NNX14AB02G, NNX17AB26G),
+The National Institutes of Health (R01MH117406, \\%rem
+R01NS076465, R01CA249054, R01AI151059, P01HD067244, P01CA214274),
+TRISH (NNX16AO69A:0107, \\%rem
+NNX16AO69A:0061),
+the LLS (9238-16, Mak, MCL-982, Chen-Kiang),
+and
+the NSF (1840275).
+
+\section*{Author contributions} \addcontentsline{toc}{section}{Author contributions}
+S.M.B. and C.E.M. conceived the study.
+K.G., J.F., and C.E.M. developed the framework and analyzed the data.
+D.Bu., J.J.L., M.J.M., L.T., and K.A.G. participated in collection and processing of the ISS samples.
+D.Be., D.Bu., J.J.L, J.R., and C.M. analyzed the data.
+All authors edited the manuscript.
+
+\section*{Competing interests} \addcontentsline{toc}{section}{Competing interests}
+The authors declare no relevant conflict of interest, although C.E.M. is a Co-Founder of Onegevity.
+
+\section*{References} \addcontentsline{toc}{section}{References}
+\begingroup \raggedright \singlespacing \printbibliography[heading=none] \endgroup
+
+\end{document}

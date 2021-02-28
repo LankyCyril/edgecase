@@ -1,0 +1,138 @@
+from pandas import read_csv, concat
+from pysam import AlignmentFile
+from re import sub, escape
+from scipy.stats import combine_pvalues
+
+
+make_pvals_worse = lambda p: p if p != 0 else SMALLEST_P_VALUE
+
+
+rule tailpuller:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/wgs.bam",
+        bai=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/wgs.bam.bai",
+    output:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
+    params:
+        max_read_length=MAX_READ_LENGTH,
+        min_map_overlap=MIN_MAP_OVERLAP,
+        min_subtelomere_overlap=MIN_SUBTELOMERE_OVERLAP,
+        min_telomere_overlap=MIN_TELOMERE_OVERLAP,
+        target=TARGET,
+        samtools_flags="-f0x4000",
+    shell: """
+        ./edgecase tailpuller -x {HG38EXT_ECX} -t {params.target} \
+            -M {params.max_read_length} \
+            --min-map-overlap {params.min_map_overlap} \
+            --min-subtelomere-overlap {params.min_subtelomere_overlap} \
+            --min-telomere-overlap {params.min_telomere_overlap} \
+            {input.bam} \
+        | samtools view -bh {params.samtools_flags} > {output.bam}
+    """
+
+rule tailchopper:
+    input:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailpuller.bam",
+    output:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/{dataset}/tailchopper.bam",
+    params:
+        target=TARGET,
+    shell: """
+        ./edgecase tailchopper -x {HG38EXT_ECX} \
+            -f {params.target} -t cigar {input.bam} \
+        | samtools view -bh > {output.bam}
+    """
+
+def bam_combiner(w):
+    return [f"{pacbio_path}/{w.name}.bam" for pacbio_path in DATASETS.loc[
+        (DATASETS["group"]==w.group) & (DATASETS["subject"]==w.subject),
+        "dataset_pacbio_path",
+    ]]
+
+rule combined_bam:
+    input: bams=bam_combiner,
+    output: bam=DATA_DIR+"/PacBio/{group}/{subject}/{name}.bam",
+    params: sam=DATA_DIR+"/PacBio/{group}/{subject}/{name}.sam",
+    run:
+        shell("samtools view -H {input.bams[0]} > {params.sam}")
+        visited_entries = set()
+        selection = DATASETS.loc[
+            (DATASETS["subject"]==wildcards.subject),
+            ["priority", "dataset", "dataset_pacbio_path"],
+        ]
+        iterator = selection.sort_values(by="priority").iterrows()
+        for _, (_, dataset, dataset_pacbio_path) in iterator:
+            filename = f"{dataset_pacbio_path}/{wildcards.name}.bam"
+            with AlignmentFile(filename) as bam:
+                with open(params.sam, mode="at") as sam:
+                    for entry in bam:
+                        entry_identifier = "{} {} {}".format(
+                            entry.qname, entry.seq, entry.qual,
+                        )
+                        if entry_identifier not in visited_entries:
+                            visited_entries.add(entry_identifier)
+                            modified_entry = "{}:{}".format(
+                                dataset, entry.tostring(),
+                            )
+                            print(modified_entry, file=sam)
+        shell("samtools view -bh {params.sam} > {output.bam}")
+        shell("rm {params.sam}")
+
+
+rule repeatfinder_pacbio:
+    input: bam=DATA_DIR+"/PacBio/{group}/{subject}/tailchopper.bam",
+    output: tsv=DATA_DIR+"/PacBio/{group}/{subject}/repeatfinder-{arm}.tsv",
+    params: s="8G", min_k=4, max_k=16, max_p_adjusted=1.1,
+    threads: 24,
+    run:
+        flags = get_sam_flags(wildcards.arm)
+        shell("""
+            ./edgecase repeatfinder -j {threads} -s {params.s} \
+                -m {params.min_k} -M {params.max_k} -P {params.max_p_adjusted} \
+                {flags} {input.bam} > {output.tsv}
+        """)
+
+
+rule repeatfinder_all_pacbio:
+    input:
+        p_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/repeatfinder-p_arm.tsv"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+        q_arm=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/repeatfinder-q_arm.tsv"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
+    output:
+        p_arm=DATA_DIR+"/PacBio/repeatfinder-p_arm-unadjusted.tsv",
+        q_arm=DATA_DIR+"/PacBio/repeatfinder-q_arm-unadjusted.tsv",
+    run:
+        pivot_p = dict(index="#monomer", columns="subject", values="p")
+        pivot_s = dict(index="#monomer", columns="subject", values="score")
+        pivot_f = dict(
+            index="#monomer", columns="subject", values="fraction_explained",
+        )
+        for arm in "p_arm", "q_arm":
+            arm_rf_as_list = []
+            for tsv in getattr(input, arm):
+                sample_rf = read_csv(tsv, sep="\t", usecols=(0, 3, 4, 5))
+                rpath = sub(r'^'+escape(DATA_DIR)+r'/PacBio/', "", tsv)
+                sample_rf["group"], sample_rf["subject"], *_ = rpath.split("/")
+                arm_rf_as_list.append(sample_rf)
+            arm_rf = concat(arm_rf_as_list)
+            arm_rf["p"] = arm_rf["p"].apply(make_pvals_worse)
+            arm_rf_by_p = arm_rf[pivot_p.values()].pivot(**pivot_p).fillna(1)
+            arm_rf_by_s = arm_rf[pivot_s.values()].pivot(**pivot_s).fillna(0)
+            arm_rf_by_f = arm_rf[pivot_f.values()].pivot(**pivot_f).fillna(0)
+            assert (arm_rf_by_p.index == arm_rf_by_f.index).all()
+            assert (arm_rf_by_p.index == arm_rf_by_s.index).all()
+            arm_rf_combined = concat(
+                {"score": arm_rf_by_s, "fraction_explained": arm_rf_by_f},
+                axis=1,
+            )
+            arm_rf_combined = arm_rf_combined[sorted(arm_rf_combined.columns)]
+            mg = lambda row: combine_pvalues(row, method="mudholkar_george")[1]
+            arm_rf_combined["p"] = arm_rf_by_p.apply(mg, axis=1).fillna(1)
+            arm_rf_combined.to_csv(getattr(output, arm), sep="\t")

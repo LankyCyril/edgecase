@@ -1,0 +1,63 @@
+from pysam import AlignmentFile
+from gzip import open as gzopen
+
+
+rule bam_to_fastq:
+    input: bam="{prefix}/telbam.bam"
+    output: fq="{prefix}/telbam.fq.gz"
+    run:
+        names = set()
+        with AlignmentFile(input.bam) as bam, gzopen(output.fq, mode="wt") as fq:
+            for entry in bam:
+                if entry.qname not in names:
+                    names.add(entry.qname)
+                    read_repr = "@{}\n{}\n+\n{}".format(
+                        entry.qname, entry.query_sequence,
+                        "".join(map(lambda x:chr(x+33), entry.query_qualities)),
+                    )
+                    print(read_repr, file=fq)
+
+
+rule tailchopper_to_fasta:
+    input:
+        bam="{prefix}/tailchopper.bam"
+    output:
+        fa=temp("{prefix}/tailchopper.fa"),
+        fai=temp("{prefix}/tailchopper.fa.fai"),
+    run:
+        names = set()
+        with AlignmentFile(input.bam) as bam, open(output.fa, mode="wt") as fa:
+            for entry in bam:
+                if entry.flag & 0x4000 == 0x4000:
+                    if entry.qname not in names:
+                        names.add(entry.qname)
+                        arm = "q" if (entry.flag & 0x8000 == 0x8000) else "p"
+                        read_repr = ">{}/{}\n{}".format(
+                            entry.qname, arm, entry.query_sequence,
+                        )
+                        print(read_repr, file=fa)
+        shell("samtools faidx {output.fa}")
+
+
+rule telbam_support:
+    input:
+        tailchopper=DATA_DIR+"/PacBio/{group}/{subject}/tailchopper.fa",
+        telbam_fq=DATA_DIR+"/Illumina/{group}/{subject}/telbam.fq.gz",
+    output:
+        bam=DATA_DIR+"/PacBio/{group}/{subject}/telbam2tailchopper.bam",
+    threads: 48,
+    params: n_multimap=1000000,
+    shell: """
+        minimap2 -t {threads} -ax sr \
+            --secondary=yes -p0 -N{params.n_multimap} \
+            {input.tailchopper} {input.telbam_fq} \
+        | samtools view -F4 -bh > {output.bam}
+    """
+
+rule telbam_support_all:
+    input:
+        bams=[
+            DATA_DIR+f"/PacBio/{group}/{subject}/telbam2tailchopper.bam"
+            for _, (group, subject)
+            in DATASETS[["group", "subject"]].drop_duplicates().iterrows()
+        ],
