@@ -13,7 +13,8 @@ preprint: https://www.biorxiv.org/content/10.1101/2020.01.31.929307v1
 ### Obtaining code
 
 The code can either be downloaded from the
-[releases](https://github.com/LankyCyril/edgecase/releases) page,  
+[releases](https://github.com/LankyCyril/edgecase/releases) page
+(the [SLIM](https://github.com/LankyCyril/edgecase/releases/download/2021.02.27/edgecase-20210227-SLIM.tar.gz) tarball),  
 or cloned with git: `git clone https://github.com/LankyCyril/edgecase`
 
 ### Environment setup
