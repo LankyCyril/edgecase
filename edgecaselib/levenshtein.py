@@ -11,9 +11,8 @@ from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import dendrogram, linkage
 
 
-__warning__ = """The `levenshtein` subprogram is in development!
-Pairwise distance computation is O(n^2) and is not suited for large scale
-experiments."""
+__warning__ = """Pairwise distance computation is O(n^2) and is not suited for
+large scale experiments."""
 
 __doc__ = """edgeCase levenshtein: pairwise edit distance among telomeric reads
 

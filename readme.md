@@ -2,8 +2,8 @@ edgeCase
 ========
 
 *edgeCase* is a framework for extraction and interpretation of telomeric reads
-from long-read single-molecule whole genome sequencing datasets. Associated
-preprint: https://www.biorxiv.org/content/10.1101/2020.01.31.929307v1
+from long-read single-molecule whole genome sequencing datasets. Paper:
+https://genome.cshlp.org/content/31/7/1269
 
 ![haplotypes_example](assets/haplotypes-example.png?raw=true "haplotypes example")
 
@@ -393,18 +393,47 @@ Outputs a TSV file with columns:
 where `rname` is the name of the chromosome, `qnameN` is the name of a read in
 the pair, and `relative_ld` is the distance.
 
+If option `--cluster` is passed, outputs a multi-section TSV file, with data
+clustered with the Ward method on euclidean distances. Each arm's section
+contains two subsections: "##linkage" with SciPy format linkage information,
+and "##data2d" with reads reordered according to the clustering.
+
 **NB**: this algorithm scales quadratically with the number of input reads and
 is computationally infeasible for large datasets.
 
 ```
 Usage: ./edgecase levenshtein [-f flagspec]... [-F flagspec]... [-q integer]
-                              [-j integer] <sequencefile>
+                              [-j integer] [-c] <sequencefile>
 
 Options:
     -j, --jobs [integer]               number of jobs to run in parallel [default: 1]
+    -c, --cluster                      perform clustering after LD calculation
 
 Input filtering options:
     -f, --flags [flagspec]             process only entries with all these sam flags present [default: 0]
     -F, --flag-filter [flagspec]       process only entries with none of these sam flags present [default: 0]
     -q, --min-quality [integer]        process only entries with this MAPQ or higher [default: 0]
+```
+
+
+
+## How to cite
+
+Grigorev, K., Foox, J., Bezdan, D., Butler, D., Luxton, J.J., Reed, J., McKenna, M.J., Taylor, L., George, K.A., Meydan, C. and Bailey, S.M., 2021. Haplotype diversity and sequence heterogeneity of human telomeres. *Genome research, 31*(7), pp.1269-1279.
+
+DOI: 10.1101/gr.274639.120
+
+```
+@article {grigorev2021haplotype,
+    title = {Haplotype diversity and sequence heterogeneity of human telomeres},
+    author = {Grigorev, Kirill and Foox, Jonathan and Bezdan, Daniela and Butler, Daniel and Luxton, Jared J and Reed, Jake and McKenna, Miles J and Taylor, Lynn and George, Kerry A and Meydan, Cem and others},
+    journal = {Genome research},
+    volume = {31},
+    number = {7},
+    pages = {1269--1279},
+    year = {2021},
+    publisher = {Cold Spring Harbor Lab},
+    url = {https://genome.cshlp.org/content/31/7/1269}
+    doi = {https://10.1101/gr.274639.120}
+}
 ```
