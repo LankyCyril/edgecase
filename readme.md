@@ -393,15 +393,21 @@ Outputs a TSV file with columns:
 where `rname` is the name of the chromosome, `qnameN` is the name of a read in
 the pair, and `relative_ld` is the distance.
 
+If option `--cluster` is passed, outputs a multi-section TSV file, with data
+clustered with the Ward method on euclidean distances. Each arm's section
+contains two subsections: "##linkage" with SciPy format linkage information,
+and "##data2d" with reads reordered according to the clustering.
+
 **NB**: this algorithm scales quadratically with the number of input reads and
 is computationally infeasible for large datasets.
 
 ```
 Usage: ./edgecase levenshtein [-f flagspec]... [-F flagspec]... [-q integer]
-                              [-j integer] <sequencefile>
+                              [-j integer] [-c] <sequencefile>
 
 Options:
     -j, --jobs [integer]               number of jobs to run in parallel [default: 1]
+    -c, --cluster                      perform clustering after LD calculation
 
 Input filtering options:
     -f, --flags [flagspec]             process only entries with all these sam flags present [default: 0]
