@@ -6,6 +6,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import combinations_with_replacement
 from collections import defaultdict
 from edgecaselib.util import progressbar
+from pandas import DataFrame
+from scipy.spatial.distance import squareform
+from scipy.cluster.hierarchy import dendrogram, linkage
 
 
 __warning__ = """The `levenshtein` subprogram is in development!
@@ -15,16 +18,19 @@ experiments."""
 __doc__ = """edgeCase levenshtein: pairwise edit distance among telomeric reads
 
 Usage: {0} levenshtein [-f flagspec]... [-F flagspec]... [-q integer]
-       {1}             [-j integer] <sequencefile>
+       {1}             [-j integer] [-c] <sequencefile>
 
 Output:
-    TSV-formatted file with computed relative pairwise distances (per-arm)
+    TSV-formatted file with computed relative pairwise distances (per-arm).
+    If `-c` (`--cluster`) is passed, converts the distances to a square matrix
+    and clusters it with the Ward method over the euclidean metric.
 
 Positional arguments:
     <sequencefile>                     name of input BAM/SAM file
 
 Options:
     -j, --jobs [integer]               number of jobs to run in parallel [default: 1]
+    -c, --cluster                      perform clustering after LD calculation
 
 Input filtering options:
     -f, --flags [flagspec]             process only entries with all these sam flags present [default: 0]
@@ -121,13 +127,37 @@ def calculate_chromosome_lds(chrom, entries, jobs):
             yield worker.result()
 
 
-def main(sequencefile, flags, flag_filter, min_quality, jobs=1, file=stdout, **kwargs):
-    print("#rname", "qname1", "qname2", "relative_ld", sep="\t", file=file)
+def clustered_rld(ld_iterator, columns, metric="euclidean", method="ward"):
+    narrowform = DataFrame(data=ld_iterator, columns=columns)
+    pivot_kws = dict(index=columns[0], columns=columns[1], values=columns[2])
+    triu_fillna = narrowform.pivot(**pivot_kws).fillna(0)
+    squarish = triu_fillna.T + triu_fillna
+    Z = linkage(
+        squareform(squarish), metric=metric, method=method,
+        optimal_ordering=False,
+    )
+    leaves = dendrogram(Z, no_plot=True)["leaves"]
+    data2d = squarish.iloc[leaves, leaves]
+    return DataFrame(Z), data2d
+
+
+def main(sequencefile, flags, flag_filter, min_quality, cluster=False, jobs=1, file=stdout, **kwargs):
+    HEADER = ["rname", "qname1", "qname2", "relative_ld"]
+    if not cluster:
+        print("#", end="", file=file)
+        print(*HEADER, sep="\t", file=file)
     with AlignmentFile(sequencefile) as alignment:
         bam_dict = load_bam_as_dict(
             alignment, samfilters=[flags, flag_filter, min_quality],
         )
     for chrom, entries in bam_dict.items():
         ld_iterator = calculate_chromosome_lds(chrom, entries, jobs)
-        for qname1, qname2, relative_ld in ld_iterator:
-            print(chrom, qname1, qname2, relative_ld, sep="\t", file=file)
+        if cluster:
+            Z, data2d = clustered_rld(ld_iterator, columns=HEADER[1:])
+            print("##linkage", chrom, sep="\t", file=file)
+            print(Z.to_csv(sep="\t", index=False, header=False))
+            print("##data2d", chrom, sep="\t", file=file)
+            print(data2d.to_csv(sep="\t"))
+        else:
+            for data in ld_iterator:
+                print(chrom, *data, sep="\t", file=file)
