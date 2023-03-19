@@ -32,7 +32,7 @@ $ ./edgecase
 
 ```{sh}
 $ cd edgecase
-$ pip install numpy scipy scikit-learn statsmodels numba
+$ pip install numpy scipy scikit-learn statsmodels edlib
 $ pip install pandas matplotlib seaborn tqdm regex pysam
 $ ./edgecase
 ```
