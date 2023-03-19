@@ -421,6 +421,8 @@ Input filtering options:
 
 Grigorev, K., Foox, J., Bezdan, D., Butler, D., Luxton, J.J., Reed, J., McKenna, M.J., Taylor, L., George, K.A., Meydan, C. and Bailey, S.M., 2021. Haplotype diversity and sequence heterogeneity of human telomeres. *Genome research, 31*(7), pp.1269-1279.
 
+DOI: 10.1101/gr.274639.120
+
 ```
 @article {grigorev2021haplotype,
     title = {Haplotype diversity and sequence heterogeneity of human telomeres},
@@ -432,5 +434,6 @@ Grigorev, K., Foox, J., Bezdan, D., Butler, D., Luxton, J.J., Reed, J., McKenna,
     year = {2021},
     publisher = {Cold Spring Harbor Lab},
     url = {https://genome.cshlp.org/content/31/7/1269}
+    doi = {https://10.1101/gr.274639.120}
 }
 ```
