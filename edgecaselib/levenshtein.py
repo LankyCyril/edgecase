@@ -1,8 +1,7 @@
 from sys import stdout
-from numba import njit
 from pysam import AlignmentFile
 from edgecaselib.formats import filter_bam
-from numpy import zeros, array, uint32, uint8
+from numpy import zeros, array, uint32, uint8, ndarray
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import combinations_with_replacement
 from collections import defaultdict
@@ -40,34 +39,45 @@ __docopt_converters__ = [
 ]
 
 
+try:
+    from edlib import align
+except (ModuleNotFoundError, ImportError):
+    from numba import njit
+    dna2int = lambda seq: (
+        ((array(list(seq.upper())).view(uint32) - 2) >> 1) & 3
+    ).astype(uint8)
+    @njit(nogil=True)
+    def ld(v, w):
+        """Calculate levenshtein distance between two int8arrays"""
+        m, n = len(v), len(w)
+        dp = zeros((m+1, n+1), dtype=uint32)
+        for i in range(m+1):
+            for j in range(n+1):
+                if i == 0:
+                    dp[i, j] = j
+                elif j == 0:
+                    dp[i, j] = i
+                elif v[i-1] == w[j-1]:
+                    dp[i, j] = dp[i-1, j-1]
+                else:
+                    dp[i, j] = 1 + min(dp[i, j-1], dp[i-1, j], dp[i-1, j-1])
+        return dp[m, n]
+else:
+    dna2int = lambda _:_
+    def ld(v, w):
+        """Calculate levenshtein distance between two nucleotide sequences"""
+        return align(v, w)["editDistance"]
+
+
 def load_bam_as_dict(alignment, samfilters):
     """Load BAM entries as dictionary: chrom -> qname -> (mappos, int8array)"""
-    dna2int = lambda seq: ((array(list(seq.upper())).view(uint32) - 2) >> 1) & 3
     bam_dict = defaultdict(dict)
     for entry in filter_bam(alignment, samfilters, desc="Reading BAM"):
         bam_dict[entry.reference_name][entry.qname] = (
             entry.reference_start,
-            dna2int(entry.seq[entry.query_alignment_start:]).astype(uint8),
+            dna2int(entry.seq[entry.query_alignment_start:]),
         )
     return bam_dict
-
-
-@njit(nogil=True)
-def ld(v, w):
-    """Calculate levenshtein distance between two int8arrays"""
-    m, n = len(v), len(w)
-    dp = zeros((m+1, n+1), dtype=uint32)
-    for i in range(m+1):
-        for j in range(n+1):
-            if i == 0:
-                dp[i, j] = j
-            elif j == 0:
-                dp[i, j] = i
-            elif v[i-1] == w[j-1]:
-                dp[i, j] = dp[i-1, j-1]
-            else:
-                dp[i, j] = 1 + min(dp[i, j-1], dp[i-1, j], dp[i-1, j-1])
-    return dp[m, n]
 
 
 def get_relative_read_ld(aname, bname, adata, bdata):
@@ -82,7 +92,9 @@ def get_relative_read_ld(aname, bname, adata, bdata):
         _A, _B = A, B
     overlap_length = min(len(_A), len(_B))
     _A, _B = _A[:overlap_length], _B[:overlap_length]
-    if (_A == _B).all():
+    if isinstance(_A, str) and (_A == _B):
+        return aname, bname, 0
+    elif isinstance(_A, ndarray) and (_A == _B).all():
         return aname, bname, 0
     elif overlap_length > 0:
         return aname, bname, ld(_A, _B) / overlap_length
