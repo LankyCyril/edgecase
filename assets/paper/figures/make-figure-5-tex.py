@@ -18,7 +18,7 @@ PDFS = [
 
 
 TEX_LEGEND = r'''\begin{textblock}{13}($X,$Y)
-\includegraphics[width=$WIDTHin,keepaspectratio]{Figure_5/legend.pdf}
+\includegraphics[width=$WIDTHin,keepaspectratio]{Figure_5/legend.png}
 \end{textblock}'''
 LEGEND_WIDTH = 3.6
 EXTRA_MARGIN = 1.5
