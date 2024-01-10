@@ -1,18 +1,15 @@
 from sys import stderr
-from regex import compile
+from regex import compile, IGNORECASE as REGEX_IGNORECASE
 from re import split, search, IGNORECASE
 from shutil import which
 from os import path, access, X_OK
-from functools import partial
+from functools import partial, lru_cache
 from tqdm import tqdm
 
 
-MAINCHROMS_ENSEMBL = {str(i) for i in range(1, 23)} | {"X", "Y"}
-MAINCHROMS_UCSC = {"chr" + s for s in MAINCHROMS_ENSEMBL}
-MAINCHROMS_T2T = {"chrX_fixedBionanoSV_centromereV3"}
-
 ALPHABET = list("ACGT")
 COMPLEMENTS = dict(zip(ALPHABET, reversed(ALPHABET)))
+COMPLEMENT_PATTERN = compile(r'|'.join(COMPLEMENTS.keys()))
 MOTIF_COMPLEMENTS = {**COMPLEMENTS, **{"[": "]", "]": "[", ".": "."}}
 MOTIF_COMPLEMENT_PATTERN = compile(r'|'.join(MOTIF_COMPLEMENTS.keys()))
 
@@ -30,6 +27,17 @@ def validate_motif(motif):
     return (search(r'^[ACGT\[\]\.]*$', motif, flags=IGNORECASE) is not None)
 
 
+@lru_cache(maxsize=None)
+def revcomp(sequence, ignorecase=True):
+    """Reverse-complement a sequence"""
+    if ignorecase:
+        matcher = lambda match: COMPLEMENTS[match.group().upper()]
+    else:
+        matcher = lambda match: COMPLEMENTS[match.group()]
+    return COMPLEMENT_PATTERN.sub(matcher, sequence[::-1])
+
+
+@lru_cache(maxsize=None)
 def motif_revcomp(motif, ignorecase=True):
     """Reverse-complement a regex-like motif; only allows a subset of regex syntax (ACGT, dot, square brackets)"""
     if ignorecase:
@@ -40,6 +48,19 @@ def motif_revcomp(motif, ignorecase=True):
         return MOTIF_COMPLEMENT_PATTERN.sub(matcher, motif[::-1])
     except KeyError:
         raise ValueError("Unsupported character(s) in motif: {}".format(motif))
+
+
+def get_circular_pattern(motif, repeats=2):
+    """Convert motif into circular regex pattern (e.g., r'TCGA|CGAT|GATC|ATCG' for TCGA)"""
+    atom_pattern = compile(r'[ACGT.]|\[[ACGT]+\]', flags=REGEX_IGNORECASE)
+    atoms = atom_pattern.findall(motif)
+    if "".join(atoms) != motif:
+        raise ValueError("Could not parse motif: {}".format(motif))
+    repeated_inversions = {
+        "".join(atoms[i:] + atoms[:i]) * repeats
+        for i in range(len(atoms))
+    }
+    return compile(r'|'.join(repeated_inversions), flags=REGEX_IGNORECASE)
 
 
 def chromosome_natsort(chrom):

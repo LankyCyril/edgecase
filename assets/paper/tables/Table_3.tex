@@ -1,0 +1,24 @@
+\begin{samepage} \begin{table}[h!] \small \begin{tabular}{ll}
+\hline
+\textbf{Comparison}                                                                     & \textbf{Adjusted p-value} \\
+\hline
+A subject's reads are closer to each other than to other subjects' reads in the trio    & 4.2e-56                   \\
+A subject's reads are closer to each other than to subjects' reads in other populations & 7.6e-107                  \\
+Reads within a population are closer to each other than to reads in other populations   & 2.2e-40                   \\
+Ashkenazi trio:                                                                         & \textbf{}                 \\
+\hspace{.5cm} Father's reads are closer to son's reads than to mother's reads           & 3.1e-11                   \\
+\hspace{.5cm} Mother's reads are closer to son's reads than to father's reads           & ns (1.00)                 \\
+Chinese trio:                                                                           & \textbf{}                 \\
+\hspace{.5cm} Father's reads are closer to son's reads than to mother's reads           & 3.4e-02                   \\
+\hspace{.5cm} Mother's reads are closer to son's reads than to father's reads           & ns (0.23)                 \\
+\hline
+\end{tabular}
+\caption{
+    \small Adjusted \textit{p}-values of the Wilcoxon signed-rank tests on relative Levenshtein distances.
+    For each read among all telomeric reads on each arm,
+    closest distances to groups of reads described in the \textit{Comparison} column are compared
+    (see \hyperref[sec:methods]{Materials and Methods}).
+}
+\label{tab:haptests}
+\end{table}
+\end{samepage}

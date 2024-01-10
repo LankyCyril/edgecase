@@ -1,9 +1,16 @@
 __pycache__
 .snakemake
 .ipynb_checkpoints
+.sourcetrail
 data
 tools
 sandbox
 jupyter
 *.log
 *.aux
+assets/paper/figures/*.png
+assets/paper/figures/*/*.png
+assets/paper/figures/*.svg
+assets/paper/figures/*/*.svg
+*.odt
+Snakefile

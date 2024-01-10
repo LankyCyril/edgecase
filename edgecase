@@ -12,13 +12,15 @@ Usage: {0} [-h | --help]
        {0} <command> [<args>...]
 
 Commmands (<command>):
-    tailpuller      select overhanging reads
-    levenshtein     cluster reads by edit distance
-    tailchopper     get overhanging heads/tails of reads
-    repeatfinder    discover enriched repeats in candidate sequences
-    kmerscanner     perform scan of known kmers/motifs
-    densityplot     visualize densities of candidate motifs
-    basic-pipeline  so basic
+    tailpuller               select overhanging long reads
+    tailchopper              get overhanging heads/tails of long reads
+    repeatfinder             discover enriched repeats in candidate sequences
+    kmerscanner              perform scan of known kmers/motifs
+    densityplot              visualize densities of candidate motifs
+
+Development area:
+    entropy                  calculate motif entropy among long reads
+    levenshtein              calculate pairwise edit distance among long reads
 """
 
 
@@ -61,6 +63,9 @@ def main(module):
         submodule = getattr(module, command.replace("-", "_"), None)
         submodule_entrypoint = getattr(submodule, "main", None)
         if submodule_entrypoint:
+            submodule_warning = getattr(submodule, "__warning__", None)
+            if submodule_warning:
+                print("WARNING:", submodule_warning.strip(), file=stderr)
             __command_doc__ = submodule.__doc__.lstrip().format(
                 __file__, " "*len(__file__),
             )
