@@ -247,7 +247,8 @@ def load_index(index_filename, as_filter_dict=False):
             index_filename, sep="\t", skiprows=1,
             escapechar="#", na_values="-",
         )
-        ecx = ecx[ecx["blacklist"].isnull()]
+        if "blacklist" in ecx:
+            ecx = ecx[ecx["blacklist"].isnull()]
         if as_filter_dict:
             slim_ecx = ecx[["rname", "pos", "flag", "prime"]]
             rnames = set(slim_ecx["rname"])
