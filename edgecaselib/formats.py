@@ -6,7 +6,7 @@ from numpy import linspace, array, mean, concatenate, fromstring, full, vstack
 from numpy import nan, unique
 from pandas import read_csv, merge, concat, DataFrame
 from gzip import open as gzopen
-from re import search
+from re import search, findall
 from tempfile import TemporaryDirectory
 from os import path
 from edgecaselib.util import progressbar
@@ -247,6 +247,14 @@ def load_index(index_filename, as_filter_dict=False):
             index_filename, sep="\t", skiprows=1,
             escapechar="#", na_values="-",
         )
+        if "telomere" not in ecx:
+            ecx["telomere"] = ecx.apply(
+                lambda r: (
+                    findall(r'(\d+|X|Y)', r["main_rname"])[0] +
+                    ((r["prime"] == 5) and "p" or "q")
+                ),
+                axis=1,
+            )
         if "blacklist" in ecx:
             ecx = ecx[ecx["blacklist"].isnull()]
         if as_filter_dict:
