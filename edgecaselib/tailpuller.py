@@ -178,11 +178,12 @@ def parse_bam_with_ambiguity(bam, ecxfd, max_read_length, min_map_overlap, targe
             bam_chunk = get_bam_chunk(
                 bam_data, chrom, ecxfd, reflens, max_read_length,
             )
-            entries.extend(
-                filter_entries(
-                    bam_chunk, ecxfd, targets, samfilters, min_map_overlap,
-                ),
-            )
+            if bam_chunk is not None:
+                entries.extend(
+                    filter_entries(
+                        bam_chunk, ecxfd, targets, samfilters, min_map_overlap,
+                    ),
+                )
     return bam_header_string, entries
 
 
