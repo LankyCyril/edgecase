@@ -20,7 +20,8 @@ Usage: {0} repeatfinder [-m integer] [-M integer] [-r integer] [-P float]
        {1}              [--jellyfish filename] [--jellyfish-hash-size string]
        {1}              [-n integer] [-j integer] [-q integer]
        {1}              [-f flagspec]... [-F flagspec]... [--fmt string]
-       {1}              [--collapse-reverse-complement] <sequencefile>
+       {1}              [--collapse-reverse-complement] [--no-fractions]
+       {1}              <sequencefile>
 
 Output:
     TSV-formatted file with statistics describing enriched motifs
@@ -39,6 +40,7 @@ Options:
     -n, --max-motifs [integer]          maximum number of motifs to report
     -j, --jobs [integer]                number of jellyfish jobs (parallel threads) [default: 1]
     -C, --collapse-reverse-complement   collapse counts of reverse complement motifs
+    --no-fractions                      do not calculate fraction_explained
 
 Input filtering options:
     -f, --flags [flagspec]              process only entries with all these sam flags present [default: 0]
@@ -258,7 +260,7 @@ def coerce_and_filter_report(analysis, max_p_adjusted):
     ].copy()
 
 
-def explain_report(filtered_analysis, sequencefile, min_repeats, jobs=1):
+def explain_report_with_fractions(filtered_analysis, sequencefile, min_repeats, jobs=1):
     """Calculate fraction of reads explainable by each motif"""
     explained_analysis = filtered_analysis.copy()
     explained_analysis["bases_explained"], total_bases = 0.0, 0
@@ -274,6 +276,37 @@ def explain_report(filtered_analysis, sequencefile, min_repeats, jobs=1):
                 for match in matcher:
                     positions_to_mask |= set(range(match.start(), match.end()))
                 n_masked_positions_per_motif[motif] = len(positions_to_mask)
+            return n_masked_positions_per_motif, len(sequence)
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            workers = [
+                pool.submit(
+                    get_number_of_masked_positions, entry.sequence,
+                    set(filtered_analysis["motif"]),
+                )
+                for entry in fastx
+            ]
+            iterator = progressbar(
+                as_completed(workers), total=len(workers),
+                desc="Calculating fractions", unit="read",
+            )
+            for worker in iterator:
+                n_masked_positions_per_motif, total_seq_bases = worker.result()
+                for motif, n_pos in n_masked_positions_per_motif.items():
+                    indexer = (
+                        explained_analysis["motif"]==motif, "bases_explained",
+                    )
+                    explained_analysis.loc[indexer] += n_pos
+                total_bases += total_seq_bases
+    return explained_analysis, total_bases
+
+
+def explain_report_without_fractions(filtered_analysis, sequencefile, min_repeats, jobs=1):
+    """Calculate fraction of reads explainable by each motif""" # TODO: refactor vs. explain_report_with_fractions
+    explained_analysis = filtered_analysis.copy()
+    explained_analysis["bases_explained"], total_bases = 0.0, 0
+    with FastxFile(sequencefile) as fastx:
+        def get_number_of_masked_positions(sequence, motifs):
+            n_masked_positions_per_motif = {motif: 0 for motif in motifs}
             return n_masked_positions_per_motif, len(sequence)
         with ThreadPoolExecutor(max_workers=jobs) as pool:
             workers = [
@@ -333,7 +366,7 @@ def format_analysis(explained_analysis, min_k, max_motifs, total_bases):
         return formatted_analysis[:max_motifs]
 
 
-def main(sequencefile, fmt, flags, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, collapse_reverse_complement, jobs=1, file=stdout, **kwargs):
+def main(sequencefile, fmt, flags, flag_filter, min_quality, min_k, max_k, min_repeats, max_motifs, max_p_adjusted, jellyfish, jellyfish_hash_size, collapse_reverse_complement, no_fractions, jobs=1, file=stdout, **kwargs):
     # parse arguments:
     manager, jellyfish = interpret_args(fmt, jellyfish)
     with TemporaryDirectory() as tempdir:
@@ -353,11 +386,22 @@ def main(sequencefile, fmt, flags, flag_filter, min_quality, min_k, max_k, min_r
             filtered_analysis = coerce_and_filter_report(
                 analysis, max_p_adjusted,
             )
+            filtered_analysis.to_csv(file, sep="\t", index=False, na_rep="NA")
+            exit(0)
+            if True: # XXX TEMPORARY XXX
+                filtered_analysis.sort_values(by="count", ascending=False).to_csv(file, sep="\t", index=False, na_rep="NA")
+                return 0
+            explain_report = (no_fractions and
+                explain_report_without_fractions or
+                explain_report_with_fractions
+            )
             explained_analysis, total_bases = explain_report(
                 filtered_analysis, sequencefile, min_repeats, jobs=jobs,
             )
             formatted_analysis = format_analysis(
                 explained_analysis, min_k, max_motifs, total_bases,
             )
-            formatted_analysis.to_csv(file, sep="\t", index=False)
+            if no_fractions:
+                formatted_analysis["fraction_explained"] = float("nan")
+            formatted_analysis.to_csv(file, sep="\t", index=False, na_rep="NA")
     return 0
