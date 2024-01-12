@@ -489,7 +489,7 @@ def interpret_arguments(palette, chroms_to_plot, samfilters, title, outfmt, dat)
 def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, palette, title, chroms_to_plot, plot_coverage, outfmt, figwidth_inches, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
-    if (palette[0] == "'") and (palette[-1] == "'"):
+    if palette and (palette[0] == "'") and (palette[-1] == "'"):
         palette = palette[1:-1]
     _intrg = interpret_arguments(
         palette, chroms_to_plot, samfilters, title, outfmt, dat,
