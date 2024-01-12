@@ -17,10 +17,10 @@ buffer = getattr(stdout, "buffer", stdout)
 
 __doc__ = """edgeCase densityplot: visualization of motif densities
 
-Usage: {0} densityplot -x filename [-b integer] [--plot-coverage]
-       {1}             [--palette palettespec] [--title string]
-       {1}             [--n-boot integer] [--chroms-to-plot string]
+Usage: {0} densityplot -x filename [--title string]
        {1}             [-f flagspec]... [-F flagspec]... [-q integer]
+       {1}             [--palette palettespec] [--plot-coverage] [--no-outlines]
+       {1}             [-b integer] [--n-boot integer] [--chroms-to-plot string]
        {1}             [--figwidth-inches float] [--outfmt string] [-z] <dat>
 
 Output:
@@ -37,6 +37,7 @@ Options:
     -b, --bin-size [integer]      size of each bin in bp (overrides bin size in <dat>)
     --n-boot [integer]            number of bootstrap iterations for 95% confidence intervals [default: 1000]
     --palette [palettespec]       custom palette for plotting motifs
+    --no-outlines                 do not plot a black outline along each motif
     --title [string]              figure title (defaults to input filename)
     --chroms-to-plot [string]     if set, plot chromosomes from this comma-separated list unconditionally
     --plot-coverage               plot coverage by telomeric reads on each arm
@@ -249,18 +250,21 @@ def plot_anchors(ecx_chrom_name, ecx, target_anchor, is_q, ax):
     return ecx.loc[indexer, "pos"].min(), ecx.loc[indexer, "pos"].max()
 
 
-def plot_combined_density(binned_density_dataframe, n_boot, ecx, title, palette, target_anchor, is_q, ecx_chrom_name, plot_coverage, ax):
+def plot_combined_density(binned_density_dataframe, n_boot, ecx, title, palette, target_anchor, is_q, ecx_chrom_name, plot_coverage, no_outlines, ax):
     """Plot stacked area charts with bootstrapped CIs"""
     plottable_df, motif_order = stack_motif_densities(binned_density_dataframe)
     updated_palette, updated_motif_order = generate_updated_palette(
         palette, motif_order,
     )
+    if no_outlines:
+        lineplot_palette = updated_palette
+    else:
+        lineplot_palette = {m: "black" for m in set(plottable_df["motif"])}
     for i in range(len(updated_motif_order)+1):
         fill_area(plottable_df, i, updated_palette, ax)
     lineplot(
         data=plottable_df, x="position", y="density", hue="motif", legend=False,
-        palette={m: "black" for m in set(plottable_df["motif"])},
-        n_boot=n_boot, linewidth=.5, alpha=.7, ax=ax,
+        palette=lineplot_palette, n_boot=n_boot, linewidth=.5, alpha=.7, ax=ax,
     )
     lineplot(
         x=plottable_df["position"].drop_duplicates().sort_values(), y=1,
@@ -374,7 +378,7 @@ def format_chrom(chrom):
     return ecx_chrom_name, short_chrom_name, display_chrom_name
 
 
-def plot_densities(densities, n_boot, ecx, title, palette, motifs_legend, density_legend, target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage, unit="Kbp"):
+def plot_densities(densities, n_boot, ecx, title, palette, motifs_legend, density_legend, target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage, no_outlines, unit="Kbp"):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator, n_axes = make_decorated_densities_iterator(
         densities, chroms_to_plot,
@@ -391,6 +395,7 @@ def plot_densities(densities, n_boot, ecx, title, palette, motifs_legend, densit
             updated_palette = plot_combined_density(
                 bdf, n_boot, ecx, title, palette, target_anchor, is_q, ax=ax,
                 ecx_chrom_name=ecx_chrom_name, plot_coverage=plot_coverage,
+                no_outlines=no_outlines,
             )
         xlim = plot_anchors(ecx_chrom_name, ecx, target_anchor, is_q, ax)
         if bdf is None:
@@ -488,7 +493,7 @@ def interpret_arguments(palette, chroms_to_plot, samfilters, title, outfmt, dat)
     )
 
 
-def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, palette, title, chroms_to_plot, plot_coverage, outfmt, figwidth_inches, file=buffer, **kwargs):
+def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, palette, title, chroms_to_plot, plot_coverage, no_outlines, outfmt, figwidth_inches, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
     if palette and (palette[0] == "'") and (palette[-1] == "'"):
@@ -503,6 +508,7 @@ def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot,
     figure = plot_densities(
         densities, n_boot, ecx, title, palette, motifs_legend, density_legend,
         target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage,
+        no_outlines,
     )
     if outfmt == "pdf":
         figure.savefig(file, bbox_inches="tight", format="pdf")
