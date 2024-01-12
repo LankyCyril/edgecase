@@ -429,11 +429,13 @@ def interpret_target(samfilters):
         (flags2set(flags) - flags2set(flag_filter))
     )
     if len(target_anchors) == 1:
-        target_anchor = target_anchors.pop()
+        return is_q, target_anchors.pop()
     else:
-        error_message = f"Multiple anchors to plot: {sorted(target_anchor)}"
-        raise NotImplementedError(error_message)
-    return is_q, target_anchor
+        if target_anchors:
+            msg = f"Multiple anchors to plot: {sorted(target_anchors)}"
+        else:
+            msg = "No anchors to plot"
+        raise NotImplementedError(msg)
 
 
 def generate_paper_palette(paper_palette, is_q):
