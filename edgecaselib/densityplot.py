@@ -21,7 +21,8 @@ Usage: {0} densityplot -x filename [--title string]
        {1}             [-f flagspec]... [-F flagspec]... [-q integer]
        {1}             [--palette palettespec] [--plot-coverage] [--no-outlines]
        {1}             [-b integer] [--n-boot integer] [--chroms-to-plot string]
-       {1}             [--figwidth-inches float] [--outfmt string] [-z] <dat>
+       {1}             [--figwidth-inches float] [--subplot-aspect integer]
+       {1}             [--outfmt string] [-z] <dat>
 
 Output:
     PDF file with motif densities visualized along chromosomal ends
@@ -42,6 +43,7 @@ Options:
     --chroms-to-plot [string]     if set, plot chromosomes from this comma-separated list unconditionally
     --plot-coverage               plot coverage by telomeric reads on each arm
     --figwidth-inches [float]     width of figure in inches [default: 13]
+    --subplot-aspect [integer]    aspect ratio (W/H) of a single chromosome plot [default: 15]
     --outfmt [string]             output format (pdf, pkl) [default: pdf]
 
 Input filtering options:
@@ -54,6 +56,7 @@ __docopt_converters__ = [
     lambda bin_size: None if bin_size is None else int(bin_size),
     lambda n_boot: int(n_boot),
     lambda figwidth_inches: float(figwidth_inches),
+    lambda subplot_aspect: 15 if subplot_aspect is None else int(subplot_aspect),
 ]
 
 __docopt_tests__ = {
@@ -72,16 +75,18 @@ def simplify_axes(ax, keep=(), keep_scientific=False):
         ax.ticklabel_format(useOffset=False, style="plain")
 
 
-def chromosome_subplots(nrows, figwidth_inches, plot_coverage=False):
+def chromosome_subplots(nrows, figwidth_inches, subplot_aspect=15, plot_coverage=False):
     """Prepare figure with subplots for each chromosome end"""
     if plot_coverage:
-        figsize = (figwidth_inches*.7, nrows*2.2*.7*figwidth_inches/15)
+        figwidth = figwidth_inches * .7
+        figheight = nrows * 2.2 * .7 * figwidth_inches / subplot_aspect
         hspace = .3
     else:
-        figsize = (figwidth_inches*.7, nrows*1.5*.7*figwidth_inches/15)
+        figwidth = figwidth_inches * .7
+        figheight = nrows * 1.5 * .7 *figwidth_inches / subplot_aspect
         hspace = .7
     figure, axs = subplots(
-        figsize=figsize, gridspec_kw={"hspace": hspace},
+        figsize=(figwidth, figheight), gridspec_kw={"hspace": hspace},
         nrows=nrows, squeeze=False, frameon=False,
     )
     for ax in axs[:, 0]:
@@ -378,12 +383,14 @@ def format_chrom(chrom):
     return ecx_chrom_name, short_chrom_name, display_chrom_name
 
 
-def plot_densities(densities, n_boot, ecx, title, palette, motifs_legend, density_legend, target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage, no_outlines, unit="Kbp"):
+def plot_densities(densities, n_boot, ecx, title, palette, motifs_legend, density_legend, target_anchor, is_q, chroms_to_plot, figwidth_inches, subplot_aspect, plot_coverage, no_outlines, unit="Kbp"):
     """Plot binned densities as bootstrapped line plots, combined per chromosome"""
     decorated_densities_iterator, n_axes = make_decorated_densities_iterator(
         densities, chroms_to_plot,
     )
-    figure, axs = chromosome_subplots(n_axes, figwidth_inches, plot_coverage)
+    figure, axs = chromosome_subplots(
+        n_axes, figwidth_inches, subplot_aspect, plot_coverage,
+    )
     ax2chrom, ax2ylabel = {}, {}
     for (chrom, bdf), ax in zip(decorated_densities_iterator, axs[:, 0]):
         ecx_chrom_name, short_chrom_name, display_chrom_name = format_chrom(
@@ -493,7 +500,7 @@ def interpret_arguments(palette, chroms_to_plot, samfilters, title, outfmt, dat)
     )
 
 
-def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, palette, title, chroms_to_plot, plot_coverage, no_outlines, outfmt, figwidth_inches, file=buffer, **kwargs):
+def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot, palette, title, chroms_to_plot, plot_coverage, no_outlines, outfmt, figwidth_inches, subplot_aspect, file=buffer, **kwargs):
     """Dispatch data to subroutines"""
     samfilters = [flags, flag_filter, min_quality]
     if palette and (palette[0] == "'") and (palette[-1] == "'"):
@@ -507,8 +514,8 @@ def main(dat, index, gzipped, flags, flag_filter, min_quality, bin_size, n_boot,
     switch_backend("Agg")
     figure = plot_densities(
         densities, n_boot, ecx, title, palette, motifs_legend, density_legend,
-        target_anchor, is_q, chroms_to_plot, figwidth_inches, plot_coverage,
-        no_outlines,
+        target_anchor, is_q, chroms_to_plot, figwidth_inches, subplot_aspect,
+        plot_coverage, no_outlines,
     )
     if outfmt == "pdf":
         figure.savefig(file, bbox_inches="tight", format="pdf")
